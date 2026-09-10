@@ -314,22 +314,22 @@
             {
               "id": "112ddf8184604f0d89925703b8a85ddc",
               "text": "lined interface",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "b452ff95aac245c286b48111a3379d6c",
               "text": "auto complete for known types,variables,functions,classes",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "d4bc460c95864887be5fc7c803f002f5",
               "text": "color hilight for keywords or types (also strings and numbers)",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "a085e834e0854e31bf50c249a9d327c4",
               "text": "auto save on play, save button, ctrl \u002B s support",
-              "isDone": false
+              "isDone": true
             }
           ],
           "flags": {
@@ -338,11 +338,11 @@
             "release": false,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:29:31.2023123+00:00",
-          "updatedAt": "2026-09-10T01:31:30.1481081+00:00"
+          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
         },
         {
           "id": "7e2c34d418d045babea4c82560238226",

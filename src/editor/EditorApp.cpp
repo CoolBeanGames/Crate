@@ -172,6 +172,18 @@ void EditorApp::onFrame() {
     drawMenuBar();
     drawToolbar();
 
+    if (scriptMode_) {
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
+        ImGui::BeginChild("##scriptmode", ImVec2(0, 0), false);
+        scriptEditor_.draw();
+        ImGui::EndChild();
+        ImGui::PopStyleVar();
+        ImGui::End(); // dock host
+        if (showDemo_)
+            ImGui::ShowDemoWindow(&showDemo_);
+        return;
+    }
+
     ImGuiID dockspace_id = ImGui::GetID("CrateDockspace");
     if (ImGui::DockBuilderGetNode(dockspace_id) == nullptr) {
         ImGui::DockBuilderRemoveNode(dockspace_id);
@@ -281,6 +293,16 @@ void EditorApp::drawToolbar() {
     if (ImGui::Button("  Stop  "))
         setPlaying(false);
     ImGui::EndDisabled();
+
+    ImGui::SameLine(0, 20);
+    if (scriptMode_)
+        ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+    if (ImGui::Button(scriptMode_ ? "  Scene  " : "  Script Editor  ")) {
+        scriptMode_ = !scriptMode_;
+        CR_LOG("app", scriptMode_ ? "Switched to Script Editor" : "Switched to Scene");
+    }
+    if (scriptMode_)
+        ImGui::PopStyleColor();
 
     ImGui::SameLine(0, 20);
     ImGui::TextDisabled("SCENE: %s   |   ACTORS: %d   |   %s", scene_.name().c_str(),
@@ -840,6 +862,7 @@ void EditorApp::setPlaying(bool playing) {
         return;
     playing_ = playing;
     if (playing_) {
+        scriptEditor_.saveAll(); // auto-save scripts on play
         playBackup_ = scene_.clone();
         physicsAccum_ = 0.0f;
         scene_.startPlay();
