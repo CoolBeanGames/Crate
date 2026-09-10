@@ -35,6 +35,8 @@ add_library(crate_core STATIC
     src/core/Log.cpp
     src/scene/Actor.cpp
     src/scene/Scene.cpp
+    src/scene/ComponentRegistry.cpp
+    src/scene/BuiltinComponents.cpp
     src/render/Mesh.cpp
     src/render/Renderer.cpp
     src/assets/FbxImport.cpp

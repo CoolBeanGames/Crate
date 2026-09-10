@@ -1,5 +1,6 @@
 #pragma once
 #include "core/Transform.h"
+#include "scene/Component.h"
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -58,6 +59,23 @@ public:
     // Deep copy of this actor and its whole subtree. New ids are assigned.
     std::unique_ptr<Actor> clone() const;
 
+    // --- Components --------------------------------------------------------
+    const std::vector<std::unique_ptr<Component>>& components() const { return components_; }
+    Component* addComponent(std::unique_ptr<Component> c);
+    void removeComponent(Component* c);
+
+    template <class T> T* getComponent() const {
+        for (const auto& c : components_)
+            if (auto* t = dynamic_cast<T*>(c.get()))
+                return t;
+        return nullptr;
+    }
+
+    // Lifecycle fan-out (called by Scene while playing).
+    void startComponents();
+    void updateComponents(float dt);
+    void physicsUpdateComponents(float dt);
+
     // --- Flags -------------------------------------------------------------
     void setVisible(bool v) { visible_ = v; }
     bool visible() const { return visible_; }
@@ -77,6 +95,7 @@ protected:
     Transform transform_;
     Actor* parent_ = nullptr;
     std::vector<std::unique_ptr<Actor>> children_;
+    std::vector<std::unique_ptr<Component>> components_;
     bool visible_ = true;
     bool enabled_ = true;
 

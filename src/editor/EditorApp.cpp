@@ -8,6 +8,7 @@
 #include "core/Log.h"
 #include "scene/Actor2D.h"
 #include "scene/Actor3D.h"
+#include "scene/ComponentRegistry.h"
 
 #include <algorithm>
 #include <cctype>
@@ -34,6 +35,7 @@ static Actor* findById(Actor& node, uint64_t id) {
 }
 
 EditorApp::EditorApp() : scene_(Scene::makeSample()) {
+    registerBuiltinComponents();
     renderer_.setMeshLibrary(&meshLib_);
     CR_LOG("app", "Crate editor started");
     CR_LOG("scene", "Loaded sample scene with " + std::to_string(scene_.actorCount()) + " actors");
@@ -111,9 +113,23 @@ void EditorApp::onFrame() {
         CR_LOG("render", "First frame presented");
         firstFrame_ = false;
     }
+    const float dt = ImGui::GetIO().DeltaTime;
+
     // "Spin preview" slowly orbits the camera so a lone object reads as 3D.
-    if (spinPreview_ && !ImGui::IsMouseDragging(ImGuiMouseButton_Left))
-        camera_.yaw += ImGui::GetIO().DeltaTime * 18.0f;
+    if (spinPreview_ && !playing_ && !ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+        camera_.yaw += dt * 18.0f;
+
+    // Play mode: tick components (frame update + fixed-step physics).
+    if (playing_) {
+        scene_.tick(dt);
+        physicsAccum_ += dt;
+        const float step = 1.0f / 60.0f;
+        int guard = 0;
+        while (physicsAccum_ >= step && guard++ < 8) {
+            scene_.physicsTick(step);
+            physicsAccum_ -= step;
+        }
+    }
 
     // Global editor shortcuts (skipped while typing in a field).
     if (!ImGui::GetIO().WantTextInput) {
@@ -532,6 +548,58 @@ void EditorApp::drawInspector() {
             ImGui::DragFloat2("Size", ui->size, 1.0f, 0.0f, 4096.0f);
         }
 
+        ImGui::SeparatorText("Components");
+        Component* toRemove = nullptr;
+        int ci = 0;
+        for (const auto& comp : a->components()) {
+            ImGui::PushID(ci++);
+            comp->inspectorOpen = ImGui::CollapsingHeader(
+                comp->typeName(),
+                comp->inspectorOpen ? ImGuiTreeNodeFlags_DefaultOpen : 0);
+            if (ImGui::BeginPopupContextItem("comp_ctx")) {
+                ImGui::Checkbox("Enabled", &comp->enabled);
+                if (ImGui::MenuItem("Remove Component"))
+                    toRemove = comp.get();
+                ImGui::EndPopup();
+            }
+            if (comp->inspectorOpen) {
+                ImGui::Indent();
+                if (!comp->enabled)
+                    ImGui::TextDisabled("(disabled)");
+                comp->drawInspector();
+                ImGui::Unindent();
+            }
+            ImGui::PopID();
+        }
+        if (toRemove) {
+            CR_LOG("scene", std::string("Removed ") + toRemove->typeName() + " from '" + a->name() +
+                                "'");
+            a->removeComponent(toRemove);
+        }
+
+        ImGui::Spacing();
+        if (ImGui::Button("Add Component", ImVec2(-1, 0)))
+            ImGui::OpenPopup("add_component");
+        // Right-click blank space in the inspector also opens it.
+        if (ImGui::BeginPopupContextWindow("add_component",
+                                           ImGuiPopupFlags_MouseButtonRight |
+                                               ImGuiPopupFlags_NoOpenOverItems)) {
+            std::string lastCat;
+            for (const auto& e : ComponentRegistry::get().entries()) {
+                if (e.category != lastCat) {
+                    ImGui::SeparatorText(e.category.c_str());
+                    lastCat = e.category;
+                }
+                if (ImGui::MenuItem(e.name.c_str())) {
+                    Component* c = a->addComponent(ComponentRegistry::get().create(e.name));
+                    if (c && playing_)
+                        c->start();
+                    CR_LOG("scene", "Added " + e.name + " to '" + a->name() + "'");
+                }
+            }
+            ImGui::EndPopup();
+        }
+
         ImGui::SeparatorText("Hierarchy");
         ImGui::Text("Parent: %s", a->parent() ? a->parent()->name().c_str() : "(root)");
         ImGui::Text("Children: %d", static_cast<int>(a->children().size()));
@@ -708,11 +776,20 @@ void EditorApp::setPlaying(bool playing) {
         return;
     playing_ = playing;
     if (playing_) {
+        playBackup_ = scene_.clone();
+        physicsAccum_ = 0.0f;
+        scene_.startPlay();
         CR_GAME("play", "--- Play started ---");
         CR_LOG("play", "Entered play mode");
     } else {
+        Actor* wasSelected = scene_.selected();
+        std::string selName = wasSelected ? wasSelected->name() : std::string();
+        scene_ = std::move(playBackup_);
+        playBackup_ = Scene("");
+        scene_.select(nullptr);
+        (void)selName;
         CR_GAME("play", "--- Play stopped ---");
-        CR_LOG("play", "Returned to edit mode");
+        CR_LOG("play", "Returned to edit mode (scene restored)");
     }
 }
 

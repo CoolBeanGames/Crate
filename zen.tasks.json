@@ -304,27 +304,27 @@
             {
               "id": "7e001d4c46ca48ee9eb26bb52c32cf67",
               "text": "add component button to inspector for actors",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "b10a665ab13442e2ae19c2990b55c837",
               "text": "right click blank space in actors inspector for add component",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "4a5e08878b774972b4143340ac4ffe90",
               "text": "can delete componetns from an actor",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "b78e5d55bdc049d8ac48dcc1d53f614d",
               "text": "can collapse components in the inspector",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "fbf2e07eccc04802a35410ee37b713f4",
               "text": "components have Start,Update,PhysicsUpdate methods Update and PhysicsUpdate Take (float delta) as a parameter for the time since the last time it was called",
-              "isDone": false
+              "isDone": true
             }
           ],
           "flags": {
@@ -333,11 +333,11 @@
             "release": false,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:18:44.3429429+00:00",
-          "updatedAt": "2026-09-10T01:24:20.6119766+00:00"
+          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
         },
         {
           "id": "e5afa18e3daf4a55b91657d1844c3bd2",

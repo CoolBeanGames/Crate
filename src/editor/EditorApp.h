@@ -56,6 +56,8 @@ private:
     void setPlaying(bool playing);
 
     Scene scene_;
+    Scene playBackup_;      // scene state captured when Play was pressed
+    float physicsAccum_ = 0.0f;
     MeshLibrary meshLib_;
     Renderer renderer_;
     OrbitCamera camera_;

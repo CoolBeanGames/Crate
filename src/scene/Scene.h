@@ -42,6 +42,15 @@ public:
     // Total actor count excluding the root.
     int actorCount() const;
 
+    // --- Play-mode ticking ----------------------------------------------
+    void startPlay() { root_->startComponents(); }
+    void tick(float dt) { root_->updateComponents(dt); }
+    void physicsTick(float dt) { root_->physicsUpdateComponents(dt); }
+
+    // Deep copy (geometry + components; not selection). Used to snapshot the
+    // scene when entering play mode so edits during play can be rolled back.
+    Scene clone() const;
+
     // Build a small default scene so the editor is not empty on first launch.
     static Scene makeSample();
 

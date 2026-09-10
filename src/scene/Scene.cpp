@@ -90,6 +90,13 @@ Actor* Scene::duplicate(Actor* actor) {
 
 int Scene::actorCount() const { return countRecursive(*root_); }
 
+Scene Scene::clone() const {
+    Scene s(name_);
+    for (const auto& c : root_->children())
+        s.root_->addChild(c->clone());
+    return s;
+}
+
 Scene Scene::makeSample() {
     Scene s("Sample Scene");
 

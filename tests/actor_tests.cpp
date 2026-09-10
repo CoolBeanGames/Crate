@@ -3,6 +3,7 @@
 
 #include "scene/Actor2D.h"
 #include "scene/Actor3D.h"
+#include "scene/BuiltinComponents.h"
 #include "scene/Scene.h"
 
 #include <cassert>
@@ -111,6 +112,32 @@ int main() {
     orig->setEnabled(false);
     CHECK(!orig->enabled());
     CHECK(orig->visible());
+
+    // --- components: attach, tick, clone --------------------------------
+    Scene cs("cs");
+    auto* host = cs.add(std::make_unique<Actor3D>("host"));
+    auto* spin = static_cast<SpinnerComponent*>(
+        host->addComponent(std::make_unique<SpinnerComponent>()));
+    spin->degreesPerSecond = 100.0f;
+    spin->axis = 1;
+    CHECK(host->getComponent<SpinnerComponent>() == spin);
+    CHECK(spin->actor() == host);
+
+    float y0 = host->transform().rotationEuler.y;
+    cs.startPlay();
+    cs.tick(0.5f); // 100 deg/s * 0.5s = 50 deg
+    CHECK(std::abs(host->transform().rotationEuler.y - (y0 + 50.0f)) < 0.01f);
+
+    // Clone carries components with their settings.
+    std::unique_ptr<Actor> hostCopy = host->clone();
+    auto* spinCopy = hostCopy->getComponent<SpinnerComponent>();
+    CHECK(spinCopy != nullptr);
+    CHECK(spinCopy != spin);
+    CHECK(spinCopy->degreesPerSecond == 100.0f);
+    CHECK(spinCopy->actor() == hostCopy.get());
+
+    host->removeComponent(spin);
+    CHECK(host->getComponent<SpinnerComponent>() == nullptr);
 
     std::printf("ok  %d checks passed\n", g_checks);
     return 0;

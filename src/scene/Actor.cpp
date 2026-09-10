@@ -68,9 +68,52 @@ std::unique_ptr<Actor> Actor::clone() const {
     c->transform_ = transform_;
     c->visible_ = visible_;
     c->enabled_ = enabled_;
+    for (const auto& comp : components_)
+        c->addComponent(comp->clone());
     for (const auto& ch : children_)
         c->addChild(ch->clone());
     return c;
+}
+
+Component* Actor::addComponent(std::unique_ptr<Component> c) {
+    if (!c)
+        return nullptr;
+    c->actor_ = this;
+    Component* raw = c.get();
+    components_.push_back(std::move(c));
+    return raw;
+}
+
+void Actor::removeComponent(Component* c) {
+    for (auto it = components_.begin(); it != components_.end(); ++it)
+        if (it->get() == c) {
+            components_.erase(it);
+            return;
+        }
+}
+
+void Actor::startComponents() {
+    for (const auto& c : components_)
+        if (c->enabled)
+            c->start();
+    for (const auto& ch : children_)
+        ch->startComponents();
+}
+
+void Actor::updateComponents(float dt) {
+    for (const auto& c : components_)
+        if (c->enabled)
+            c->update(dt);
+    for (const auto& ch : children_)
+        ch->updateComponents(dt);
+}
+
+void Actor::physicsUpdateComponents(float dt) {
+    for (const auto& c : components_)
+        if (c->enabled)
+            c->physicsUpdate(dt);
+    for (const auto& ch : children_)
+        ch->physicsUpdateComponents(dt);
 }
 
 } // namespace crate
