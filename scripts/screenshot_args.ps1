@@ -1,11 +1,11 @@
-# Launch Crate, wait for it to draw a few frames, and save a PNG of the window.
-param([string]$Out = "$env:TEMP\crate_shot.png", [int]$WaitSeconds = 5)
+# Launch Crate with extra CLI args (e.g. a model to import), screenshot the window.
+param([string]$Out = "$env:TEMP\crate_shot.png", [int]$WaitSeconds = 5, [string[]]$ExtraArgs = @())
 $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.Drawing, System.Windows.Forms
 
 $root = Split-Path -Parent $PSScriptRoot
 $exe = Join-Path $root "build\Crate.exe"
-$p = Start-Process $exe -PassThru -WorkingDirectory $root
+$p = Start-Process $exe -PassThru -WorkingDirectory $root -ArgumentList $ExtraArgs
 Start-Sleep -Seconds $WaitSeconds
 
 Add-Type @"

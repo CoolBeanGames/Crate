@@ -15,7 +15,11 @@
 #include "backends/imgui_impl_dx11.h"
 
 #include <d3d11.h>
+#include <shellapi.h>
 #include <tchar.h>
+
+#include <string>
+#include <vector>
 
 static ID3D11Device*            g_pd3dDevice = nullptr;
 static ID3D11DeviceContext*     g_pd3dDeviceContext = nullptr;
@@ -23,6 +27,7 @@ static IDXGISwapChain*          g_pSwapChain = nullptr;
 static bool                     g_SwapChainOccluded = false;
 static UINT                     g_ResizeWidth = 0, g_ResizeHeight = 0;
 static ID3D11RenderTargetView*  g_mainRenderTargetView = nullptr;
+static std::vector<std::string> g_droppedFiles; // filled by WM_DROPFILES, drained each frame
 
 bool CreateDeviceD3D(HWND hWnd);
 void CleanupDeviceD3D();
@@ -33,7 +38,9 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam,
                                                              LPARAM lParam);
 
-int main(int, char**) {
+int main(int argc, char** argv) {
+    for (int i = 1; i < argc; ++i)
+        g_droppedFiles.push_back(argv[i]); // treat CLI args like dropped files
     WNDCLASSEXW wc = {sizeof(wc), CS_CLASSDC, WndProc, 0L, 0L,
                       GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr,
                       L"CrateEngine", nullptr};
@@ -50,6 +57,7 @@ int main(int, char**) {
 
     ::ShowWindow(hwnd, SW_SHOWDEFAULT);
     ::UpdateWindow(hwnd);
+    ::DragAcceptFiles(hwnd, TRUE); // accept files dragged from Explorer
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -66,6 +74,7 @@ int main(int, char**) {
     ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
 
     crate::EditorApp app;
+    app.attachDevice(g_pd3dDevice, g_pd3dDeviceContext);
 
     const ImVec4 clear_col = ImVec4(0.043f, 0.051f, 0.070f, 1.0f);
     bool running = true;
@@ -93,6 +102,10 @@ int main(int, char**) {
             CreateRenderTarget();
         }
 
+        for (const auto& f : g_droppedFiles)
+            app.ingestDroppedFile(f);
+        g_droppedFiles.clear();
+
         ImGui_ImplDX11_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
@@ -110,6 +123,7 @@ int main(int, char**) {
     }
 
     CR_LOG("platform", "Shutting down");
+    app.attachDevice(nullptr, nullptr); // release renderer GPU objects before the device
     ImGui_ImplDX11_Shutdown();
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
@@ -183,6 +197,23 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         return true;
 
     switch (msg) {
+        case WM_DROPFILES: {
+            HDROP drop = reinterpret_cast<HDROP>(wParam);
+            UINT count = ::DragQueryFileW(drop, 0xFFFFFFFF, nullptr, 0);
+            for (UINT i = 0; i < count; ++i) {
+                wchar_t wpath[MAX_PATH];
+                if (::DragQueryFileW(drop, i, wpath, MAX_PATH)) {
+                    int len = ::WideCharToMultiByte(CP_UTF8, 0, wpath, -1, nullptr, 0, nullptr, nullptr);
+                    if (len > 1) {
+                        std::string path(static_cast<size_t>(len - 1), '\0');
+                        ::WideCharToMultiByte(CP_UTF8, 0, wpath, -1, path.data(), len, nullptr, nullptr);
+                        g_droppedFiles.push_back(std::move(path));
+                    }
+                }
+            }
+            ::DragFinish(drop);
+            return 0;
+        }
         case WM_SIZE:
             if (wParam == SIZE_MINIMIZED)
                 return 0;

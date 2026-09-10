@@ -1,10 +1,18 @@
 #include "editor/EditorApp.h"
+#include "assets/FbxImport.h"
+#include "assets/Image.h"
 #include "editor/Console.h"
+#include "platform/FileDialog.h"
 #include "editor/ContextMenu.h"
 #include "editor/Theme.h"
 #include "core/Log.h"
 #include "scene/Actor2D.h"
 #include "scene/Actor3D.h"
+#include "scene/BuiltinComponents.h"
+#include "scene/ComponentRegistry.h"
+
+#include <algorithm>
+#include <cctype>
 
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -28,8 +36,79 @@ static Actor* findById(Actor& node, uint64_t id) {
 }
 
 EditorApp::EditorApp() : scene_(Scene::makeSample()) {
+    registerBuiltinComponents();
+    renderer_.setMeshLibrary(&meshLib_);
+    renderer_.setMaterialLibrary(&materialLib_);
     CR_LOG("app", "Crate editor started");
     CR_LOG("scene", "Loaded sample scene with " + std::to_string(scene_.actorCount()) + " actors");
+}
+
+EditorApp::~EditorApp() = default;
+
+static std::string lowerExt(const std::string& path) {
+    auto dot = path.find_last_of('.');
+    if (dot == std::string::npos)
+        return {};
+    std::string e = path.substr(dot + 1);
+    std::transform(e.begin(), e.end(), e.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return e;
+}
+
+void EditorApp::ingestDroppedFile(const std::string& path) {
+    const std::string ext = lowerExt(path);
+    if (ext == "fbx") {
+        renderer_.invalidateMesh(path);
+        FbxImportResult res = importFbx(path, meshLib_, materialLib_);
+        if (!res.ok) {
+            CR_ERROR("assets", "Import failed: " + (res.error.empty() ? path : res.error));
+            return;
+        }
+        if (std::find(importedAssets_.begin(), importedAssets_.end(), res.key) ==
+            importedAssets_.end())
+            importedAssets_.push_back(res.key);
+
+        std::string name = path;
+        if (auto slash = name.find_last_of("/\\"); slash != std::string::npos)
+            name = name.substr(slash + 1);
+        auto actor = std::make_unique<Actor3D>(name);
+        auto mr = std::make_unique<MeshRenderer>();
+        mr->usePrimitive = false;
+        mr->meshPath = res.key;
+        if (!res.materialNames.empty())
+            mr->materialRef = res.materialNames.front();
+        actor->addComponent(std::move(mr));
+        Actor* added = scene_.add(std::move(actor));
+        scene_.select(added);
+        CR_LOG("scene", "Added imported model '" + name + "' to the scene");
+    } else if (isSupportedImageExt(ext)) {
+        Image probe = loadImage(path);
+        if (!probe.valid()) {
+            CR_ERROR("assets", "Could not decode image: " + path);
+            return;
+        }
+        if (std::find(importedAssets_.begin(), importedAssets_.end(), path) == importedAssets_.end())
+            importedAssets_.push_back(path);
+        CR_LOG("assets", "Imported image " + path + " (" + std::to_string(probe.width) + "x" +
+                             std::to_string(probe.height) + ")");
+        Actor* sel = scene_.selected();
+        if (auto* mr = sel ? sel->getComponent<MeshRenderer>() : nullptr) {
+            mr->texturePath = path;
+            renderer_.invalidateTexture(path);
+            CR_LOG("assets", "Applied texture to '" + sel->name() + "'");
+        }
+    } else {
+        CR_WARN("assets", "Unsupported drop: " + path);
+    }
+}
+
+void EditorApp::attachDevice(ID3D11Device* device, ID3D11DeviceContext* context) {
+    if (!device || !context) {
+        renderer_.shutdown();
+        return;
+    }
+    if (renderer_.init(device, context))
+        CR_LOG("render", "Viewport renderer attached");
 }
 
 // ---------------------------------------------------------------------------
@@ -39,6 +118,25 @@ void EditorApp::onFrame() {
     if (firstFrame_) {
         CR_LOG("render", "First frame presented");
         firstFrame_ = false;
+    }
+    const float dt = ImGui::GetIO().DeltaTime;
+    if (scene_.selected())
+        selectedMaterial_.clear(); // actor selection supersedes asset selection
+
+    // "Spin preview" slowly orbits the camera so a lone object reads as 3D.
+    if (spinPreview_ && !playing_ && !ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+        camera_.yaw += dt * 18.0f;
+
+    // Play mode: tick components (frame update + fixed-step physics).
+    if (playing_) {
+        scene_.tick(dt);
+        physicsAccum_ += dt;
+        const float step = 1.0f / 60.0f;
+        int guard = 0;
+        while (physicsAccum_ >= step && guard++ < 8) {
+            scene_.physicsTick(step);
+            physicsAccum_ -= step;
+        }
     }
 
     // Global editor shortcuts (skipped while typing in a field).
@@ -406,9 +504,42 @@ void EditorApp::drawHierarchy() {
 void EditorApp::drawInspector() {
     if (ImGui::Begin("Inspector")) {
         Actor* a = scene_.selected();
+
+        // A material asset is selected in the Asset Browser: edit it here.
+        if (!a && !selectedMaterial_.empty()) {
+            Material* mat = materialLib_.find(selectedMaterial_);
+            if (!mat) {
+                selectedMaterial_.clear();
+            } else {
+                ImGui::TextDisabled("MATERIAL");
+                ImGui::SeparatorText(mat->name.c_str());
+                ImGui::ColorEdit4("Base Color", mat->baseColor);
+                ImGui::InputText("Texture", &mat->texturePath);
+                if (ImGui::Button("Browse##mattex")) {
+                    std::string p = platform::openFileDialog(
+                        "Material Texture",
+                        "Images\0*.png;*.jpg;*.jpeg;*.bmp;*.tga;*.tif;*.tiff\0All\0*.*\0");
+                    if (!p.empty()) {
+                        mat->texturePath = p;
+                        renderer_.invalidateTexture(p);
+                    }
+                }
+                ImGui::DragFloat("Emissive", &mat->emissive, 0.01f, 0.0f, 4.0f);
+                ImGui::Checkbox("Unlit", &mat->unlit);
+                ImGui::Spacing();
+                if (ImGui::Button("Delete Material")) {
+                    CR_LOG("assets", "Deleted material '" + selectedMaterial_ + "'");
+                    materialLib_.remove(selectedMaterial_);
+                    selectedMaterial_.clear();
+                }
+                ImGui::End();
+                return;
+            }
+        }
+
         if (!a) {
             ImGui::TextDisabled("Nothing selected.");
-            ImGui::TextWrapped("Select an actor in the Hierarchy or a file in the Asset Browser "
+            ImGui::TextWrapped("Select an actor in the Hierarchy or an asset in the Asset Browser "
                                "to edit its settings here.");
             ImGui::End();
             return;
@@ -436,12 +567,7 @@ void EditorApp::drawInspector() {
         Transform w = a->worldTransform();
         ImGui::TextDisabled("World pos  %.2f, %.2f, %.2f", w.position.x, w.position.y, w.position.z);
 
-        if (auto* m = dynamic_cast<MeshActor*>(a)) {
-            ImGui::SeparatorText("Mesh");
-            ImGui::InputText("Mesh Path", &m->meshPath);
-            ImGui::InputText("Primitive", &m->primitive);
-            ImGui::Checkbox("Cast Shadows", &m->castShadows);
-        } else if (auto* sp = dynamic_cast<SpriteActor*>(a)) {
+        if (auto* sp = dynamic_cast<SpriteActor*>(a)) {
             ImGui::SeparatorText("Sprite");
             ImGui::InputText("Texture Path", &sp->texturePath);
             ImGui::ColorEdit4("Tint", sp->tint);
@@ -449,6 +575,77 @@ void EditorApp::drawInspector() {
             ImGui::SeparatorText("UI Control");
             ImGui::InputText("Label", &ui->label);
             ImGui::DragFloat2("Size", ui->size, 1.0f, 0.0f, 4096.0f);
+        }
+
+        ImGui::SeparatorText("Components");
+        Component* toRemove = nullptr;
+        int ci = 0;
+        for (const auto& comp : a->components()) {
+            ImGui::PushID(ci++);
+            comp->inspectorOpen = ImGui::CollapsingHeader(
+                comp->typeName(),
+                comp->inspectorOpen ? ImGuiTreeNodeFlags_DefaultOpen : 0);
+            if (ImGui::BeginPopupContextItem("comp_ctx")) {
+                ImGui::Checkbox("Enabled", &comp->enabled);
+                if (ImGui::MenuItem("Remove Component"))
+                    toRemove = comp.get();
+                ImGui::EndPopup();
+            }
+            if (comp->inspectorOpen) {
+                ImGui::Indent();
+                if (!comp->enabled)
+                    ImGui::TextDisabled("(disabled)");
+                comp->drawInspector();
+
+                // Material picker for MeshRenderer (needs the MaterialLibrary,
+                // which the component itself does not know about).
+                if (auto* mr = dynamic_cast<MeshRenderer*>(comp.get())) {
+                    const char* cur = mr->materialRef.empty() ? "<tint only>" : mr->materialRef.c_str();
+                    if (ImGui::BeginCombo("Material", cur)) {
+                        if (ImGui::Selectable("<tint only>", mr->materialRef.empty()))
+                            mr->materialRef.clear();
+                        for (const std::string& mn : materialLib_.names())
+                            if (ImGui::Selectable(mn.c_str(), mr->materialRef == mn))
+                                mr->materialRef = mn;
+                        ImGui::EndCombo();
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("New##mrmat")) {
+                        Material& m = materialLib_.create("Material");
+                        mr->materialRef = m.name;
+                    }
+                }
+                ImGui::Unindent();
+            }
+            ImGui::PopID();
+        }
+        if (toRemove) {
+            CR_LOG("scene", std::string("Removed ") + toRemove->typeName() + " from '" + a->name() +
+                                "'");
+            a->removeComponent(toRemove);
+        }
+
+        ImGui::Spacing();
+        if (ImGui::Button("Add Component", ImVec2(-1, 0)))
+            ImGui::OpenPopup("add_component");
+        // Right-click blank space in the inspector also opens it.
+        if (ImGui::BeginPopupContextWindow("add_component",
+                                           ImGuiPopupFlags_MouseButtonRight |
+                                               ImGuiPopupFlags_NoOpenOverItems)) {
+            std::string lastCat;
+            for (const auto& e : ComponentRegistry::get().entries()) {
+                if (e.category != lastCat) {
+                    ImGui::SeparatorText(e.category.c_str());
+                    lastCat = e.category;
+                }
+                if (ImGui::MenuItem(e.name.c_str())) {
+                    Component* c = a->addComponent(ComponentRegistry::get().create(e.name));
+                    if (c && playing_)
+                        c->start();
+                    CR_LOG("scene", "Added " + e.name + " to '" + a->name() + "'");
+                }
+            }
+            ImGui::EndPopup();
         }
 
         ImGui::SeparatorText("Hierarchy");
@@ -465,24 +662,34 @@ void EditorApp::drawViewport() {
     if (ImGui::Begin("Viewport")) {
         if (ImGui::BeginTabBar("viewport_tabs")) {
             if (ImGui::BeginTabItem("Scene View")) {
+                ImGui::Checkbox("Spin preview", &spinPreview_);
+                ImGui::SameLine();
+                ImGui::TextDisabled("drag = orbit   |   wheel = zoom");
+
                 ImVec2 size = ImGui::GetContentRegionAvail();
-                ImVec2 p0 = ImGui::GetCursorScreenPos();
-                ImDrawList* dl = ImGui::GetWindowDrawList();
-                dl->AddRectFilled(p0, ImVec2(p0.x + size.x, p0.y + size.y),
-                                  IM_COL32(0x0B, 0x0D, 0x12, 0xFF));
-                const float step = 32.0f;
-                for (float x = 0; x < size.x; x += step)
-                    dl->AddLine(ImVec2(p0.x + x, p0.y), ImVec2(p0.x + x, p0.y + size.y),
-                                IM_COL32(0x26, 0x2C, 0x38, 0x80));
-                for (float y = 0; y < size.y; y += step)
-                    dl->AddLine(ImVec2(p0.x, p0.y + y), ImVec2(p0.x + size.x, p0.y + y),
-                                IM_COL32(0x26, 0x2C, 0x38, 0x80));
-                dl->AddText(ImVec2(p0.x + 12, p0.y + 12), IM_COL32(0x8E, 0x93, 0xA3, 0xFF),
-                            "Scene View - renderer lands on the Rendering branch");
-                if (Actor* s = scene_.selected())
-                    dl->AddText(ImVec2(p0.x + 12, p0.y + 30), IM_COL32(0x8B, 0x7C, 0xFF, 0xFF),
-                                ("Selected: " + s->name()).c_str());
-                ImGui::Dummy(size);
+                int w = static_cast<int>(size.x), h = static_cast<int>(size.y);
+                Renderer::Options opt;
+                opt.highlight = scene_.selected();
+                void* srv = renderer_.ready() ? renderer_.render(scene_, camera_, w, h, opt) : nullptr;
+
+                if (srv) {
+                    ImGui::Image(reinterpret_cast<ImTextureID>(srv), size);
+                    if (ImGui::IsItemHovered()) {
+                        ImGuiIO& io = ImGui::GetIO();
+                        if (ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+                            camera_.orbit(-io.MouseDelta.x * 0.4f, io.MouseDelta.y * 0.4f);
+                        if (io.MouseWheel != 0.0f)
+                            camera_.zoom(io.MouseWheel);
+                    }
+                } else {
+                    ImVec2 p0 = ImGui::GetCursorScreenPos();
+                    ImGui::GetWindowDrawList()->AddRectFilled(
+                        p0, ImVec2(p0.x + size.x, p0.y + size.y), IM_COL32(0x0B, 0x0D, 0x12, 0xFF));
+                    ImGui::GetWindowDrawList()->AddText(ImVec2(p0.x + 12, p0.y + 12),
+                                                       IM_COL32(0x8E, 0x93, 0xA3, 0xFF),
+                                                       "Viewport renderer unavailable (no D3D11 device)");
+                    ImGui::Dummy(size);
+                }
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Game View")) {
@@ -544,26 +751,73 @@ static void drawConsoleChannel(Console::Channel ch) {
 
 void EditorApp::drawBottomPanel() {
     if (ImGui::Begin("Asset Browser")) {
-        ImGui::TextDisabled("Browsing: %s", assetDir_.c_str());
+        if (ImGui::Button("Import Image...")) {
+            std::string picked = platform::openFileDialog(
+                "Import Image",
+                "Images\0*.png;*.jpg;*.jpeg;*.bmp;*.tga;*.tif;*.tiff;*.gif\0All Files\0*.*\0");
+            if (!picked.empty())
+                ingestDroppedFile(picked);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Import Model...")) {
+            std::string picked =
+                platform::openFileDialog("Import Model", "FBX\0*.fbx\0All Files\0*.*\0");
+            if (!picked.empty())
+                ingestDroppedFile(picked);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Create Material")) {
+            Material& m = materialLib_.create("Material");
+            selectedMaterial_ = m.name;
+            scene_.select(nullptr);
+            CR_LOG("assets", "Created material '" + m.name + "'");
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("or drag files onto the window");
         ImGui::Separator();
-        if (ImGui::BeginChild("files")) {
-            std::error_code ec;
-            fs::path base(assetDir_);
-            if (!fs::exists(base, ec)) {
-                ImGui::TextWrapped("No '%s' folder next to the executable yet. Create one and drop "
-                                   "models, textures and sounds in it.",
-                                   assetDir_.c_str());
-            } else {
-                for (const auto& entry : fs::directory_iterator(base, ec)) {
-                    const std::string label =
-                        (entry.is_directory() ? "[dir] " : "      ") +
-                        entry.path().filename().string();
-                    if (ImGui::Selectable(label.c_str()))
-                        CR_LOG("assets", "Asset picked: " + entry.path().string());
+
+        // Everything dropped here can also be dropped straight onto this panel.
+        ImGui::BeginChild("files");
+        if (importedAssets_.empty() && !fs::exists(fs::path(assetDir_))) {
+            ImGui::TextWrapped("No assets yet. Drop .fbx models or .png/.jpg/.bmp/.tiff images "
+                               "onto the window, or use the Import buttons above.");
+        }
+        std::error_code ec;
+        if (fs::exists(fs::path(assetDir_), ec)) {
+            for (const auto& entry : fs::directory_iterator(fs::path(assetDir_), ec)) {
+                std::string label = "  " + entry.path().filename().string();
+                if (ImGui::Selectable(label.c_str()))
+                    ingestDroppedFile(entry.path().string());
+            }
+        }
+        for (const std::string& mn : materialLib_.names()) {
+            if (ImGui::Selectable(("[mat] " + mn).c_str(), selectedMaterial_ == mn)) {
+                selectedMaterial_ = mn;
+                scene_.select(nullptr);
+            }
+        }
+        for (const std::string& a : importedAssets_) {
+            std::string name = a;
+            if (auto s = name.find_last_of("/\\"); s != std::string::npos)
+                name = name.substr(s + 1);
+            const std::string ext = lowerExt(a);
+            bool isImg = isSupportedImageExt(ext);
+            if (ImGui::Selectable(((isImg ? "[img] " : "[mesh] ") + name).c_str())) {
+                if (isImg) {
+                    Actor* sel = scene_.selected();
+                    if (auto* mr = sel ? sel->getComponent<MeshRenderer>() : nullptr) {
+                        mr->texturePath = a;
+                        renderer_.invalidateTexture(a);
+                        CR_LOG("assets", "Applied '" + name + "' to '" + sel->name() + "'");
+                    }
                 }
             }
         }
         ImGui::EndChild();
+        if (ImGui::BeginDragDropTarget()) {
+            // Handled by the OS WM_DROPFILES path; this keeps the target visible.
+            ImGui::EndDragDropTarget();
+        }
     }
     ImGui::End();
 
@@ -584,22 +838,38 @@ void EditorApp::setPlaying(bool playing) {
         return;
     playing_ = playing;
     if (playing_) {
+        playBackup_ = scene_.clone();
+        physicsAccum_ = 0.0f;
+        scene_.startPlay();
         CR_GAME("play", "--- Play started ---");
         CR_LOG("play", "Entered play mode");
     } else {
+        Actor* wasSelected = scene_.selected();
+        std::string selName = wasSelected ? wasSelected->name() : std::string();
+        scene_ = std::move(playBackup_);
+        playBackup_ = Scene("");
+        scene_.select(nullptr);
+        (void)selName;
         CR_GAME("play", "--- Play stopped ---");
-        CR_LOG("play", "Returned to edit mode");
+        CR_LOG("play", "Returned to edit mode (scene restored)");
     }
 }
 
 Actor* EditorApp::spawn(const char* kind, Actor* parent) {
     std::unique_ptr<Actor> a;
     std::string k = kind;
-    if (k == "actor3d")     a = std::make_unique<Actor3D>("Actor3D");
-    else if (k == "mesh")   a = std::make_unique<MeshActor>("Mesh");
-    else if (k == "sprite") a = std::make_unique<SpriteActor>("Sprite");
-    else if (k == "ui")     a = std::make_unique<UIControlActor>("UI Control");
-    else                    a = std::make_unique<Actor>("Actor");
+    if (k == "actor3d") {
+        a = std::make_unique<Actor3D>("Actor3D");
+    } else if (k == "mesh") {
+        a = std::make_unique<Actor3D>("Mesh");
+        a->addComponent(std::make_unique<MeshRenderer>()); // defaults to a Cube
+    } else if (k == "sprite") {
+        a = std::make_unique<SpriteActor>("Sprite");
+    } else if (k == "ui") {
+        a = std::make_unique<UIControlActor>("UI Control");
+    } else {
+        a = std::make_unique<Actor>("Actor");
+    }
 
     std::string name = a->name();
     Actor* added = scene_.add(std::move(a), parent);

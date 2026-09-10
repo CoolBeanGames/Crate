@@ -3,5 +3,7 @@
 *.png binary
 *.jpg binary
 *.JPG binary
+*.bmp binary
+*.fbx binary
 third_party/** -text
 *.ps1 text eol=crlf

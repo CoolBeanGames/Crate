@@ -3,6 +3,7 @@
 
 #include "scene/Actor2D.h"
 #include "scene/Actor3D.h"
+#include "scene/BuiltinComponents.h"
 #include "scene/Scene.h"
 
 #include <cassert>
@@ -26,17 +27,17 @@ int main() {
     Actor a("a");
     Actor2D a2("a2");
     Actor3D a3("a3");
-    MeshActor mesh("m");
+    SpriteActor sprite("s");
     CHECK(std::string(a.typeName()) == "ACTOR");
     CHECK(std::string(a2.typeName()) == "ACTOR2D");
     CHECK(std::string(a3.typeName()) == "ACTOR3D");
-    CHECK(std::string(mesh.typeName()) == "MESH");
-    CHECK(mesh.id() != a.id()); // unique ids
+    CHECK(std::string(sprite.typeName()) == "SPRITE");
+    CHECK(a3.id() != a.id()); // unique ids
 
     // Polymorphism through Actor*.
-    Actor* poly = &mesh;
-    CHECK(dynamic_cast<Actor3D*>(poly) != nullptr);
-    CHECK(dynamic_cast<Actor2D*>(poly) == nullptr);
+    Actor* poly = &sprite;
+    CHECK(dynamic_cast<Actor2D*>(poly) != nullptr);
+    CHECK(dynamic_cast<Actor3D*>(poly) == nullptr);
 
     // Scene add + count.
     Scene s("t");
@@ -47,7 +48,7 @@ int main() {
     CHECK(s.actorCount() == 1);
 
     // Child inherits parent world transform.
-    auto* child = s.add(std::make_unique<MeshActor>("child"), parent);
+    auto* child = s.add(std::make_unique<Actor3D>("child"), parent);
     child->transform().position = {1.0f, 0.0f, 0.0f};
     CHECK(s.actorCount() == 2);
     CHECK(child->parent() == parent);
@@ -96,21 +97,52 @@ int main() {
 
     // --- duplicate makes a deep, independent copy -------------------------
     Scene d("d");
-    auto* orig = d.add(std::make_unique<MeshActor>("orig"));
-    static_cast<MeshActor*>(orig)->primitive = "Sphere";
+    auto* orig = d.add(std::make_unique<Actor3D>("orig"));
+    {
+        auto mr = std::make_unique<MeshRenderer>();
+        mr->primitive = "Sphere";
+        orig->addComponent(std::move(mr));
+    }
     d.add(std::make_unique<Actor3D>("origChild"), orig);
     int countBefore = d.actorCount();
     Actor* dup = d.duplicate(orig);
     CHECK(dup != nullptr);
     CHECK(d.actorCount() == countBefore * 2);
     CHECK(dup->children().size() == 1);
-    CHECK(static_cast<MeshActor*>(dup)->primitive == "Sphere");
+    CHECK(dup->getComponent<MeshRenderer>() != nullptr);
+    CHECK(dup->getComponent<MeshRenderer>()->primitive == "Sphere");
     CHECK(dup->id() != orig->id());
 
     // --- enabled flag is independent of visible --------------------------
     orig->setEnabled(false);
     CHECK(!orig->enabled());
     CHECK(orig->visible());
+
+    // --- components: attach, tick, clone --------------------------------
+    Scene cs("cs");
+    auto* host = cs.add(std::make_unique<Actor3D>("host"));
+    auto* spin = static_cast<SpinnerComponent*>(
+        host->addComponent(std::make_unique<SpinnerComponent>()));
+    spin->degreesPerSecond = 100.0f;
+    spin->axis = 1;
+    CHECK(host->getComponent<SpinnerComponent>() == spin);
+    CHECK(spin->actor() == host);
+
+    float y0 = host->transform().rotationEuler.y;
+    cs.startPlay();
+    cs.tick(0.5f); // 100 deg/s * 0.5s = 50 deg
+    CHECK(std::abs(host->transform().rotationEuler.y - (y0 + 50.0f)) < 0.01f);
+
+    // Clone carries components with their settings.
+    std::unique_ptr<Actor> hostCopy = host->clone();
+    auto* spinCopy = hostCopy->getComponent<SpinnerComponent>();
+    CHECK(spinCopy != nullptr);
+    CHECK(spinCopy != spin);
+    CHECK(spinCopy->degreesPerSecond == 100.0f);
+    CHECK(spinCopy->actor() == hostCopy.get());
+
+    host->removeComponent(spin);
+    CHECK(host->getComponent<SpinnerComponent>() == nullptr);
 
     std::printf("ok  %d checks passed\n", g_checks);
     return 0;

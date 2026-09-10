@@ -1,16 +1,32 @@
 #pragma once
+#include "assets/MaterialLibrary.h"
+#include "assets/MeshLibrary.h"
+#include "render/Camera.h"
+#include "render/Renderer.h"
 #include "scene/Scene.h"
 #include <memory>
 #include <string>
 
+struct ID3D11Device;
+struct ID3D11DeviceContext;
+
 namespace crate {
 
 // The editor shell. Owns the active Scene and draws every panel each frame.
-// Rendering/windowing is handled by the platform layer (see src/main.cpp); this
-// class only issues ImGui calls and is backend-agnostic.
+// Windowing is handled by the platform layer (see src/main.cpp); the D3D11
+// device is created there and handed in so the viewport renderer can share it.
 class EditorApp {
 public:
     EditorApp();
+    ~EditorApp();
+
+    // Provide the shared D3D11 device (enables the 3D viewport). Optional; the
+    // editor still runs without it, showing a placeholder viewport.
+    void attachDevice(ID3D11Device* device, ID3D11DeviceContext* context);
+
+    // A file dropped onto the window from the OS. FBX files are imported and
+    // added to the scene; images are registered for use as textures.
+    void ingestDroppedFile(const std::string& path);
 
     // Draw one editor frame. Call between ImGui::NewFrame() and ImGui::Render().
     void onFrame();
@@ -41,6 +57,15 @@ private:
     void setPlaying(bool playing);
 
     Scene scene_;
+    Scene playBackup_;      // scene state captured when Play was pressed
+    float physicsAccum_ = 0.0f;
+    MeshLibrary meshLib_;
+    MaterialLibrary materialLib_;
+    Renderer renderer_;
+    OrbitCamera camera_;
+    bool spinPreview_ = true;
+    std::vector<std::string> importedAssets_; // keys of imported models/textures
+    std::string selectedMaterial_;            // asset selection (inspector shows it)
     std::unique_ptr<Actor> clipboard_; // deep clone from copy/cut
     bool playing_ = false;
     bool showDemo_ = false;

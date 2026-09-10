@@ -2,6 +2,9 @@
 #include "core/Log.h"
 #include "scene/Actor2D.h"
 #include "scene/Actor3D.h"
+#include "scene/BuiltinComponents.h"
+
+#include <memory>
 
 namespace crate {
 
@@ -90,23 +93,45 @@ Actor* Scene::duplicate(Actor* actor) {
 
 int Scene::actorCount() const { return countRecursive(*root_); }
 
+Scene Scene::clone() const {
+    Scene s(name_);
+    for (const auto& c : root_->children())
+        s.root_->addChild(c->clone());
+    return s;
+}
+
 Scene Scene::makeSample() {
     Scene s("Sample Scene");
 
     auto* set = s.add(std::make_unique<Actor3D>("-- SET --"));
 
-    auto crate = std::make_unique<MeshActor>("Crate");
-    crate->primitive = "Cube";
-    crate->transform().position = {0.0f, 0.5f, 0.0f};
+    auto crate = std::make_unique<Actor3D>("Crate");
+    crate->transform().position = {0.0f, 0.75f, 0.0f};
+    crate->transform().scale = {1.5f, 1.5f, 1.5f};
+    {
+        auto mr = std::make_unique<MeshRenderer>();
+        mr->primitive = "Cube";
+        mr->texturePath = "assets/uv_check.bmp";
+        crate->addComponent(std::move(mr));
+    }
     s.add(std::move(crate), set);
 
-    auto floor = std::make_unique<MeshActor>("Floor");
-    floor->primitive = "Plane";
-    floor->transform().scale = {10.0f, 1.0f, 10.0f};
+    auto floor = std::make_unique<Actor3D>("Floor");
+    floor->transform().scale = {6.0f, 1.0f, 6.0f};
+    {
+        auto mr = std::make_unique<MeshRenderer>();
+        mr->primitive = "Plane";
+        floor->addComponent(std::move(mr));
+    }
     s.add(std::move(floor), set);
 
     auto lamp = std::make_unique<Actor3D>("Ceiling Lamp");
     lamp->transform().position = {0.0f, 3.0f, 0.0f};
+    {
+        auto mr = std::make_unique<MeshRenderer>();
+        mr->primitive = "Sphere";
+        lamp->addComponent(std::move(mr));
+    }
     s.add(std::move(lamp), set);
 
     auto* cast = s.add(std::make_unique<Actor>("-- CAST --"));

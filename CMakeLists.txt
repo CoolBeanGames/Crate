@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Crate LANGUAGES CXX)
+project(Crate LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -23,35 +23,73 @@ add_library(imgui STATIC
 target_include_directories(imgui PUBLIC ${IMGUI_DIR})
 target_link_libraries(imgui PUBLIC d3d11 dxgi d3dcompiler)
 
+# --- ufbx (vendored, single translation unit) -----------------------------
+add_library(ufbx STATIC third_party/ufbx/ufbx.c)
+target_include_directories(ufbx PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
+if(MSVC)
+    target_compile_options(ufbx PRIVATE /w) # vendored code, silence warnings
+endif()
+
 # --- Crate engine core -----------------------------------------------------
 add_library(crate_core STATIC
     src/core/Log.cpp
     src/scene/Actor.cpp
     src/scene/Scene.cpp
+    src/scene/ComponentRegistry.cpp
+    src/scene/BuiltinComponents.cpp
+    src/render/Mesh.cpp
+    src/render/Renderer.cpp
+    src/assets/FbxImport.cpp
+    src/assets/Image.cpp
+    src/platform/FileDialog.cpp
     src/editor/Console.cpp
     src/editor/ContextMenu.cpp
     src/editor/Theme.cpp
     src/editor/EditorApp.cpp
 )
-target_include_directories(crate_core PUBLIC src)
-target_link_libraries(crate_core PUBLIC imgui)
+target_include_directories(crate_core PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
+target_link_libraries(crate_core PUBLIC imgui ufbx comdlg32)
 
 # --- Editor executable ---------------------------------------------------
 add_executable(Crate WIN32 src/main.cpp)
-target_link_libraries(Crate PRIVATE crate_core)
+target_link_libraries(Crate PRIVATE crate_core shell32)
 
 if(MSVC)
     target_compile_options(crate_core PRIVATE /W4 /permissive-)
     target_compile_definitions(Crate PRIVATE UNICODE _UNICODE)
     # Keep the standard int main() entry point under the Windows subsystem.
     target_link_options(Crate PRIVATE /ENTRY:mainCRTStartup)
+    # Non-incremental links: fast enough here and avoids intermittent
+    # LNK1163 (stale COMDAT) after header changes.
+    add_link_options(/INCREMENTAL:NO)
 endif()
 
 set_target_properties(Crate PROPERTIES
     VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
+# Copy bundled assets next to the executable so a launched build finds them.
+add_custom_command(TARGET Crate POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets $<TARGET_FILE_DIR:Crate>/assets)
 
 # --- Tests ---------------------------------------------------------------
 enable_testing()
 add_executable(actor_tests tests/actor_tests.cpp)
 target_link_libraries(actor_tests PRIVATE crate_core)
 add_test(NAME actor_tests COMMAND actor_tests)
+
+add_executable(fbx_tests tests/fbx_tests.cpp)
+target_link_libraries(fbx_tests PRIVATE crate_core)
+target_compile_definitions(fbx_tests PRIVATE
+    CRATE_TEST_DATA="${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
+add_test(NAME fbx_tests COMMAND fbx_tests)
+
+add_executable(image_tests tests/image_tests.cpp)
+target_link_libraries(image_tests PRIVATE crate_core)
+target_compile_definitions(image_tests PRIVATE
+    CRATE_TEST_DATA="${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
+add_test(NAME image_tests COMMAND image_tests)
+
+add_executable(mesh_tests tests/mesh_tests.cpp)
+target_link_libraries(mesh_tests PRIVATE crate_core)
+add_test(NAME mesh_tests COMMAND mesh_tests)

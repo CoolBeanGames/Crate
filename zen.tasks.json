@@ -191,50 +191,6 @@
       "isLocked": false,
       "tasks": [
         {
-          "id": "d472e739de014d12b87cf4356553a1c0",
-          "index": 8,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Basic 3D rendering",
-          "task": "lets start with a basic 3D rendering framework. for now put this in the viewport but we will add more stuff later and flesh it out. Use whichever framework would be MOST performant\r\n-D3D\r\n-OpenGL\r\nor\r\n-Vulkan",
-          "tags": [
-            "rendering",
-            "3D",
-            "viewport"
-          ],
-          "files": [],
-          "requirements": [
-            {
-              "id": "8da65a3684494d369a9650cbbadb8524",
-              "text": "rendering a vertex lit cube",
-              "isDone": false
-            },
-            {
-              "id": "33ba7e59c94049529a4969ec0a0c6fbb",
-              "text": "cube rotates around",
-              "isDone": false
-            },
-            {
-              "id": "eebbcfb6ceaa457da8cfb34b3f04a94e",
-              "text": "can apply textures to the cube",
-              "isDone": false
-            }
-          ],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-10T01:05:27.8469932+00:00",
-          "updatedAt": "2026-09-10T01:24:18.2234688+00:00"
-        },
-        {
           "id": "dc243aec831c4dceb6e6526bc7e1b4a3",
           "index": 9,
           "kind": "task",
@@ -254,17 +210,17 @@
             {
               "id": "8123bb3cb8e44465b5080516e0584ec6",
               "text": "can drag and drop files from explorer",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "1674c506a8454198bdf312ef7e0aa406",
               "text": "can import FBX",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "7b7930e85b2b46f29bce97df1c7d4bd7",
               "text": "also Imports Materials",
-              "isDone": false
+              "isDone": true
             }
           ],
           "flags": {
@@ -273,11 +229,11 @@
             "release": false,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:05:33.2822087+00:00",
-          "updatedAt": "2026-09-10T01:24:17.0805524+00:00"
+          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
         },
         {
           "id": "0b82c25955b64b6a86f30ed667cb9097",
@@ -299,22 +255,22 @@
             {
               "id": "ae82532e064346d0a9cc8bfa62cc9534",
               "text": "jpeg",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "bc7262872e514129bb74a6a002f6a7b5",
               "text": "png",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "e69ee8a09d5f472dabb5ceeb1c0496e3",
               "text": "bmp",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "9bea2664106e4bb69221e320dcdceb90",
               "text": "tiff",
-              "isDone": false
+              "isDone": true
             }
           ],
           "flags": {
@@ -323,11 +279,11 @@
             "release": false,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:15:44.1816267+00:00",
-          "updatedAt": "2026-09-10T01:24:19.44349+00:00"
+          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
         },
         {
           "id": "3a566e8ff4b3446db82d469ed488c4cf",
@@ -348,27 +304,27 @@
             {
               "id": "7e001d4c46ca48ee9eb26bb52c32cf67",
               "text": "add component button to inspector for actors",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "b10a665ab13442e2ae19c2990b55c837",
               "text": "right click blank space in actors inspector for add component",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "4a5e08878b774972b4143340ac4ffe90",
               "text": "can delete componetns from an actor",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "b78e5d55bdc049d8ac48dcc1d53f614d",
               "text": "can collapse components in the inspector",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "fbf2e07eccc04802a35410ee37b713f4",
               "text": "components have Start,Update,PhysicsUpdate methods Update and PhysicsUpdate Take (float delta) as a parameter for the time since the last time it was called",
-              "isDone": false
+              "isDone": true
             }
           ],
           "flags": {
@@ -377,11 +333,11 @@
             "release": false,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:18:44.3429429+00:00",
-          "updatedAt": "2026-09-10T01:24:20.6119766+00:00"
+          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
         },
         {
           "id": "e5afa18e3daf4a55b91657d1844c3bd2",
@@ -402,37 +358,37 @@
             {
               "id": "038b4a6487bd48adadef0b1fbfe1ca65",
               "text": "can add mesh renderer",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "62f5d9277504441c81c32af558de2c3b",
               "text": "can render cubes",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "c6bc0cd600124961a97509dedbb26972",
               "text": "can render spheres",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "9823e560cec34c6d989983cfeef04464",
               "text": "can render quads",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "1fa69d73cd6f4e48923b8a4a1a947708",
               "text": "can render planes",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "f1ded36b329543558967b018c6131b0b",
               "text": "can render capsules",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "5379fc3f54a041d3b8fc6bf94fa2eb35",
               "text": "can render cylinders",
-              "isDone": false
+              "isDone": true
             }
           ],
           "flags": {
@@ -441,11 +397,11 @@
             "release": false,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:18:37.2355825+00:00",
-          "updatedAt": "2026-09-10T01:24:21.7215242+00:00"
+          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
         },
         {
           "id": "fe4f8bd7950945f0b47da4c90c806da8",
@@ -466,22 +422,22 @@
             {
               "id": "5fe009c24d8c4e00a0cede1032e816cf",
               "text": "importing a FBX should create any materials it uses and apply its textures if any are present",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "7cfef429c6e241419a64e85c10b90541",
               "text": "can create materials via asset window",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "43975aeccf434000927a6448b2553315",
               "text": "can set material properties via inspector if one is selected",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "03cf926d34ac4869b00fe4b4bf4c3829",
               "text": "materials can be applied to any mesh renderer",
-              "isDone": false
+              "isDone": true
             }
           ],
           "flags": {
@@ -490,11 +446,11 @@
             "release": false,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:05:39.9304386+00:00",
-          "updatedAt": "2026-09-10T01:18:16.7708473+00:00"
+          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
         },
         {
           "id": "a3fd796553ba47b8bf19fd7ae12e608e",
@@ -1220,6 +1176,50 @@
           "isLocked": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T01:10:56.4220575+00:00",
+          "updatedAt": "2026-09-09T00:00:00+00:00"
+        },
+        {
+          "id": "d472e739de014d12b87cf4356553a1c0",
+          "index": 8,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Basic 3D rendering",
+          "task": "lets start with a basic 3D rendering framework. for now put this in the viewport but we will add more stuff later and flesh it out. Use whichever framework would be MOST performant\r\n-D3D\r\n-OpenGL\r\nor\r\n-Vulkan",
+          "tags": [
+            "rendering",
+            "3D",
+            "viewport"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "8da65a3684494d369a9650cbbadb8524",
+              "text": "rendering a vertex lit cube",
+              "isDone": true
+            },
+            {
+              "id": "33ba7e59c94049529a4969ec0a0c6fbb",
+              "text": "cube rotates around",
+              "isDone": true
+            },
+            {
+              "id": "eebbcfb6ceaa457da8cfb34b3f04a94e",
+              "text": "can apply textures to the cube",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:05:27.8469932+00:00",
           "updatedAt": "2026-09-09T00:00:00+00:00"
         }
       ]
