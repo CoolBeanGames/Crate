@@ -109,7 +109,7 @@
       "name": "main",
       "branch": "main",
       "isArchive": false,
-      "isCollapsed": false,
+      "isCollapsed": true,
       "isSystem": true,
       "isLocked": false,
       "tasks": [
