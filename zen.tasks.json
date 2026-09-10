@@ -258,32 +258,32 @@
             {
               "id": "dbc829087e664b90915e718ac57c4800",
               "text": "vertex lighting",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "eeaa7f724d1748d0af7e832546db1dfd",
               "text": "point",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "ce79e82e59e34987bf6dae440610a697",
               "text": "spot",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "1fc24c789faf4cfb9c347a4513113b8a",
               "text": "directional",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "c8c495b950f245439fe8b9e85b9b878c",
               "text": "future support for fog",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "949c6f24ec314b96b4688a025dc65307",
               "text": "colors",
-              "isDone": false
+              "isDone": true
             }
           ],
           "flags": {
@@ -292,11 +292,11 @@
             "release": false,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T18:54:52.3916047+00:00",
-          "updatedAt": "2026-09-10T18:55:48.7007836+00:00"
+          "updatedAt": "2026-09-10T13:45:00.0000000+00:00"
         }
       ]
     },
