@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "projectId": "8afe2a0217d7419db234ceda7ecb9dff",
   "name": "Crate",
-  "nextCardIndex": 30,
+  "nextCardIndex": 43,
   "latestExePath": null,
   "latestReleasePath": null,
   "tagCatalog": [
@@ -101,6 +101,14 @@
     {
       "name": "in progress",
       "color": "#8B7CFF"
+    },
+    {
+      "name": "input",
+      "color": "#815B32"
+    },
+    {
+      "name": "inspector",
+      "color": "#8C553E"
     }
   ],
   "branches": [
@@ -109,7 +117,7 @@
       "name": "main",
       "branch": "main",
       "isArchive": false,
-      "isCollapsed": true,
+      "isCollapsed": false,
       "isSystem": true,
       "isLocked": false,
       "tasks": [
@@ -184,6 +192,142 @@
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:04:06.9034488+00:00",
           "updatedAt": "2026-09-10T01:10:42.5622894+00:00"
+        },
+        {
+          "id": "ece24b16c65c4561b6ac5b3e7d63d4af",
+          "index": 37,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "delete button",
+          "task": "add functionality for the delete button that deletes whatever is selected (scene actors/assets) when delete is pressed",
+          "tags": [
+            "ui",
+            "input"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T09:20:16.9395664+00:00",
+          "updatedAt": "2026-09-10T09:27:13.3497116+00:00"
+        },
+        {
+          "id": "c12016618f374f3abd2dc70b140dac9c",
+          "index": 40,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "popup framework",
+          "task": "create a framework for popups, support standard widgets (text entry, scroll boxes, labels, buttons, etc) we will use this for various systems and dialogs so make sure data can come in and go out. it needs to be generic and scalable.",
+          "tags": [
+            "ui"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T09:24:55.259222+00:00",
+          "updatedAt": "2026-09-10T09:27:14.5740598+00:00"
+        },
+        {
+          "id": "dbaf2e894daa402199502cc5c2cc2d68",
+          "index": 38,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Create asset picker framework",
+          "task": "create a popup framework for an asset picker, when we call it we pass it a asset type, it then returns a list of all assets of that type or all scene actors with that type on attached to them. you double click one and it gets assigned to the reference. use the popup framework",
+          "tags": [
+            "ui",
+            "assets",
+            "inspector"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T09:21:22.3352162+00:00",
+          "updatedAt": "2026-09-10T09:27:15.6879096+00:00"
+        },
+        {
+          "id": "69204141e6b547aa9fcabb714a7ea29b",
+          "index": 39,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "change asset references to asset pickers",
+          "task": "anywhere that asks for a type rather than a value should use the asset picker we made, for example: materials, meshes, actor references.",
+          "tags": [
+            "ui",
+            "assets",
+            "Scripting"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T09:21:39.0198254+00:00",
+          "updatedAt": "2026-09-10T09:27:17.076639+00:00"
+        },
+        {
+          "id": "f428e9f2dfc645669eac540e2269895c",
+          "index": 41,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "picker dragging",
+          "task": "anything that uses the asset picker should support assets/actors being dragged into to set it instead, as long as the type matches.\r\n\r\nif the type is a mesh for instance, we can drag an actor with a mesh renderer on it and it will be set to that specific mesh renderer.",
+          "tags": [
+            "ui",
+            "assets"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": true
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T09:27:10.9740788+00:00",
+          "updatedAt": "2026-09-10T09:30:00.8409693+00:00"
         }
       ]
     },
@@ -231,175 +375,226 @@
           "updatedAt": "2026-09-10T01:26:17.0976737+00:00"
         },
         {
-          "id": "dabb8759e31c43248f9875d2de933606",
-          "index": 22,
+          "id": "01c13fd9f55343ecab766eb077edcd42",
+          "index": 30,
           "kind": "task",
           "dueDate": null,
           "startedDate": null,
           "priority": null,
-          "title": "expressions",
-          "task": "expressions are ways to compare values, or change them\r\n1 \u002B 2 is an expression that returns 3\r\nx \u002B y returns the sum of 2 variables\r\n1 == 1 returns true\r\n1 != 1 returns false\r\n1 == 2 returns false\r\n\r\n\u0022text\u0022 \u002B \u0022text\u0022 returns \u0027texttext\u0027\r\n\r\nall types (except string and char) should have .str() functions that return it as a string\r\n\r\n\u0022text\u0022 \u002B 1.str() would then return \u0022text1\u0022",
+          "title": "auto indent",
+          "task": "when you are in between brackets it should automatically indent you to whatever indent level the brackets are at \u002B1",
           "tags": [
-            "task"
+            "scripting"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T09:13:17.1312912+00:00",
+          "updatedAt": "2026-09-10T09:15:16.1564703+00:00"
+        },
+        {
+          "id": "be372a334d384c08a28c28f6a11e4400",
+          "index": 31,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "accessing transforms",
+          "task": "transform should be a type that is a variable attached to an actor. So when i create a script it inherits from actor. so to access its rotation should be\r\ntransform.rotation (since we are accessing it from an actor we dont need \u0027this.\u0027 to access its transform",
+          "tags": [
+            "scripting"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T09:13:27.1340252+00:00",
+          "updatedAt": "2026-09-10T09:15:17.349156+00:00"
+        },
+        {
+          "id": "93fe88ff96e8422fad5c6c43fd8dc931",
+          "index": 32,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "script access",
+          "task": "inside of of viewport you have 3 buttons scene,game,scripts. but theres a button up next to stop that is used for entering the script editor. get rid of that button and just use the viewport buttons instead",
+          "tags": [
+            "script editor"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T09:15:52.6145076+00:00",
+          "updatedAt": "2026-09-10T09:16:55.261462+00:00"
+        },
+        {
+          "id": "ef936836d42e46158d5599fbf190f680",
+          "index": 33,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "auto-rename",
+          "task": "when you make a new script, rather than open it right away it should start setting the name for the script. the class it contains should have the same name automatically.",
+          "tags": [
+            "assets"
           ],
           "files": [],
           "requirements": [],
           "flags": {
             "commit": true,
             "build": true,
-            "release": false,
-            "merge": false
+            "release": true,
+            "merge": true
           },
-          "isDone": true,
+          "isDone": false,
           "isLocked": false,
           "isCollapsed": true,
-          "createdAt": "2026-09-10T01:25:59.1808498+00:00",
-          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
-        },
+          "createdAt": "2026-09-10T09:17:08.1056713+00:00",
+          "updatedAt": "2026-09-10T09:17:53.5746976+00:00"
+        }
+      ]
+    },
+    {
+      "id": "2b668c739ffe45aaa32fa229a7aff5ed",
+      "name": "Assets",
+      "branch": "assets",
+      "isArchive": false,
+      "isCollapsed": false,
+      "isSystem": false,
+      "isLocked": false,
+      "tasks": [
         {
-          "id": "7f1c731ee84e4417a3f43069df7c2cbe",
-          "index": 24,
+          "id": "bb3dbabf2938457fb7e13c3acdae0fc0",
+          "index": 34,
           "kind": "task",
           "dueDate": null,
           "startedDate": null,
           "priority": null,
-          "title": "processing",
-          "task": "add loops and control structures",
+          "title": "folders",
+          "task": "add folders to the asset browser",
           "tags": [
-            "task"
+            "assets"
           ],
           "files": [],
           "requirements": [
             {
-              "id": "c23de4095555478490a5cac7bcf9de83",
-              "text": "do(while) {} : for as long is while is true loop through the brackets",
-              "isDone": true
+              "id": "b9bd2a65a77144cdb91f146ef213ede6",
+              "text": "add folder to right click menu",
+              "isDone": false
             },
             {
-              "id": "d924cd44277a47c394ed2d49472cccc9",
-              "text": "do_async(while) {} : similar to do except only process 1 cycle per frame",
-              "isDone": true
+              "id": "32363801ccd8491cba575df0ce4b4ee4",
+              "text": "when you make a folder immediatly ask for name",
+              "isDone": false
             },
             {
-              "id": "082804971edf43219d434f21e7b980e5",
-              "text": "if(exp) {} if expression is true process the brackets otherwise skip",
-              "isDone": true
-            },
-            {
-              "id": "f442b8ec060446cab02c454974a61b4b",
-              "text": "if(exp) {} else {} if expressions is false, skip the first bracket and do the second",
-              "isDone": true
-            },
-            {
-              "id": "8850fad1dba4411c8c5f5f5e8e9cfca4",
-              "text": "switch(value) case 1: {} - if value is 1, process case 1 brackets, otherwise check other cases or default if none are true",
-              "isDone": true
+              "id": "a1e0cbff95ec45228b0779a11e1a4ff5",
+              "text": "can right click folder for delete, rename, cut, copy, paste, and change color",
+              "isDone": false
             }
           ],
+          "flags": {
+            "commit": true,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T09:18:02.7332995+00:00",
+          "updatedAt": "2026-09-10T09:18:55.3110246+00:00"
+        },
+        {
+          "id": "c4f2d559d45a452898b624875e80a109",
+          "index": 36,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "UUID",
+          "task": "assign every asset a UUID as soon as its created,/imported. this will be used to access the asset even if it moves. maintain an internal database that maps paths to UUIDs and whenever an asset moves update that database.",
+          "tags": [
+            "assets"
+          ],
+          "files": [],
+          "requirements": [],
           "flags": {
             "commit": true,
             "build": true,
             "release": true,
             "merge": false
           },
-          "isDone": true,
+          "isDone": false,
           "isLocked": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-10T01:50:16.9498468+00:00",
-          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T09:19:07.9235141+00:00",
+          "updatedAt": "2026-09-10T09:20:00.8821315+00:00"
         },
         {
-          "id": "43edb2e6d1ea421cacb9983ea2eb1214",
-          "index": 25,
+          "id": "7a764ad264d247a6a7021c275ef2a6b7",
+          "index": 42,
           "kind": "task",
           "dueDate": null,
           "startedDate": null,
           "priority": null,
-          "title": "merge",
-          "task": "merge this into main, but dont close this branc. once done stop processing.",
+          "title": "AUUID",
+          "task": "a subset of UUID these are assigned to actors, every single one is unique and maps it by its current path. this applies to every instance of every actor.",
           "tags": [
-            "merge"
+            "assets",
+            "Actors"
           ],
           "files": [],
-          "requirements": [
-            {
-              "id": "4286fe75bcd54dac888b68c1ba2b30be",
-              "text": "merge and stop processing",
-              "isDone": true
-            }
-          ],
+          "requirements": [],
           "flags": {
             "commit": true,
             "build": true,
             "release": true,
             "merge": true
           },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-10T01:50:21.8523643+00:00",
-          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
-        },
-        {
-          "id": "e7c8f17de1554c91bcbf2275fa97457b",
-          "index": 26,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Asset browser context menu",
-          "task": "Replace the buttons at the top of the Asset Browser with a right-click context menu whose actions are organised into sub-menus. Remove the Import Image / Import Model / Create Material buttons entirely. Use the shared ui::ContextMenu framework so this matches the rest of the app and can be reused for other panels later.\r\n\r\n- Import Asset: ONE importer that inspects the chosen file and does the right thing (fbx model, png/jpg/bmp/tiff texture, cscript script, ...). No more per-type buttons.\r\n- Create Material: makes a new material asset and selects it.\r\n- Scripting: a submenu (there will be more script kinds later) containing New Script.\r\n\r\nNew Script creates assets/scripts/<Name>.cscript from a template (a class inheriting Actor with empty start / update(float delta) / physics_update(float delta)), compiles + registers it, and opens it in the Script Editor. Names are made unique.",
-          "tags": [
-            "ui",
-            "assets",
-            "menus",
-            "scripting"
-          ],
-          "files": [],
-          "requirements": [
-            {
-              "id": "a1a1000000004b0e9a00000000000001",
-              "text": "right-click anywhere in the asset browser opens a styled context menu",
-              "isDone": true
-            },
-            {
-              "id": "a1a1000000004b0e9a00000000000002",
-              "text": "single Import Asset action that detects the file type and imports it (model / image / script)",
-              "isDone": true
-            },
-            {
-              "id": "a1a1000000004b0e9a00000000000003",
-              "text": "Create Material in the menu",
-              "isDone": true
-            },
-            {
-              "id": "a1a1000000004b0e9a00000000000004",
-              "text": "Scripting submenu with a working New Script item",
-              "isDone": true
-            },
-            {
-              "id": "a1a1000000004b0e9a00000000000005",
-              "text": "New Script writes a compiling template, registers the component and opens it in the editor",
-              "isDone": true
-            },
-            {
-              "id": "a1a1000000004b0e9a00000000000006",
-              "text": "the old top buttons are gone",
-              "isDone": true
-            }
-          ],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": false,
-            "merge": false
-          },
-          "isDone": true,
+          "isDone": false,
           "isLocked": false,
           "isCollapsed": false,
-          "createdAt": "2026-09-10T09:00:00.0000000+00:00",
-          "updatedAt": "2026-09-10T00:00:00.0000000+00:00"
-        },
+          "createdAt": "2026-09-10T09:28:51.6976967+00:00",
+          "updatedAt": "2026-09-10T09:29:46.0616448+00:00"
+        }
+      ]
+    },
+    {
+      "id": "archive",
+      "name": "Archived",
+      "branch": null,
+      "isArchive": true,
+      "isCollapsed": true,
+      "isSystem": true,
+      "isLocked": false,
+      "tasks": [
         {
           "id": "bddfb1cab3e3459e847f44a5c7aa9f1b",
           "index": 27,
@@ -408,7 +603,7 @@
           "startedDate": null,
           "priority": null,
           "title": "Recompile scripts in place",
-          "task": "Editing a script in the Script Editor recompiles it on every change. compile() currently does types_[name] = std::move(newClassInfo), which frees the old ClassInfo while the component-registry factory lambda and every already-attached ScriptComponent still point at it -> use-after-free / crash when the script is then added to an actor or Play is pressed.\r\n\r\nFix: recompile IN PLACE. Keep the same ClassInfo object (stable pointer); swap its decl, re-resolve the base, re-index functions. Live ScriptObjects whose class changed should drop their cached state so field initialisers re-run and do_async resume indices reset.",
+          "task": "Editing a script in the Script Editor recompiles it on every change. compile() currently does types_[name] = std::move(newClassInfo), which frees the old ClassInfo while the component-registry factory lambda and every already-attached ScriptComponent still point at it -\u003E use-after-free / crash when the script is then added to an actor or Play is pressed.\r\n\r\nFix: recompile IN PLACE. Keep the same ClassInfo object (stable pointer); swap its decl, re-resolve the base, re-index functions. Live ScriptObjects whose class changed should drop their cached state so field initialisers re-run and do_async resume indices reset.",
           "tags": [
             "scripting",
             "bug"
@@ -422,12 +617,12 @@
             },
             {
               "id": "cc22000000004b0e9a00000000000002",
-              "text": "edit a script, add it to an actor, hit Play -> no crash",
+              "text": "edit a script, add it to an actor, hit Play -\u003E no crash",
               "isDone": true
             },
             {
               "id": "cc22000000004b0e9a00000000000003",
-              "text": "edit a script already attached to an actor, hit Play -> the new code runs",
+              "text": "edit a script already attached to an actor, hit Play -\u003E the new code runs",
               "isDone": true
             },
             {
@@ -445,116 +640,9 @@
           "isDone": true,
           "isLocked": false,
           "isCollapsed": false,
-          "createdAt": "2026-09-10T09:00:00.0000000+00:00",
-          "updatedAt": "2026-09-10T00:00:00.0000000+00:00"
+          "createdAt": "2026-09-10T09:00:00+00:00",
+          "updatedAt": "2026-09-10T00:00:00+00:00"
         },
-        {
-          "id": "994696eaa7e24cbd8dad1f3bbc7ce286",
-          "index": 28,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Reload scripts folder",
-          "task": "assets/scripts/ is only scanned once at startup, so a .cscript created or deleted outside the editor never shows up without a restart. Add a Reload Scripts action (asset browser context menu and/or the script editor) that re-runs the folder scan: new files are compiled + registered, edited-on-disk files recompiled, deleted files removed from the list and (best effort) their component entry.",
-          "tags": [
-            "scripting",
-            "assets"
-          ],
-          "files": [],
-          "requirements": [
-            {
-              "id": "dd28000000004b0e9a00000000000001",
-              "text": "a Reload Scripts action re-scans assets/scripts/",
-              "isDone": true
-            },
-            {
-              "id": "dd28000000004b0e9a00000000000002",
-              "text": "newly added .cscript files appear in the editor and the Add Component menu",
-              "isDone": true
-            },
-            {
-              "id": "dd28000000004b0e9a00000000000003",
-              "text": "files deleted on disk are dropped from the list",
-              "isDone": true
-            },
-            {
-              "id": "dd28000000004b0e9a00000000000004",
-              "text": "files edited on disk are recompiled",
-              "isDone": true
-            }
-          ],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": false,
-            "merge": false
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-10T09:00:00.0000000+00:00",
-          "updatedAt": "2026-09-10T00:00:00.0000000+00:00"
-        },
-        {
-          "id": "b64f8fbd48f849a8bfdcbe773353c401",
-          "index": 29,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Live component reload and registry cleanup",
-          "task": "Two loose ends from live editing:\r\n1. Renaming a class inside a script leaves the old name in the Add Component menu forever (ComponentRegistry::add dedupes by name and never replaces / removes).\r\n2. A ScriptComponent already on an actor keeps running the old code until it is removed and re-added.\r\n\r\nFix: when a class is renamed, drop the old registry entry (or rename it); when a class recompiles, invalidate the cached ScriptObject on every attached ScriptComponent so edits take effect in the same session.",
-          "tags": [
-            "scripting",
-            "components"
-          ],
-          "files": [],
-          "requirements": [
-            {
-              "id": "ee29000000004b0e9a00000000000001",
-              "text": "renaming a class in the editor removes the stale component-menu entry",
-              "isDone": true
-            },
-            {
-              "id": "ee29000000004b0e9a00000000000002",
-              "text": "a ScriptComponent attached to an actor reflects code edits without being re-added",
-              "isDone": true
-            }
-          ],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": false,
-            "merge": false
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-10T09:00:00.0000000+00:00",
-          "updatedAt": "2026-09-10T00:00:00.0000000+00:00"
-        }
-      ]
-    },
-    {
-      "id": "2b668c739ffe45aaa32fa229a7aff5ed",
-      "name": "Assets",
-      "branch": "assets",
-      "isArchive": false,
-      "isCollapsed": false,
-      "isSystem": false,
-      "isLocked": false,
-      "tasks": []
-    },
-    {
-      "id": "archive",
-      "name": "Archived",
-      "branch": null,
-      "isArchive": true,
-      "isCollapsed": true,
-      "isSystem": true,
-      "isLocked": false,
-      "tasks": [
         {
           "id": "c9d4482b33c94eeda497726091ff6dbf",
           "index": 2,
@@ -1420,6 +1508,262 @@
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:25:43.3710568+00:00",
           "updatedAt": "2026-09-09T00:00:00+00:00"
+        },
+        {
+          "id": "dabb8759e31c43248f9875d2de933606",
+          "index": 22,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "expressions",
+          "task": "expressions are ways to compare values, or change them\r\n1 \u002B 2 is an expression that returns 3\r\nx \u002B y returns the sum of 2 variables\r\n1 == 1 returns true\r\n1 != 1 returns false\r\n1 == 2 returns false\r\n\r\n\u0022text\u0022 \u002B \u0022text\u0022 returns \u0027texttext\u0027\r\n\r\nall types (except string and char) should have .str() functions that return it as a string\r\n\r\n\u0022text\u0022 \u002B 1.str() would then return \u0022text1\u0022",
+          "tags": [
+            "task"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:25:59.1808498+00:00",
+          "updatedAt": "2026-09-09T00:00:00+00:00"
+        },
+        {
+          "id": "7f1c731ee84e4417a3f43069df7c2cbe",
+          "index": 24,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "processing",
+          "task": "add loops and control structures",
+          "tags": [
+            "task"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "c23de4095555478490a5cac7bcf9de83",
+              "text": "do(while) {} : for as long is while is true loop through the brackets",
+              "isDone": true
+            },
+            {
+              "id": "d924cd44277a47c394ed2d49472cccc9",
+              "text": "do_async(while) {} : similar to do except only process 1 cycle per frame",
+              "isDone": true
+            },
+            {
+              "id": "082804971edf43219d434f21e7b980e5",
+              "text": "if(exp) {} if expression is true process the brackets otherwise skip",
+              "isDone": true
+            },
+            {
+              "id": "f442b8ec060446cab02c454974a61b4b",
+              "text": "if(exp) {} else {} if expressions is false, skip the first bracket and do the second",
+              "isDone": true
+            },
+            {
+              "id": "8850fad1dba4411c8c5f5f5e8e9cfca4",
+              "text": "switch(value) case 1: {} - if value is 1, process case 1 brackets, otherwise check other cases or default if none are true",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:50:16.9498468+00:00",
+          "updatedAt": "2026-09-09T00:00:00+00:00"
+        },
+        {
+          "id": "43edb2e6d1ea421cacb9983ea2eb1214",
+          "index": 25,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "merge",
+          "task": "merge this into main, but dont close this branc. once done stop processing.",
+          "tags": [
+            "merge"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "4286fe75bcd54dac888b68c1ba2b30be",
+              "text": "merge and stop processing",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": true
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:50:21.8523643+00:00",
+          "updatedAt": "2026-09-09T00:00:00+00:00"
+        },
+        {
+          "id": "e7c8f17de1554c91bcbf2275fa97457b",
+          "index": 26,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Asset browser context menu",
+          "task": "Replace the buttons at the top of the Asset Browser with a right-click context menu whose actions are organised into sub-menus. Remove the Import Image / Import Model / Create Material buttons entirely. Use the shared ui::ContextMenu framework so this matches the rest of the app and can be reused for other panels later.\r\n\r\n- Import Asset: ONE importer that inspects the chosen file and does the right thing (fbx model, png/jpg/bmp/tiff texture, cscript script, ...). No more per-type buttons.\r\n- Create Material: makes a new material asset and selects it.\r\n- Scripting: a submenu (there will be more script kinds later) containing New Script.\r\n\r\nNew Script creates assets/scripts/\u003CName\u003E.cscript from a template (a class inheriting Actor with empty start / update(float delta) / physics_update(float delta)), compiles \u002B registers it, and opens it in the Script Editor. Names are made unique.",
+          "tags": [
+            "ui",
+            "assets",
+            "menus",
+            "scripting"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "a1a1000000004b0e9a00000000000001",
+              "text": "right-click anywhere in the asset browser opens a styled context menu",
+              "isDone": true
+            },
+            {
+              "id": "a1a1000000004b0e9a00000000000002",
+              "text": "single Import Asset action that detects the file type and imports it (model / image / script)",
+              "isDone": true
+            },
+            {
+              "id": "a1a1000000004b0e9a00000000000003",
+              "text": "Create Material in the menu",
+              "isDone": true
+            },
+            {
+              "id": "a1a1000000004b0e9a00000000000004",
+              "text": "Scripting submenu with a working New Script item",
+              "isDone": true
+            },
+            {
+              "id": "a1a1000000004b0e9a00000000000005",
+              "text": "New Script writes a compiling template, registers the component and opens it in the editor",
+              "isDone": true
+            },
+            {
+              "id": "a1a1000000004b0e9a00000000000006",
+              "text": "the old top buttons are gone",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T09:00:00+00:00",
+          "updatedAt": "2026-09-10T00:00:00+00:00"
+        },
+        {
+          "id": "994696eaa7e24cbd8dad1f3bbc7ce286",
+          "index": 28,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Reload scripts folder",
+          "task": "assets/scripts/ is only scanned once at startup, so a .cscript created or deleted outside the editor never shows up without a restart. Add a Reload Scripts action (asset browser context menu and/or the script editor) that re-runs the folder scan: new files are compiled \u002B registered, edited-on-disk files recompiled, deleted files removed from the list and (best effort) their component entry.",
+          "tags": [
+            "scripting",
+            "assets"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "dd28000000004b0e9a00000000000001",
+              "text": "a Reload Scripts action re-scans assets/scripts/",
+              "isDone": true
+            },
+            {
+              "id": "dd28000000004b0e9a00000000000002",
+              "text": "newly added .cscript files appear in the editor and the Add Component menu",
+              "isDone": true
+            },
+            {
+              "id": "dd28000000004b0e9a00000000000003",
+              "text": "files deleted on disk are dropped from the list",
+              "isDone": true
+            },
+            {
+              "id": "dd28000000004b0e9a00000000000004",
+              "text": "files edited on disk are recompiled",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T09:00:00+00:00",
+          "updatedAt": "2026-09-10T00:00:00+00:00"
+        },
+        {
+          "id": "b64f8fbd48f849a8bfdcbe773353c401",
+          "index": 29,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Live component reload and registry cleanup",
+          "task": "Two loose ends from live editing:\r\n1. Renaming a class inside a script leaves the old name in the Add Component menu forever (ComponentRegistry::add dedupes by name and never replaces / removes).\r\n2. A ScriptComponent already on an actor keeps running the old code until it is removed and re-added.\r\n\r\nFix: when a class is renamed, drop the old registry entry (or rename it); when a class recompiles, invalidate the cached ScriptObject on every attached ScriptComponent so edits take effect in the same session.",
+          "tags": [
+            "scripting",
+            "components"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "ee29000000004b0e9a00000000000001",
+              "text": "renaming a class in the editor removes the stale component-menu entry",
+              "isDone": true
+            },
+            {
+              "id": "ee29000000004b0e9a00000000000002",
+              "text": "a ScriptComponent attached to an actor reflects code edits without being re-added",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T09:00:00+00:00",
+          "updatedAt": "2026-09-10T00:00:00+00:00"
         }
       ]
     }
