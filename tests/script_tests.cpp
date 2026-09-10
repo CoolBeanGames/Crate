@@ -1,5 +1,6 @@
 // cScript: lexer / parser / interpreter and the reindent formatter.
 
+#include "scene/Actor3D.h"
 #include "script/Format.h"
 #include "script/Interpreter.h"
 #include "script/Lexer.h"
@@ -138,6 +139,52 @@ static int run() {
 })");
         Value r = Interpreter(&h.ctx, obj).call("greet");
         CHECK(r.str() == "base+child");
+    }
+
+    // --- variables: all base types (task 18) ------------------------
+    {
+        Harness h;
+        crate::Actor3D host("host");
+        host.transform().position = {1.0f, 2.0f, 3.0f};
+        auto obj = h.load(R"(class types_c : Actor3D
+{
+    func run() : string
+    {
+        int i = 7;
+        float f = 2.5;
+        bool b = true;
+        char c = 'z';
+        string s = "hi";
+        var arr = [1, "two", 3.0, true];
+        Vector3 v = Vector3(1, 2, 3);
+        Vector2 v2 = Vector2(4, 5);
+        Actor a = this.actor;
+        var mixed = arr[0].str() + arr[1] + "/" + arr.length.str();
+        return i.str() + "|" + f.str() + "|" + b.str() + "|" + c + "|" + s
+             + "|" + v.str() + "|" + v2.str() + "|" + a.name + "|" + mixed;
+    }
+})");
+        obj->owner = &host;
+        Value r = Interpreter(&h.ctx, obj).call("run");
+        CHECK(r.str() == "7|2.5|true|z|hi|(1, 2, 3)|(4, 5)|host|1two/4");
+    }
+
+    // --- typed coercion + Actor2D/Actor3D type refs ----------------
+    {
+        Harness h;
+        auto obj = h.load(R"(class coerce_c : Actor2D
+{
+    func run() : string
+    {
+        int fromFloat = 9.9;
+        float fromInt = 4;
+        return fromFloat.str() + "," + fromInt.str();
+    }
+})");
+        CHECK(h.types.count("coerce_c") == 1);
+        CHECK(h.types["coerce_c"]->base == "Actor2D");
+        Value r = Interpreter(&h.ctx, obj).call("run");
+        CHECK(r.str() == "9,4");
     }
 
     // --- reindent --------------------------------------------------

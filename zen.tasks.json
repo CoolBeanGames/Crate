@@ -364,57 +364,57 @@
             {
               "id": "bacf6fd604a4406cacdb8d685b615cf2",
               "text": "implimented int",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "50c8c39ed4194ebf8d93d588fa4de019",
               "text": "implimented float",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "503227ae2afb4dbf8079db5fe2eb7ebc",
               "text": "implimented string",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "a85fea407bd8464ea49f70195a6ffb49",
               "text": "implimented char",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "ab9fec779fff417d816ca9a87b19a084",
               "text": "implimented array",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "327a77d2404845469a504f8eb85a5d1c",
               "text": "implemented Vector3",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "7081a7ebd7b3425982e95cdd572e7da3",
               "text": "implimented  Vector2 (a vector 3 with z disabled)",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "db868c6c9a6b4cf49c5028849bb1df4c",
               "text": "implimented Actor",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "4eeb6f27867d40a0ab09e2c58fc20fce",
               "text": "implimented Actor2D (just the type, we are actually hooking this one up yet)",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "2a2a8e7cc7134cb1828d4c67d324f815",
               "text": "implimented Actor3D",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "132bfe2a473b4fd48867bb51862b88a3",
               "text": "implimented bool",
-              "isDone": false
+              "isDone": true
             }
           ],
           "flags": {
@@ -423,11 +423,11 @@
             "release": false,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:25:33.5372597+00:00",
-          "updatedAt": "2026-09-10T01:41:33.8791279+00:00"
+          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
         },
         {
           "id": "7ffe86adde734e868accb2ed9e22255b",

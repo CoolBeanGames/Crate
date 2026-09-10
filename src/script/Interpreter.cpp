@@ -31,6 +31,24 @@ std::shared_ptr<ScriptObject> Interpreter::instantiate(ScriptContext* ctx, const
     return obj;
 }
 
+// Coerce a value to a declared type name (best effort; keeps the value on a
+// mismatch rather than erroring, in the spirit of a loose scripting language).
+static Value coerce(Value v, const std::string& ty) {
+    if (ty.empty())
+        return v;
+    if (ty == "int")
+        return Value::Int((long long)v.num());
+    if (ty == "float")
+        return Value::Float(v.num());
+    if (ty == "bool")
+        return Value::Bool(v.truthy());
+    if (ty == "string")
+        return v.t == Value::T::String ? v : Value::Str(v.str());
+    if (ty == "char")
+        return v.t == Value::T::Char ? v : Value::Char(v.str().empty() ? '\0' : v.str()[0]);
+    return v; // Actor / Vector / arrays / class types pass through
+}
+
 void Interpreter::constructFields() {
     if (!self_ || !self_->cls || !self_->cls->decl)
         return;
@@ -41,7 +59,7 @@ void Interpreter::constructFields() {
     for (auto it = chain.rbegin(); it != chain.rend(); ++it) {
         for (const auto& fd : (*it)->decl->fields) {
             Value v = fd.init ? eval(*fd.init) : Value::Null_();
-            self_->fields[fd.name] = v;
+            self_->fields[fd.name] = coerce(std::move(v), fd.type);
         }
     }
 }
@@ -102,7 +120,7 @@ void Interpreter::execStmt(const Stmt& s) {
             return;
         case StmtKind::VarDecl: {
             Value v = s.init ? eval(*s.init) : Value::Null_();
-            scopes_.back().vars[s.name] = v;
+            scopes_.back().vars[s.name] = coerce(std::move(v), s.declType);
             return;
         }
         case StmtKind::ExprStmt:
@@ -305,7 +323,9 @@ Value Interpreter::evalMember(const Expr& e) {
         auto it = obj.obj->fields.find(name);
         if (it != obj.obj->fields.end())
             return it->second;
-        // built-in vector components already covered by fields; nothing else
+        // A script instance exposes its owning actor as `this.actor`.
+        if (obj.obj->cls && name == "actor")
+            return Value::ActorRef(obj.obj->owner);
         throw RuntimeError("no member '" + name + "'", e.line);
     }
     if (obj.t == Value::T::Actor)
@@ -354,8 +374,22 @@ Value Interpreter::evalCall(const Expr& e) {
         }
 
         Value obj = eval(objExpr);
-        if (obj.t == Value::T::Object && obj.obj && obj.obj->cls)
+        if (obj.t == Value::T::Object && obj.obj && obj.obj->cls) {
+            // `this.get_component(...)` / `this.actor` shortcuts forward to the
+            // owning actor when the script class has no such method.
+            if (!obj.obj->cls->findFunction(method)) {
+                if (method == "get_component") {
+                    std::string tn;
+                    if (!args.empty())
+                        tn = args[0].t == Value::T::TypeRef ? args[0].s : args[0].str();
+                    if (ctx_->getComponent)
+                        if (auto so = ctx_->getComponent(obj.obj->owner, tn))
+                            return Value::Obj(so);
+                    return Value::Null_();
+                }
+            }
             return callMethodOn(obj.obj, method, std::move(args), e.line, false);
+        }
 
         // native Actor methods
         if (obj.t == Value::T::Actor) {
