@@ -45,6 +45,8 @@ private:
     void drawHierarchy();
     void drawInspector();
     void drawViewport();
+    void drawViewportGizmo(float x, float y, float w, float h); // ImGuizmo overlay
+    bool gizmoActive() const; // gizmo hovered or being dragged (suppresses orbit)
     void drawBottomPanel(); // Asset Browser / Engine Console / Game Console
     void assetBrowserMenu(); // right-click menu: create / import / new folder
     void drawAssetFolders(); // navigable folder tree of the assets directory
@@ -88,6 +90,11 @@ private:
     AssetPicker assetPicker_;
     bool openScriptsTab_ = false; // one-shot: select the viewport Scripts tab
     bool spinPreview_ = true;
+
+    // Viewport transform gizmo (ImGuizmo). op: 0=translate 1=rotate 2=scale.
+    int gizmoOp_ = 0;
+    bool gizmoLocal_ = true; // local vs world axes
+    bool gizmoInit_ = false;
     std::vector<std::string> importedAssets_; // keys of imported models/textures
     std::string selectedMaterial_;            // asset selection (inspector shows it)
     std::string selectedAsset_;               // selected imported model/texture path

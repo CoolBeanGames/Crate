@@ -6,8 +6,12 @@ $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.Drawing
 
 $root = Split-Path -Parent $PSScriptRoot
-$p = Start-Process (Join-Path $root "build\Crate.exe") -PassThru -WorkingDirectory $root `
-        -ArgumentList $ExtraArgs
+$exe = Join-Path $root "build\Crate.exe"
+if ($ExtraArgs -and $ExtraArgs.Count -gt 0) {
+    $p = Start-Process $exe -PassThru -WorkingDirectory $root -ArgumentList $ExtraArgs
+} else {
+    $p = Start-Process $exe -PassThru -WorkingDirectory $root
+}
 Start-Sleep -Seconds $WaitSeconds
 
 Add-Type @"

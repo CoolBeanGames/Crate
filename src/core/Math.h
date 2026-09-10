@@ -73,9 +73,10 @@ struct Mat4 {
         r.m[0] = c; r.m[1] = s; r.m[4] = -s; r.m[5] = c;
         return r;
     }
-    // Euler order Z * X * Y (roll, pitch, yaw) for row vectors.
+    // Euler order X * Y * Z for row vectors (v' = v * Rx * Ry * Rz). Matches
+    // the order the viewport gizmo (ImGuizmo) decomposes/recomposes with.
     static Mat4 rotationEuler(const Vec3& deg) {
-        return rotationY(deg.y) * rotationX(deg.x) * rotationZ(deg.z);
+        return rotationX(deg.x) * rotationY(deg.y) * rotationZ(deg.z);
     }
 
     static Mat4 perspectiveLH(float fovYdeg, float aspect, float zn, float zf) {

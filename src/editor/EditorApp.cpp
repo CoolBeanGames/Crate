@@ -22,6 +22,7 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "misc/cpp/imgui_stdlib.h"
+#include "ImGuizmo.h"
 
 #include <filesystem>
 
@@ -141,6 +142,11 @@ void EditorApp::onFrame() {
         CR_LOG("render", "First frame presented");
         firstFrame_ = false;
     }
+    if (!gizmoInit_) {
+        ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
+        gizmoInit_ = true;
+    }
+    ImGuizmo::BeginFrame();
     const float dt = ImGui::GetIO().DeltaTime;
     if (scene_.selected()) {
         // An actor selection supersedes an asset selection (kept exclusive so
@@ -178,6 +184,10 @@ void EditorApp::onFrame() {
             deleteSelection();
         if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_V))
             scene_.select(pasteInto(scene_.selected()));
+        // Gizmo mode: W / E / R (Blender/Unity-ish).
+        if (ImGui::IsKeyPressed(ImGuiKey_W)) gizmoOp_ = 0;
+        if (ImGui::IsKeyPressed(ImGuiKey_E)) gizmoOp_ = 1;
+        if (ImGui::IsKeyPressed(ImGuiKey_R)) gizmoOp_ = 2;
     }
 
     ImGuiViewport* vp = ImGui::GetMainViewport();
@@ -725,7 +735,15 @@ void EditorApp::drawViewport() {
             if (ImGui::BeginTabItem("Scene View")) {
                 ImGui::Checkbox("Spin preview", &spinPreview_);
                 ImGui::SameLine();
-                ImGui::TextDisabled("drag = orbit   |   wheel = zoom");
+                if (ImGui::RadioButton("Move", gizmoOp_ == 0)) gizmoOp_ = 0;
+                ImGui::SameLine();
+                if (ImGui::RadioButton("Rotate", gizmoOp_ == 1)) gizmoOp_ = 1;
+                ImGui::SameLine();
+                if (ImGui::RadioButton("Scale", gizmoOp_ == 2)) gizmoOp_ = 2;
+                ImGui::SameLine();
+                ImGui::Checkbox("Local", &gizmoLocal_);
+                ImGui::SameLine();
+                ImGui::TextDisabled("W/E/R  |  drag = orbit  |  wheel = zoom");
 
                 ImVec2 size = ImGui::GetContentRegionAvail();
                 int w = static_cast<int>(size.x), h = static_cast<int>(size.y);
@@ -734,8 +752,10 @@ void EditorApp::drawViewport() {
                 void* srv = renderer_.ready() ? renderer_.render(scene_, camera_, w, h, opt) : nullptr;
 
                 if (srv) {
+                    ImVec2 imgPos = ImGui::GetCursorScreenPos();
                     ImGui::Image(reinterpret_cast<ImTextureID>(srv), size);
-                    if (ImGui::IsItemHovered()) {
+                    drawViewportGizmo(imgPos.x, imgPos.y, size.x, size.y);
+                    if (ImGui::IsItemHovered() && !gizmoActive()) {
                         ImGuiIO& io = ImGui::GetIO();
                         if (ImGui::IsMouseDragging(ImGuiMouseButton_Left))
                             camera_.orbit(-io.MouseDelta.x * 0.4f, io.MouseDelta.y * 0.4f);
@@ -775,6 +795,52 @@ void EditorApp::drawViewport() {
         }
     }
     ImGui::End();
+}
+
+bool EditorApp::gizmoActive() const {
+    return scene_.selected() && (ImGuizmo::IsOver() || ImGuizmo::IsUsing());
+}
+
+// Draw the translate/rotate/scale gizmo over the viewport image for the
+// selected actor and fold any manipulation back into its local Transform.
+// ImGuizmo's matrix convention (row-major, row vectors, X*Y*Z euler) matches
+// the engine's Mat4, so matrices pass through with no transpose.
+void EditorApp::drawViewportGizmo(float x, float y, float w, float h) {
+    Actor* sel = scene_.selected();
+    if (!sel || w < 1.0f || h < 1.0f)
+        return;
+
+    ImGuizmo::SetOrthographic(false);
+    ImGuizmo::SetDrawlist();
+    ImGuizmo::SetRect(x, y, w, h);
+
+    Mat4 view = camera_.view();
+    Mat4 proj = camera_.proj(w / h);
+
+    Transform world = sel->worldTransform();
+    Mat4 model = Mat4::scale(world.scale) * Mat4::rotationEuler(world.rotationEuler) *
+                 Mat4::translation(world.position);
+
+    const ImGuizmo::OPERATION op = gizmoOp_ == 1   ? ImGuizmo::ROTATE
+                                   : gizmoOp_ == 2 ? ImGuizmo::SCALE
+                                                   : ImGuizmo::TRANSLATE;
+    // Scale only makes sense in local space.
+    const ImGuizmo::MODE mode =
+        (gizmoLocal_ || op == ImGuizmo::SCALE) ? ImGuizmo::LOCAL : ImGuizmo::WORLD;
+
+    if (ImGuizmo::Manipulate(view.m, proj.m, op, mode, model.m) && ImGuizmo::IsUsing()) {
+        float t[3], r[3], s[3];
+        ImGuizmo::DecomposeMatrixToComponents(model.m, t, r, s);
+
+        Transform desired;
+        desired.position = {t[0], t[1], t[2]};
+        desired.rotationEuler = {r[0], r[1], r[2]};
+        desired.scale = {s[0], s[1], s[2]};
+
+        Transform parentWorld =
+            sel->parent() ? sel->parent()->worldTransform() : Transform{};
+        sel->transform() = Transform::localUnder(parentWorld, desired);
+    }
 }
 
 // ---------------------------------------------------------------------------

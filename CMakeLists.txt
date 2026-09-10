@@ -31,6 +31,15 @@ if(MSVC)
     target_compile_options(imgui_texteditor PRIVATE /w)
 endif()
 
+# --- ImGuizmo (vendored) -----------------------------------------------
+add_library(imguizmo STATIC third_party/imguizmo/ImGuizmo.cpp)
+target_include_directories(imguizmo PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imguizmo)
+target_compile_definitions(imguizmo PRIVATE IMGUI_DEFINE_MATH_OPERATORS)
+target_link_libraries(imguizmo PUBLIC imgui)
+if(MSVC)
+    target_compile_options(imguizmo PRIVATE /w)
+endif()
+
 # --- ufbx (vendored, single translation unit) -----------------------------
 add_library(ufbx STATIC third_party/ufbx/ufbx.c)
 target_include_directories(ufbx PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
@@ -67,7 +76,7 @@ add_library(crate_core STATIC
     src/editor/EditorApp.cpp
 )
 target_include_directories(crate_core PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
-target_link_libraries(crate_core PUBLIC imgui imgui_texteditor ufbx comdlg32)
+target_link_libraries(crate_core PUBLIC imgui imgui_texteditor imguizmo ufbx comdlg32)
 
 # --- Editor executable ---------------------------------------------------
 add_executable(Crate WIN32 src/main.cpp)
