@@ -1,0 +1,25 @@
+class counter : Actor
+{
+	var count = 0;
+	var phase = "idle";
+
+	func start()
+	{
+		phase = "counting";
+		print("counter start");
+	}
+
+	func update(float delta)
+	{
+		do_async(count < 5)
+		{
+			count = count + 1;
+			print("count = " + count.str());
+		}
+		phase = "done";
+	}
+
+	func physics_update(float delta)
+	{
+	}
+}

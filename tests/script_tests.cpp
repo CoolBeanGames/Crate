@@ -292,6 +292,60 @@ static int run() {
         CHECK(!sys.compile("class 9bad : Actor { }", &err));
     }
 
+    // --- processing: control flow + do_async (task 24) ------------
+    {
+        Harness h;
+        auto obj = h.load(R"(class ctrl : Actor
+{
+    func classify(int n) : string
+    {
+        if (n < 0) { return "neg"; }
+        else { if (n == 0) { return "zero"; } }
+        switch (n)
+        {
+            case 1: { return "one"; }
+            case 2: { return "two"; }
+            default: { return "many"; }
+        }
+    }
+    func sumTo(int n) : int
+    {
+        var total = 0;
+        var i = 1;
+        do (i <= n) { total = total + i; i = i + 1; }
+        return total;
+    }
+})");
+        Interpreter ip(&h.ctx, obj);
+        CHECK(ip.call("classify", {Value::Int(-3)}).str() == "neg");
+        CHECK(ip.call("classify", {Value::Int(0)}).str() == "zero");
+        CHECK(ip.call("classify", {Value::Int(2)}).str() == "two");
+        CHECK(ip.call("classify", {Value::Int(9)}).str() == "many");
+        CHECK(ip.call("sumTo", {Value::Int(5)}).i == 15); // 1+2+3+4+5
+    }
+    {
+        // do_async: one body iteration per update() call, then post-code runs
+        Harness h;
+        auto obj = h.load(R"(class async_c : Actor
+{
+    var n = 0;
+    var phase = "run";
+    func update(float delta)
+    {
+        do_async(n < 3) { n = n + 1; }
+        phase = "done";
+    }
+})");
+        for (int frame = 0; frame < 2; ++frame)
+            Interpreter(&h.ctx, obj).call("update", {Value::Float(0.016)});
+        CHECK(obj->fields["n"].i == 2);          // one increment per frame
+        CHECK(obj->fields["phase"].str() == "run"); // post-code not reached yet
+        for (int frame = 0; frame < 3; ++frame)
+            Interpreter(&h.ctx, obj).call("update", {Value::Float(0.016)});
+        CHECK(obj->fields["n"].i == 3);          // capped by the condition
+        CHECK(obj->fields["phase"].str() == "done"); // loop finished -> post-code ran
+    }
+
     // --- reindent --------------------------------------------------
     {
         std::string messy = "class x : Actor\n{\nfunc start()\n{\nreturn;\n}\n}\n";

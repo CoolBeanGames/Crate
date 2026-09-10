@@ -81,11 +81,23 @@ Value Interpreter::call(const std::string& method, std::vector<Value> args, bool
             throw RuntimeError("script has no '" + method + "' function", 0);
         return Value::Null_();
     }
-    return runFunction(*fn, definedIn, args);
+
+    resumable_ = true;
+    resumeIndex_ = (self_->asyncResumeFn == method) ? self_->asyncResumeIndex : -1;
+    yielded_ = false;
+    Value r = runFunction(*fn, definedIn, args, /*resumable=*/true);
+    if (yielded_) {
+        self_->asyncResumeFn = method;
+        self_->asyncResumeIndex = yieldIndex_;
+    } else if (self_->asyncResumeFn == method) {
+        self_->asyncResumeFn.clear();
+        self_->asyncResumeIndex = 0;
+    }
+    return r;
 }
 
 Value Interpreter::runFunction(const FunctionDecl& fn, const ClassInfo* definedIn,
-                               std::vector<Value>& args) {
+                               std::vector<Value>& args, bool resumable) {
     const ClassInfo* prevDispatch = dispatchClass_;
     dispatchClass_ = definedIn ? definedIn : dispatchClass_;
     scopes_.push_back({});
@@ -95,6 +107,58 @@ Value Interpreter::runFunction(const FunctionDecl& fn, const ClassInfo* definedI
     }
 
     Value result = Value::Null_();
+
+    // Frame-stepped path: walk the top-level statement list so a `do_async`
+    // can run one body iteration and suspend the whole method until next frame.
+    if (resumable) {
+        int resumeAt = resumeIndex_;
+        int startStmt = 0;
+        if (resumeAt >= 0) {
+            int ord = 0;
+            for (size_t k = 0; k < fn.body.size(); ++k) {
+                if (fn.body[k]->kind == StmtKind::DoAsync) {
+                    if (ord == resumeAt) {
+                        startStmt = (int)k;
+                        break;
+                    }
+                    ++ord;
+                }
+            }
+        }
+        int asyncOrd = 0;
+        for (int k = 0; k < startStmt; ++k)
+            if (fn.body[k]->kind == StmtKind::DoAsync)
+                ++asyncOrd;
+
+        try {
+            for (size_t k = (size_t)startStmt; k < fn.body.size(); ++k) {
+                const Stmt& s = *fn.body[k];
+                if (s.kind == StmtKind::DoAsync) {
+                    if (eval(*s.cond).truthy()) {
+                        try {
+                            execBlock(s.body);
+                        } catch (BreakSignal&) {
+                            ++asyncOrd; // loop aborted; move past it
+                            continue;
+                        } catch (ContinueSignal&) {
+                        }
+                        yielded_ = true;
+                        yieldIndex_ = asyncOrd;
+                        break;
+                    }
+                    ++asyncOrd; // cond false -> loop done, fall through
+                } else {
+                    execStmt(s);
+                }
+            }
+        } catch (ReturnSignal& r) {
+            result = std::move(r.value);
+        }
+        scopes_.pop_back();
+        dispatchClass_ = prevDispatch;
+        return result;
+    }
+
     try {
         execBlock(fn.body);
     } catch (ReturnSignal& r) {

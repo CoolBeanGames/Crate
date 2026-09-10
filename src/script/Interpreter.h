@@ -76,7 +76,14 @@ private:
     std::vector<Scope> scopes_;
     const ClassInfo* dispatchClass_ = nullptr; // for `this.base`
 
-    Value runFunction(const FunctionDecl& fn, const ClassInfo* definedIn, std::vector<Value>& args);
+    // do_async (frame-stepped loop) state for the current top-level call.
+    bool resumable_ = false;      // this call may suspend/resume a do_async
+    int resumeIndex_ = -1;        // resume at the Nth top-level do_async (-1 = none)
+    bool yielded_ = false;        // set when a do_async suspended this frame
+    int yieldIndex_ = 0;
+
+    Value runFunction(const FunctionDecl& fn, const ClassInfo* definedIn, std::vector<Value>& args,
+                      bool resumable = false);
     void execBlock(const std::vector<StmtPtr>& body);
     void execStmt(const Stmt& s);
     Value eval(const Expr& e);

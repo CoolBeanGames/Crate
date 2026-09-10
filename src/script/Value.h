@@ -63,6 +63,10 @@ struct ScriptObject {
     std::string builtin;                       // "Vector2" / "Vector3" when cls == null
     std::unordered_map<std::string, Value> fields;
     crate::Actor* owner = nullptr;             // owning actor for script components
+
+    // do_async suspension: which top-level do_async of which method is paused.
+    std::string asyncResumeFn;
+    int asyncResumeIndex = 0;
 };
 
 } // namespace crate::script

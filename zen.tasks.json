@@ -273,27 +273,27 @@
             {
               "id": "c23de4095555478490a5cac7bcf9de83",
               "text": "do(while) {} : for as long is while is true loop through the brackets",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "d924cd44277a47c394ed2d49472cccc9",
               "text": "do_async(while) {} : similar to do except only process 1 cycle per frame",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "082804971edf43219d434f21e7b980e5",
               "text": "if(exp) {} if expression is true process the brackets otherwise skip",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "f442b8ec060446cab02c454974a61b4b",
               "text": "if(exp) {} else {} if expressions is false, skip the first bracket and do the second",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "8850fad1dba4411c8c5f5f5e8e9cfca4",
               "text": "switch(value) case 1: {} - if value is 1, process case 1 brackets, otherwise check other cases or default if none are true",
-              "isDone": false
+              "isDone": true
             }
           ],
           "flags": {
@@ -302,11 +302,11 @@
             "release": true,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:50:16.9498468+00:00",
-          "updatedAt": "2026-09-10T01:53:09.8102835+00:00"
+          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
         },
         {
           "id": "43edb2e6d1ea421cacb9983ea2eb1214",
