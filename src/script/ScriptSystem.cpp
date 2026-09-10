@@ -347,6 +347,7 @@ void ScriptSystem::rebuildTypeDocs() {
     add("array", "", false, {"length", "add", "str"});
     add("Vector2", "", false, {"x", "y", "str"});
     add("Vector3", "", false, {"x", "y", "z", "str"});
+    add("Transform", "", false, {"position", "rotation", "scale"});
     add("Actor", "", false, {"name", "position", "rotation", "scale", "get_component"});
     add("Actor2D", "Actor", false, {"name", "position", "rotation", "scale", "get_component"});
     add("Actor3D", "Actor", false, {"name", "position", "rotation", "scale", "get_component"});
@@ -366,7 +367,7 @@ std::vector<std::string> ScriptSystem::completions(const std::string& prefix) co
                                      "switch", "case",   "default", "do",     "do_async", "true",
                                      "false",  "null",   "static", "abstract", "this",  "base",
                                      "break",  "continue"};
-    static const char* globals[] = {"print", "type_of", "Vector2", "Vector3"};
+    static const char* globals[] = {"print", "type_of", "Vector2", "Vector3", "transform", "actor"};
 
     std::vector<std::string> out;
     auto consider = [&](const std::string& s) {

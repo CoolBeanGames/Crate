@@ -420,11 +420,11 @@
             "release": false,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T09:13:27.1340252+00:00",
-          "updatedAt": "2026-09-10T09:15:17.349156+00:00"
+          "updatedAt": "2026-09-10T00:00:00.0000000+00:00"
         },
         {
           "id": "93fe88ff96e8422fad5c6c43fd8dc931",
