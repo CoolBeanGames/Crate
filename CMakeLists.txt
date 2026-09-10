@@ -57,6 +57,7 @@ add_library(crate_core STATIC
     src/assets/FbxImport.cpp
     src/assets/Image.cpp
     src/platform/FileDialog.cpp
+    src/editor/AssetPicker.cpp
     src/editor/Console.cpp
     src/editor/ContextMenu.cpp
     src/editor/Popup.cpp
