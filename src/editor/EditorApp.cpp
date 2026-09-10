@@ -10,6 +10,7 @@
 #include "scene/Actor3D.h"
 #include "scene/BuiltinComponents.h"
 #include "scene/ComponentRegistry.h"
+#include "script/ScriptSystem.h"
 
 #include <algorithm>
 #include <cctype>
@@ -37,6 +38,7 @@ static Actor* findById(Actor& node, uint64_t id) {
 
 EditorApp::EditorApp() : scene_(Scene::makeSample()) {
     registerBuiltinComponents();
+    script::ScriptSystem::get().loadFolder(assetDir_ + "/scripts");
     renderer_.setMeshLibrary(&meshLib_);
     renderer_.setMaterialLibrary(&materialLib_);
     CR_LOG("app", "Crate editor started");

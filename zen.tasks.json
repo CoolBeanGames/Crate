@@ -254,32 +254,32 @@
             {
               "id": "8a4b7d74cc254914a69161ebb867d08c",
               "text": "basic script format .cscript (crate script)",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "1a0ef6fa1a814b44860c5bfbf0cd0948",
               "text": "all scripts have Start Update and Physics Update Functions",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "36160867ac1045b185550d8b44e25af7",
               "text": "code blocks use curley brackets {}",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "4bc41f563da54a449c8db49b212b0bfa",
               "text": "each bracket increases indentation automatically",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "61d23bdb4c8446d5aed3e2590ec2aefc",
               "text": "var untyped to be interpreited at runtime",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "23acf86232e04ee48117c72778b51422",
               "text": "things can also be implicity typed",
-              "isDone": false
+              "isDone": true
             }
           ],
           "flags": {
@@ -288,11 +288,11 @@
             "release": false,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:25:29.3205373+00:00",
-          "updatedAt": "2026-09-10T01:34:26.3891213+00:00"
+          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
         },
         {
           "id": "6cca33174cbd4050b7cb25aeb49b59cf",

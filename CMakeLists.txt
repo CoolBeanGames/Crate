@@ -37,6 +37,13 @@ add_library(crate_core STATIC
     src/scene/Scene.cpp
     src/scene/ComponentRegistry.cpp
     src/scene/BuiltinComponents.cpp
+    src/script/Lexer.cpp
+    src/script/Parser.cpp
+    src/script/Value.cpp
+    src/script/Interpreter.cpp
+    src/script/Format.cpp
+    src/script/ScriptComponent.cpp
+    src/script/ScriptSystem.cpp
     src/render/Mesh.cpp
     src/render/Renderer.cpp
     src/assets/FbxImport.cpp
@@ -93,3 +100,7 @@ add_test(NAME image_tests COMMAND image_tests)
 add_executable(mesh_tests tests/mesh_tests.cpp)
 target_link_libraries(mesh_tests PRIVATE crate_core)
 add_test(NAME mesh_tests COMMAND mesh_tests)
+
+add_executable(script_tests tests/script_tests.cpp)
+target_link_libraries(script_tests PRIVATE crate_core)
+add_test(NAME script_tests COMMAND script_tests)
