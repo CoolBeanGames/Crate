@@ -551,11 +551,11 @@
             "release": true,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T09:19:07.9235141+00:00",
-          "updatedAt": "2026-09-10T09:20:00.8821315+00:00"
+          "updatedAt": "2026-09-10T10:30:00.0000000+00:00"
         },
         {
           "id": "7a764ad264d247a6a7021c275ef2a6b7",
