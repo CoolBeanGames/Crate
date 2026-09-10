@@ -197,8 +197,24 @@ Scene Scene::makeSample() {
         auto mr = std::make_unique<MeshRenderer>();
         mr->primitive = "Sphere";
         lamp->addComponent(std::move(mr));
+        auto lc = std::make_unique<LightComponent>();
+        lc->type = LightComponent::Type::Point;
+        lc->range = 9.0f;
+        lc->intensity = 1.4f;
+        lamp->addComponent(std::move(lc));
     }
     s.add(std::move(lamp), set);
+
+    auto sun = std::make_unique<Actor3D>("Sun");
+    sun->transform().rotationEuler = {55.0f, -30.0f, 0.0f};
+    {
+        auto lc = std::make_unique<LightComponent>();
+        lc->type = LightComponent::Type::Directional;
+        lc->color[0] = 0.55f; lc->color[1] = 0.6f; lc->color[2] = 0.8f;
+        lc->intensity = 0.5f;
+        sun->addComponent(std::move(lc));
+    }
+    s.add(std::move(sun), set);
 
     auto* cast = s.add(std::make_unique<Actor>("-- CAST --"));
     s.add(std::make_unique<SpriteActor>("Player Ghost"), cast);

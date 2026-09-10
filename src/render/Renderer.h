@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 struct ID3D11Device;
 struct ID3D11DeviceContext;
@@ -52,6 +53,11 @@ public:
     struct Options {
         Vec3 clear{0.043f, 0.051f, 0.070f};
         Actor* highlight = nullptr; // selected actor, drawn with a tinted base colour
+        Vec3 ambient{0.14f, 0.14f, 0.17f}; // base light when no light reaches a face
+        bool fogEnabled = false;
+        Vec3 fogColor{0.043f, 0.051f, 0.070f};
+        float fogStart = 6.0f;
+        float fogEnd = 40.0f;
     };
 
     // Render the scene; returns an SRV (as void* for ImGui::Image) valid until
@@ -69,11 +75,24 @@ private:
         uint32_t indexCount = 0;
     };
 
+    // One scene light resolved to world space for the shader.
+    struct LightSample {
+        int type = 1; // 0 dir, 1 point, 2 spot
+        Vec3 pos{};
+        Vec3 dir{0, 0, -1};
+        Vec3 color{1, 1, 1}; // already scaled by intensity
+        float range = 8.0f;
+        float cosInner = 1.0f;
+        float cosOuter = 0.9f;
+    };
+    std::vector<LightSample> lights_;
+
     bool ensureTargets(int w, int h);
     bool compileShaders();
     const GpuMesh& meshFor(const std::string& key, const std::string& primitiveFallback);
     GpuMesh upload(const MeshData& data);
     void drawActor(Actor& actor, const Mat4& viewProj, const Options& opt);
+    void collectLights(Actor& actor); // fills lights_ (world space), capped
     void releaseTargets();
 
     ID3D11Device* device_ = nullptr;

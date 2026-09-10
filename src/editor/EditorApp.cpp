@@ -743,12 +743,15 @@ void EditorApp::drawViewport() {
                 ImGui::SameLine();
                 ImGui::Checkbox("Local", &gizmoLocal_);
                 ImGui::SameLine();
+                ImGui::Checkbox("Fog", &fog_);
+                ImGui::SameLine();
                 ImGui::TextDisabled("W/E/R  |  drag = orbit  |  wheel = zoom");
 
                 ImVec2 size = ImGui::GetContentRegionAvail();
                 int w = static_cast<int>(size.x), h = static_cast<int>(size.y);
                 Renderer::Options opt;
                 opt.highlight = scene_.selected();
+                opt.fogEnabled = fog_;
                 void* srv = renderer_.ready() ? renderer_.render(scene_, camera_, w, h, opt) : nullptr;
 
                 if (srv) {

@@ -95,6 +95,7 @@ private:
     int gizmoOp_ = 0;
     bool gizmoLocal_ = true; // local vs world axes
     bool gizmoInit_ = false;
+    bool fog_ = false;       // viewport distance fog
     std::vector<std::string> importedAssets_; // keys of imported models/textures
     std::string selectedMaterial_;            // asset selection (inspector shows it)
     std::string selectedAsset_;               // selected imported model/texture path

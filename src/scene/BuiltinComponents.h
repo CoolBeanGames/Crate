@@ -30,6 +30,26 @@ public:
     const std::string& primitiveName() const { return primitive; }
 };
 
+// A light source. The renderer collects every enabled LightComponent in the
+// scene and feeds them to a simple per-vertex (Gourand) lighting model.
+class LightComponent : public Component {
+public:
+    enum class Type { Directional, Point, Spot };
+
+    const char* typeName() const override { return "Light"; }
+    void drawInspector() override;
+    std::unique_ptr<Component> clone() const override {
+        return std::make_unique<LightComponent>(*this);
+    }
+
+    Type type = Type::Point;
+    float color[3] = {1.0f, 0.94f, 0.85f};
+    float intensity = 1.0f;
+    float range = 8.0f;        // point / spot falloff distance
+    float spotInnerDeg = 22.0f; // full brightness inside this cone half-angle
+    float spotOuterDeg = 32.0f; // zero past this one
+};
+
 // A tiny demonstration component: spins its actor about an axis while playing.
 // Proves the Start/Update lifecycle and shows up in the Add Component menu.
 class SpinnerComponent : public Component {
