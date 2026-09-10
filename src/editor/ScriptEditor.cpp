@@ -130,15 +130,33 @@ void ScriptEditor::draw() {
     ImGui::Columns(1);
 }
 
+void ScriptEditor::beginNewScript() {
+    newName_ = "NewScript";
+    newRequested_ = true;
+}
+
 void ScriptEditor::drawSidebar() {
-    if (ImGui::SmallButton("New")) {
-        std::string name = ScriptSystem::get().newScript();
-        if (!name.empty())
-            openScript(name);
-    }
+    if (ImGui::SmallButton("New"))
+        beginNewScript();
     ImGui::SameLine();
     if (ImGui::SmallButton("Reload"))
         ScriptSystem::get().reload();
+
+    if (newRequested_) {
+        newRequested_ = false;
+        newPopup_.title("New Script")
+            .size(320, 0)
+            .onBody([this](ui::Popup& p) {
+                p.help("The class gets this name too. Must start with an uppercase letter.");
+                p.inputText("Name", &newName_, /*focusOnAppear=*/true);
+            })
+            .open();
+    }
+    if (newPopup_.draw() == ui::Popup::Result::Ok && !newName_.empty()) {
+        std::string made = ScriptSystem::get().newScript(newName_);
+        if (!made.empty())
+            openScript(made);
+    }
 
     ImGui::TextDisabled("SCRIPTS");
     ImGui::BeginChild("scripts", ImVec2(0, 200), true);

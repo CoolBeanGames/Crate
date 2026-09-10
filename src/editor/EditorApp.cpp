@@ -815,11 +815,8 @@ void EditorApp::assetBrowserMenu() {
     }
     if (menu.beginSub("Scripting")) {
         if (menu.item("New Script")) {
-            std::string name = script::ScriptSystem::get().newScript();
-            if (!name.empty()) {
-                openScriptsTab_ = true;
-                scriptEditor_.openScript(name);
-            }
+            openScriptsTab_ = true;
+            scriptEditor_.beginNewScript();
         }
         if (menu.item("Reload Scripts")) {
             script::ScriptSystem::get().reload();

@@ -42,9 +42,11 @@ public:
     // recompiled, deleted files removed from the list / catalogue.
     void reload();
 
-    // Create a new script from a template in the scripts folder, compile and
-    // register it. Returns the class/file name, or "" on failure.
-    std::string newScript();
+    // Create a new script named `className` from a template in the scripts
+    // folder (file <className>.cscript, `class <className> : Actor`), compile
+    // and register it. The name is validated (uppercase first letter, no
+    // leading digit) and made unique. Returns the final name, or "".
+    std::string newScript(const std::string& className = "NewScript");
 
     // Compile source into a class; registers/updates the type + component.
     // Returns false and fills `errorOut` on a parse error.

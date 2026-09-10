@@ -226,17 +226,27 @@ void ScriptSystem::loadFolder(const std::string& dir) {
     }
 }
 
-std::string ScriptSystem::newScript() {
+std::string ScriptSystem::newScript(const std::string& className) {
     if (dir_.empty())
         dir_ = "assets/scripts";
     std::error_code ec;
     fs::create_directories(dir_, ec);
 
-    // unique class + file name
-    std::string name = "NewScript";
-    for (int n = 1; (types_.count(name) || fs::exists(fs::path(dir_) / (name + ".cscript"), ec));
+    // Sanitize to a valid class identifier.
+    std::string base;
+    for (char c : className)
+        if (std::isalnum((unsigned char)c) || c == '_')
+            base += c;
+    if (base.empty() || std::isdigit((unsigned char)base[0]))
+        base = "Script" + base;
+    if (std::islower((unsigned char)base[0]))
+        base[0] = (char)std::toupper((unsigned char)base[0]);
+
+    // Make it unique.
+    std::string name = base;
+    for (int n = 2; (types_.count(name) || fs::exists(fs::path(dir_) / (name + ".cscript"), ec));
          ++n)
-        name = "NewScript" + std::to_string(n);
+        name = base + std::to_string(n);
 
     const std::string tpl =
         "class " + name + " : Actor\n"

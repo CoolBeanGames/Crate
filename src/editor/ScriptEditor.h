@@ -1,4 +1,5 @@
 #pragma once
+#include "editor/Popup.h"
 #include "imgui_texteditor/TextEditor.h"
 
 #include <string>
@@ -23,6 +24,9 @@ public:
     void saveAll();
     bool hasUnsaved() const;
 
+    // Start the "name your new script" prompt (the class gets the same name).
+    void beginNewScript();
+
     const std::string& current() const { return current_; }
 
 private:
@@ -38,6 +42,10 @@ private:
     std::vector<std::pair<std::string, int>> functions_; // name, line
     bool suppressSync_ = false;
     int syncGrace_ = 0; // skip the spurious text-changed right after SetText
+
+    ui::Popup newPopup_;
+    std::string newName_ = "NewScript";
+    bool newRequested_ = false;
 
     // autocomplete state
     bool acOpen_ = false;
