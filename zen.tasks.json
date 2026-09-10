@@ -473,11 +473,11 @@
             "release": true,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T18:48:08.7959899+00:00",
-          "updatedAt": "2026-09-10T18:48:43.0678311+00:00"
+          "updatedAt": "2026-09-10T15:00:00.0000000+00:00"
         },
         {
           "id": "0837094031af4d629d9af0dc33e2578c",
@@ -499,11 +499,11 @@
             "release": false,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T18:46:27.6148496+00:00",
-          "updatedAt": "2026-09-10T18:47:05.9245501+00:00"
+          "updatedAt": "2026-09-10T15:00:00.0000000+00:00"
         },
         {
           "id": "e1922dbdfac743f7b6255d340776f070",
@@ -523,42 +523,42 @@
             {
               "id": "58c0348720144cdcbe25391f6ab27f97",
               "text": "input map asset",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "87c4d7f157d248c586f258793523c186",
               "text": "double click to open",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "e9bb3d7d52a1404f99b7c89fae453434",
               "text": "buttons",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "066e7a2528ae43978fdb0bdb66aab7ac",
               "text": "4 button axis",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "294fca622c1740b6a542a72cec9be9f6",
               "text": "2 button axis",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "af2acfc39ab24f59becf6e2da4124ac8",
               "text": "scripting side",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "7fed62bdad144e638209edeb27b2b5f8",
               "text": "window",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "28b452e548f7401da9da663729fbb9c6",
               "text": "listen for input",
-              "isDone": false
+              "isDone": true
             }
           ],
           "flags": {
@@ -567,11 +567,11 @@
             "release": false,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T18:49:29.7370408+00:00",
-          "updatedAt": "2026-09-10T18:54:24.7371746+00:00"
+          "updatedAt": "2026-09-10T15:00:00.0000000+00:00"
         }
       ]
     },
