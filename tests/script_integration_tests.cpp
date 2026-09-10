@@ -135,6 +135,33 @@ int main() {
         std::printf("ok  reload: new script added, deleted script removed\n");
     }
 
+    // --- class rename cleans up the old menu entry (task 29) -----------
+    {
+        const std::string dir = sys.scriptsDir();
+        const std::string p = dir + "/Renamer.cscript";
+        {
+            std::ofstream o(p, std::ios::binary);
+            o << "class Alpha : Actor { func update(float d) {} }";
+        }
+        sys.reload();
+        auto* f = sys.file("Alpha");
+        if (!f || !ComponentRegistry::get().has("Alpha")) {
+            std::printf("FAIL: Alpha not loaded\n");
+            std::remove(p.c_str());
+            return 1;
+        }
+        std::string nowName =
+            sys.setSource("Alpha", "class Beta : Actor { func update(float d) {} }");
+        std::remove(p.c_str());
+        if (nowName != "Beta" || ComponentRegistry::get().has("Alpha") ||
+            !ComponentRegistry::get().has("Beta")) {
+            std::printf("FAIL: rename cleanup (name=%s, hasAlpha=%d, hasBeta=%d)\n", nowName.c_str(),
+                        ComponentRegistry::get().has("Alpha"), ComponentRegistry::get().has("Beta"));
+            return 1;
+        }
+        std::printf("ok  class rename: old component entry removed, new one added\n");
+    }
+
     std::printf("ok  Mover ran: rotation.y = %.1f after play\n", y);
     return 0;
 }

@@ -296,20 +296,34 @@ bool ScriptSystem::saveFile(ScriptFile& f) {
     return true;
 }
 
-void ScriptSystem::setSource(const std::string& name, std::string source) {
+std::string ScriptSystem::setSource(const std::string& name, std::string source) {
     ScriptFile* f = file(name);
     if (!f)
-        return;
+        return {};
+    const std::string oldName = f->name;
     f->source = std::move(source);
     f->dirty = true;
     std::string err, newName;
     if (compile(f->source, &err, &newName)) {
         f->error.clear();
-        if (!newName.empty())
+        if (!newName.empty() && newName != oldName) {
             f->name = newName;
+            // The class was renamed: retire the old type and drop its stale
+            // entry from the Add Component menu.
+            if (auto it = types_.find(oldName); it != types_.end()) {
+                retired_.push_back(std::move(it->second));
+                types_.erase(it);
+            }
+            statics_.erase(oldName);
+            ComponentRegistry::get().remove(oldName);
+            resolveBases();
+            rebuildTypeDocs();
+            CR_LOG("script", "Script renamed " + oldName + " -> " + newName);
+        }
     } else {
         f->error = err;
     }
+    return f->name;
 }
 
 const ScriptSystem::TypeDoc* ScriptSystem::typeDoc(const std::string& name) const {

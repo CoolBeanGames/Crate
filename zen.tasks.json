@@ -514,12 +514,12 @@
             {
               "id": "ee29000000004b0e9a00000000000001",
               "text": "renaming a class in the editor removes the stale component-menu entry",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "ee29000000004b0e9a00000000000002",
               "text": "a ScriptComponent attached to an actor reflects code edits without being re-added",
-              "isDone": false
+              "isDone": true
             }
           ],
           "flags": {
@@ -528,11 +528,11 @@
             "release": false,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T09:00:00.0000000+00:00",
-          "updatedAt": "2026-09-10T09:00:00.0000000+00:00"
+          "updatedAt": "2026-09-10T00:00:00.0000000+00:00"
         }
       ]
     },

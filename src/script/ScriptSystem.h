@@ -54,7 +54,9 @@ public:
     std::vector<ScriptFile>& files() { return files_; }
     ScriptFile* file(const std::string& name);
     bool saveFile(ScriptFile& f);
-    void setSource(const std::string& name, std::string source); // marks dirty, recompiles
+    // Update a script's text, recompile, and (if the class was renamed) retire
+    // the old type + menu entry. Returns the script's current name, or "".
+    std::string setSource(const std::string& name, std::string source);
 
     // Autocomplete: all type names, and members of a given type (for `x.` where
     // x is of that type). Also plain keyword/identifier completions.

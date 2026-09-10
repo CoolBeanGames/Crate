@@ -99,7 +99,9 @@ void ScriptEditor::pushToSystem() {
     if (current_.empty())
         return;
     std::string txt = editor_.GetText();
-    ScriptSystem::get().setSource(current_, txt);
+    std::string nowName = ScriptSystem::get().setSource(current_, txt);
+    if (!nowName.empty())
+        current_ = nowName; // follow a class rename
     refreshFunctions();
 }
 
