@@ -1325,7 +1325,7 @@ void EditorApp::folderContextMenu(const std::string& relPath) {
         assetDlgColor_[0] = c.x; assetDlgColor_[1] = c.y;
         assetDlgColor_[2] = c.z; assetDlgColor_[3] = 1.0f;
         assetPopup_.title("Folder Color")
-            .onBody([this](ui::Popup& p) {
+            .onBody([this](ui::Popup&) {
                 ImGui::ColorPicker3("##col", assetDlgColor_);
             })
             .open();
