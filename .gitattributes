@@ -1,0 +1,7 @@
+# Normalize line endings for source; leave vendored code and binaries alone.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.JPG binary
+third_party/** -text
+*.ps1 text eol=crlf

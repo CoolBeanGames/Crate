@@ -1,0 +1,19 @@
+# Build output
+/build/
+/out/
+*.obj
+*.exe
+*.pdb
+*.ilk
+*.lib
+
+# Editor layout written at runtime
+crate_editor.ini
+
+# IDE
+/.vs/
+CMakeSettings.json
+CMakeUserPresets.json
+
+# Task-system scratch
+zen.tasks.json.bak

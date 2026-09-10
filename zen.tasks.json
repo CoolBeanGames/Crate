@@ -1,0 +1,212 @@
+{
+  "schemaVersion": 1,
+  "projectId": "8afe2a0217d7419db234ceda7ecb9dff",
+  "name": "Crate",
+  "nextCardIndex": 4,
+  "tagCatalog": [
+    {
+      "name": "bug",
+      "color": "#7A2632"
+    },
+    {
+      "name": "task",
+      "color": "#2F7A68"
+    },
+    {
+      "name": "UI",
+      "color": "#704F9B"
+    },
+    {
+      "name": "Actors",
+      "color": "#57742F"
+    },
+    {
+      "name": "Scripting",
+      "color": "#386D9A"
+    },
+    {
+      "name": "Data",
+      "color": "#8A4F78"
+    }
+  ],
+  "branches": [
+    {
+      "id": "main",
+      "name": "main",
+      "branch": "main",
+      "isArchive": false,
+      "isCollapsed": false,
+      "isSystem": true,
+      "isLocked": false,
+      "tasks": [
+        {
+          "id": "064051784cdc43b7aeba0c5540b95482",
+          "index": 1,
+          "kind": "note",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "about the project",
+          "task": "This is going to be a simple 3D game engine, a merge of Unreal Unity and Godot with some design principals belonging to one or the other and a melding of the Three. My style is simple PSX style horror games so this engine will be geared towords that. For now we will work in \u0027main\u0027 and focus on the very very basics, before moving into more strucutres sub systems via branches\r\n\r\nLanguage Used should be C\u002B\u002B",
+          "tags": [],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T00:36:52.7890665+00:00",
+          "updatedAt": "2026-09-10T00:46:15.5942426+00:00"
+        },
+        {
+          "id": "c9d4482b33c94eeda497726091ff6dbf",
+          "index": 2,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "initial UI setup",
+          "task": "attached is a screenshot of how the general UI should work. However the \u0022timeline\u0022 at the bottom of the screenshot should not be a timeline it will be split between a few screens which I will detail below",
+          "tags": [
+            "UI"
+          ],
+          "files": [
+            {
+              "id": "bed1af58c5234e0e828d982d21ac6be1",
+              "name": "IMG_5607.JPG",
+              "relativePath": "files/IMG_5607.JPG",
+              "size": 268294
+            }
+          ],
+          "requirements": [
+            {
+              "id": "8f679dd02f7240c3b8884d6a75e0fc14",
+              "text": "left side -\u003E scene view/hierarchy lists all of the actors in the scene",
+              "isDone": true
+            },
+            {
+              "id": "2495b145fb63433580a55838fddc008f",
+              "text": "bottom -\u003E asset browser / engine console / game console : used for browsing files to use and for giving debugging info",
+              "isDone": true
+            },
+            {
+              "id": "914db7ceb0a248e2a03aa4cd73bf3483",
+              "text": "right side -\u003E inspector, shows settings for the currently selected actor or file",
+              "isDone": true
+            },
+            {
+              "id": "b038b74f5ce041a1ab7a0a8f218c958a",
+              "text": "top -\u003E menu bar / play \u0026 stop buttons / settings",
+              "isDone": true
+            },
+            {
+              "id": "b85427402483436eb497b87586edd35b",
+              "text": "middle -\u003E viewport / game view / scripts",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T00:37:04.4617862+00:00",
+          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
+        },
+        {
+          "id": "7a39a4295dcf4fc09ae2939996fa9b6f",
+          "index": 3,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Basic Actors",
+          "task": "Actors are the base class for everything\r\na 3D model is an actor\r\na UI control is an actor\r\na 2D sprite is an actor\r\n\r\nall of these things inherit from actors. So there should be Actor3D which is then inherited by other actor types such as a mesh\r\n\r\nActor2D inherits from Actor also. they all have a Transform and can be parented to one another and will inherit positions from their parents.",
+          "tags": [
+            "Actors",
+            "Scripting",
+            "Data"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "3aac2063308f422896ffc69b9e8f9848",
+              "text": "Actor, Actor2D, Actor3D, base types implemented",
+              "isDone": false
+            },
+            {
+              "id": "dedc16e4997a4d42a3d44a1784a8d643",
+              "text": "Actors can be added to the scene",
+              "isDone": false
+            },
+            {
+              "id": "03b581ce51c94dc99bbc6dee8eda6014",
+              "text": "Actors can be selected and show the details in the inspector",
+              "isDone": false
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T00:37:17.0769602+00:00",
+          "updatedAt": "2026-09-10T00:44:59.3323257+00:00"
+        }
+      ]
+    },
+    {
+      "id": "14dbcb46c5b14e9e93f502f4c7f020dc",
+      "name": "Rendering",
+      "branch": "rendering",
+      "isArchive": false,
+      "isCollapsed": false,
+      "isSystem": false,
+      "isLocked": false,
+      "tasks": []
+    },
+    {
+      "id": "9463e19afcbe4cd18681afff19b840a9",
+      "name": "Scripting",
+      "branch": "scripting",
+      "isArchive": false,
+      "isCollapsed": false,
+      "isSystem": false,
+      "isLocked": false,
+      "tasks": []
+    },
+    {
+      "id": "2b668c739ffe45aaa32fa229a7aff5ed",
+      "name": "Assets",
+      "branch": "assets",
+      "isArchive": false,
+      "isCollapsed": false,
+      "isSystem": false,
+      "isLocked": false,
+      "tasks": []
+    },
+    {
+      "id": "archive",
+      "name": "Archived",
+      "branch": null,
+      "isArchive": true,
+      "isCollapsed": false,
+      "isSystem": true,
+      "isLocked": false,
+      "tasks": []
+    }
+  ]
+}
