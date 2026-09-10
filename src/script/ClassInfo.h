@@ -52,6 +52,15 @@ struct ClassInfo {
         return nullptr;
     }
 
+    // True if this class (or a base) declares the named signal.
+    bool hasSignal(const std::string& n) const {
+        if (decl)
+            for (const auto& sig : decl->signals)
+                if (sig.name == n)
+                    return true;
+        return baseClass && baseClass->hasSignal(n);
+    }
+
     bool isA(const std::string& typeName) const {
         if (name == typeName || base == typeName)
             return true;

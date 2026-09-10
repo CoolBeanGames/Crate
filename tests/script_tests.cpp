@@ -163,6 +163,36 @@ static int run() {
         CHECK(host.transform().rotationEuler.y == 15.0f);
     }
 
+    // --- signals, Godot style (task 48) ----------------------------
+    {
+        Harness h;
+        auto obj = h.load(R"(class sig_c : Actor
+{
+    signal hit;
+    signal scored(points);
+    var log = "";
+    var total = 0;
+
+    func on_hit() { log = log + "H"; }
+    func on_scored(p) { total = total + p; }
+
+    func run() : string
+    {
+        hit.connect(on_hit);
+        scored.connect(on_scored);
+        hit.emit();
+        hit.emit();
+        emit_signal("scored", 5);
+        scored.emit(3);
+        hit.disconnect(on_hit);
+        hit.emit();                 // no-op now
+        return log + "|" + total.str() + "|" + hit.is_connected(on_hit).str();
+    }
+})");
+        Value r = Interpreter(&h.ctx, obj).call("run");
+        CHECK(r.str() == "HH|8|false");
+    }
+
     // --- Math.* global functions (task 47) --------------------------
     {
         Harness h;

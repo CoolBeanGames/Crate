@@ -302,6 +302,13 @@ Value Interpreter::eval(const Expr& e) {
             if (ctx_->findType(e.strVal) || e.strVal == "Actor" || e.strVal == "Actor2D" ||
                 e.strVal == "Actor3D" || e.strVal == "Vector2" || e.strVal == "Vector3")
                 return Value::Type(e.strVal);
+            // a bare signal name on `this`.
+            if (self_ && self_->cls && self_->cls->hasSignal(e.strVal))
+                return Value::SignalRef(self_, e.strVal);
+            // a bare method name is a Callable bound to `this` (for signal
+            // .connect(my_func) and callback passing, Godot-style).
+            if (self_ && self_->cls && self_->cls->findFunction(e.strVal))
+                return Value::Fn(self_, e.strVal);
             throw RuntimeError("unknown identifier '" + e.strVal + "'", e.line);
         }
         case ExprKind::Unary: {
@@ -441,6 +448,11 @@ Value Interpreter::evalMember(const Expr& e) {
         // A script instance exposes its owning actor as `this.actor`.
         if (obj.obj->cls && name == "actor")
             return Value::ActorRef(obj.obj->owner);
+        // Signals and bare method references (Godot-style callables).
+        if (obj.obj->cls && obj.obj->cls->hasSignal(name))
+            return Value::SignalRef(obj.obj, name);
+        if (obj.obj->cls && obj.obj->cls->findFunction(name))
+            return Value::Fn(obj.obj, name);
         throw RuntimeError("no member '" + name + "'", e.line);
     }
     if (obj.t == Value::T::Actor)
@@ -483,8 +495,18 @@ Value Interpreter::evalCall(const Expr& e) {
         args.push_back(eval(*a));
 
     // Global function:  print(...), type_of(...), Vector3(...), Vector2(...)
-    if (callee.kind == ExprKind::Identifier)
+    if (callee.kind == ExprKind::Identifier) {
+        // A local/field holding a Callable can be invoked directly: cb(args).
+        if (Value* v = findVar(callee.strVal))
+            if (v->t == Value::T::Callable)
+                return invokeCallable(*v, std::move(args), e.line);
+        if (self_) {
+            auto fit = self_->fields.find(callee.strVal);
+            if (fit != self_->fields.end() && fit->second.t == Value::T::Callable)
+                return invokeCallable(fit->second, std::move(args), e.line);
+        }
         return builtinCall(callee.strVal, args, e.line);
+    }
 
     // Method call: obj.method(args)
     if (callee.kind == ExprKind::Member) {
@@ -504,6 +526,14 @@ Value Interpreter::evalCall(const Expr& e) {
 
         Value obj = eval(objExpr);
 
+        // Signal.connect / emit / disconnect / is_connected  (Godot-style).
+        if (obj.t == Value::T::Signal)
+            return signalCall(obj, method, std::move(args), e.line);
+
+        // callable.call(args)
+        if (obj.t == Value::T::Callable && (method == "call" || method == "emit"))
+            return invokeCallable(obj, std::move(args), e.line);
+
         // StaticClass.method(...)  -> call on the static singleton
         if (obj.t == Value::T::TypeRef && ctx_->getStatic) {
             if (auto so = ctx_->getStatic(obj.s))
@@ -514,6 +544,17 @@ Value Interpreter::evalCall(const Expr& e) {
             // `this.get_component(...)` / `this.actor` shortcuts forward to the
             // owning actor when the script class has no such method.
             if (!obj.obj->cls->findFunction(method)) {
+                // Godot-3 style signal API on any script object.
+                if (method == "emit_signal" && !args.empty()) {
+                    emitSignal(obj.obj, args[0].str(),
+                               std::vector<Value>(args.begin() + 1, args.end()), e.line);
+                    return Value::Null_();
+                }
+                if ((method == "connect" || method == "disconnect" || method == "is_connected") &&
+                    args.size() >= 2 && args[1].t == Value::T::Callable) {
+                    Value sigRef = Value::SignalRef(obj.obj, args[0].str());
+                    return signalCall(sigRef, method, {args[1]}, e.line);
+                }
                 if (method == "get_component") {
                     std::string tn;
                     if (!args.empty())
@@ -556,6 +597,71 @@ Value Interpreter::evalCall(const Expr& e) {
     }
 
     throw RuntimeError("expression is not callable", e.line);
+}
+
+// Two callables refer to the same target+method (for disconnect / is_connected).
+static bool sameCallable(const Value& a, const Value& b) {
+    return a.t == Value::T::Callable && b.t == Value::T::Callable && a.s == b.s &&
+           a.wobj.lock() == b.wobj.lock();
+}
+
+Value Interpreter::invokeCallable(const Value& fn, std::vector<Value> args, int line) {
+    if (fn.t != Value::T::Callable)
+        throw RuntimeError("value is not callable", line);
+    auto self = fn.wobj.lock();
+    if (!self)
+        return Value::Null_(); // target was freed; a no-op, as in Godot
+    return callMethodOn(self, fn.s, std::move(args), line, false);
+}
+
+void Interpreter::emitSignal(const std::shared_ptr<ScriptObject>& owner, const std::string& name,
+                             std::vector<Value> args, int line) {
+    if (!owner)
+        return;
+    auto it = owner->connections.find(name);
+    if (it == owner->connections.end())
+        return;
+    // Copy: a handler may connect/disconnect while we iterate.
+    std::vector<Value> handlers = it->second;
+    for (const auto& h : handlers)
+        invokeCallable(h, args, line);
+}
+
+Value Interpreter::signalCall(const Value& sig, const std::string& method, std::vector<Value> args,
+                              int line) {
+    if (!sig.obj)
+        throw RuntimeError("signal has no owner", line);
+    auto& conns = sig.obj->connections[sig.s];
+
+    if (method == "connect") {
+        if (args.empty() || args[0].t != Value::T::Callable)
+            throw RuntimeError("signal.connect expects a callable", line);
+        for (const auto& c : conns)
+            if (sameCallable(c, args[0]))
+                return Value::Null_(); // already connected
+        conns.push_back(args[0]);
+        return Value::Null_();
+    }
+    if (method == "disconnect") {
+        if (!args.empty())
+            conns.erase(std::remove_if(conns.begin(), conns.end(),
+                                       [&](const Value& c) { return sameCallable(c, args[0]); }),
+                        conns.end());
+        return Value::Null_();
+    }
+    if (method == "is_connected") {
+        for (const auto& c : conns)
+            if (!args.empty() && sameCallable(c, args[0]))
+                return Value::Bool(true);
+        return Value::Bool(false);
+    }
+    if (method == "emit") {
+        emitSignal(sig.obj, sig.s, std::move(args), line);
+        return Value::Null_();
+    }
+    if (method == "get_connections")
+        return Value::Int((long long)conns.size());
+    throw RuntimeError("signal has no method '" + method + "'", line);
 }
 
 Value Interpreter::mathCall(const std::string& fn, std::vector<Value>& args, int line) {
@@ -642,6 +748,14 @@ Value Interpreter::builtinCall(const std::string& name, std::vector<Value>& args
         if (args[0].t == Value::T::TypeRef)
             return args[0];
         return Value::Type(args[0].typeName());
+    }
+    // Godot-3 style: emit_signal("name", args...) on `this`.
+    if (name == "emit_signal") {
+        if (args.empty())
+            throw RuntimeError("emit_signal needs a signal name", line);
+        std::string sn = args[0].str();
+        emitSignal(self_, sn, std::vector<Value>(args.begin() + 1, args.end()), line);
+        return Value::Null_();
     }
     if (name == "Vector3" || name == "Vector2") {
         double x = args.size() > 0 ? args[0].num() : 0;
