@@ -1,6 +1,7 @@
 #pragma once
 #include "assets/MaterialLibrary.h"
 #include "assets/MeshLibrary.h"
+#include "editor/AssetPicker.h"
 #include "editor/Popup.h"
 #include "editor/ScriptEditor.h"
 #include "render/Camera.h"
@@ -65,6 +66,8 @@ private:
     // or an imported asset (in that priority order).
     void deleteSelection();
 
+    PickerSources pickerSources();
+
     Scene scene_;
     Scene playBackup_;      // scene state captured when Play was pressed
     float physicsAccum_ = 0.0f;
@@ -74,6 +77,7 @@ private:
     OrbitCamera camera_;
     ScriptEditor scriptEditor_;
     ui::Popup renamePopup_;
+    AssetPicker assetPicker_;
     bool scriptMode_ = false;
     bool spinPreview_ = true;
     std::vector<std::string> importedAssets_; // keys of imported models/textures

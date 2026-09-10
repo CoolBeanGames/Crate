@@ -558,16 +558,9 @@ void EditorApp::drawInspector() {
                 ImGui::TextDisabled("MATERIAL");
                 ImGui::SeparatorText(mat->name.c_str());
                 ImGui::ColorEdit4("Base Color", mat->baseColor);
-                ImGui::InputText("Texture", &mat->texturePath);
-                if (ImGui::Button("Browse##mattex")) {
-                    std::string p = platform::openFileDialog(
-                        "Material Texture",
-                        "Images\0*.png;*.jpg;*.jpeg;*.bmp;*.tga;*.tif;*.tiff\0All\0*.*\0");
-                    if (!p.empty()) {
-                        mat->texturePath = p;
-                        renderer_.invalidateTexture(p);
-                    }
-                }
+                if (assetPicker_.field("Texture", PickKind::Texture, &mat->texturePath,
+                                       pickerSources()))
+                    renderer_.invalidateTexture(mat->texturePath);
                 ImGui::DragFloat("Emissive", &mat->emissive, 0.01f, 0.0f, 4.0f);
                 ImGui::Checkbox("Unlit", &mat->unlit);
                 ImGui::Spacing();
@@ -640,7 +633,7 @@ void EditorApp::drawInspector() {
 
         if (auto* sp = dynamic_cast<SpriteActor*>(a)) {
             ImGui::SeparatorText("Sprite");
-            ImGui::InputText("Texture Path", &sp->texturePath);
+            assetPicker_.field("Texture", PickKind::Texture, &sp->texturePath, pickerSources());
             ImGui::ColorEdit4("Tint", sp->tint);
         } else if (auto* ui = dynamic_cast<UIControlActor*>(a)) {
             ImGui::SeparatorText("UI Control");
@@ -668,20 +661,28 @@ void EditorApp::drawInspector() {
                     ImGui::TextDisabled("(disabled)");
                 comp->drawInspector();
 
-                // Material picker for MeshRenderer (needs the MaterialLibrary,
-                // which the component itself does not know about).
+                // Asset-reference fields for MeshRenderer: drawn here because the
+                // component can't reach the asset libraries.
                 if (auto* mr = dynamic_cast<MeshRenderer*>(comp.get())) {
-                    const char* cur = mr->materialRef.empty() ? "<tint only>" : mr->materialRef.c_str();
-                    if (ImGui::BeginCombo("Material", cur)) {
-                        if (ImGui::Selectable("<tint only>", mr->materialRef.empty()))
-                            mr->materialRef.clear();
-                        for (const std::string& mn : materialLib_.names())
-                            if (ImGui::Selectable(mn.c_str(), mr->materialRef == mn))
-                                mr->materialRef = mn;
-                        ImGui::EndCombo();
+                    PickerSources src = pickerSources();
+                    if (!mr->usePrimitive) {
+                        if (assetPicker_.field("Model", PickKind::Mesh, &mr->meshPath, src) &&
+                            !mr->meshPath.empty()) {
+                            // if a bare primitive name was picked, switch back
+                            static const char* prims[] = {"Cube", "Sphere", "Cylinder",
+                                                          "Capsule", "Plane", "Quad"};
+                            for (const char* p : prims)
+                                if (mr->meshPath == p) {
+                                    mr->usePrimitive = true;
+                                    mr->primitive = p;
+                                    mr->meshPath.clear();
+                                }
+                        }
                     }
-                    ImGui::SameLine();
-                    if (ImGui::SmallButton("New##mrmat")) {
+                    assetPicker_.field("Texture", PickKind::Texture, &mr->texturePath, src);
+                    if (assetPicker_.field("Material", PickKind::Material, &mr->materialRef, src))
+                        renderer_.invalidateTexture(mr->texturePath);
+                    if (ImGui::SmallButton("New Material##mrmat")) {
                         Material& m = materialLib_.create("Material");
                         mr->materialRef = m.name;
                     }
@@ -928,6 +929,14 @@ void EditorApp::drawBottomPanel() {
 // ---------------------------------------------------------------------------
 // Actions
 // ---------------------------------------------------------------------------
+PickerSources EditorApp::pickerSources() {
+    PickerSources s;
+    s.materials = &materialLib_;
+    s.importedAssets = &importedAssets_;
+    s.sceneRoot = &scene_.root();
+    return s;
+}
+
 void EditorApp::deleteSelection() {
     if (Actor* a = scene_.selected()) {
         scene_.remove(a);

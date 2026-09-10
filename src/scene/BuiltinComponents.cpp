@@ -21,10 +21,9 @@ void MeshRenderer::drawInspector() {
                     primitive = p;
             ImGui::EndCombo();
         }
-    } else {
-        ImGui::InputText("Model Path", &meshPath);
     }
-    ImGui::InputText("Texture", &texturePath);
+    // Model / Texture / Material are edited by the editor as asset-picker
+    // fields (the component can't reach the asset libraries).
     ImGui::ColorEdit4("Tint", tint);
     ImGui::Checkbox("Cast Shadows", &castShadows);
 }
