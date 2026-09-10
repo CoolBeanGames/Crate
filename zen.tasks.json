@@ -3,6 +3,8 @@
   "projectId": "8afe2a0217d7419db234ceda7ecb9dff",
   "name": "Crate",
   "nextCardIndex": 26,
+  "latestExePath": null,
+  "latestReleasePath": null,
   "tagCatalog": [
     {
       "name": "bug",
@@ -95,6 +97,10 @@
     {
       "name": "cScript",
       "color": "#386D9A"
+    },
+    {
+      "name": "in progress",
+      "color": "#8B7CFF"
     }
   ],
   "branches": [
@@ -189,307 +195,7 @@
       "isCollapsed": false,
       "isSystem": false,
       "isLocked": false,
-      "tasks": [
-        {
-          "id": "dc243aec831c4dceb6e6526bc7e1b4a3",
-          "index": 9,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Importing FBX",
-          "task": "add the ability to drag an FBX into the scene view to import it as an asset",
-          "tags": [
-            "import",
-            "assets",
-            "3D",
-            "files"
-          ],
-          "files": [],
-          "requirements": [
-            {
-              "id": "8123bb3cb8e44465b5080516e0584ec6",
-              "text": "can drag and drop files from explorer",
-              "isDone": true
-            },
-            {
-              "id": "1674c506a8454198bdf312ef7e0aa406",
-              "text": "can import FBX",
-              "isDone": true
-            },
-            {
-              "id": "7b7930e85b2b46f29bce97df1c7d4bd7",
-              "text": "also Imports Materials",
-              "isDone": true
-            }
-          ],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": false,
-            "merge": false
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-10T01:05:33.2822087+00:00",
-          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
-        },
-        {
-          "id": "0b82c25955b64b6a86f30ed667cb9097",
-          "index": 12,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Importing Images",
-          "task": "add support for importing images to be used as textures by dragging them into the asset window OR right clicking and selecting import inside the asset window",
-          "tags": [
-            "files",
-            "assets",
-            "textures",
-            "images"
-          ],
-          "files": [],
-          "requirements": [
-            {
-              "id": "ae82532e064346d0a9cc8bfa62cc9534",
-              "text": "jpeg",
-              "isDone": true
-            },
-            {
-              "id": "bc7262872e514129bb74a6a002f6a7b5",
-              "text": "png",
-              "isDone": true
-            },
-            {
-              "id": "e69ee8a09d5f472dabb5ceeb1c0496e3",
-              "text": "bmp",
-              "isDone": true
-            },
-            {
-              "id": "9bea2664106e4bb69221e320dcdceb90",
-              "text": "tiff",
-              "isDone": true
-            }
-          ],
-          "flags": {
-            "commit": true,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-10T01:15:44.1816267+00:00",
-          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
-        },
-        {
-          "id": "3a566e8ff4b3446db82d469ed488c4cf",
-          "index": 15,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Component framework",
-          "task": "this is the basis for much of the engine, we can add \u0022components\u0022 to actors, such as adding a mesh renderer.",
-          "tags": [
-            "components",
-            "types",
-            "Actors"
-          ],
-          "files": [],
-          "requirements": [
-            {
-              "id": "7e001d4c46ca48ee9eb26bb52c32cf67",
-              "text": "add component button to inspector for actors",
-              "isDone": true
-            },
-            {
-              "id": "b10a665ab13442e2ae19c2990b55c837",
-              "text": "right click blank space in actors inspector for add component",
-              "isDone": true
-            },
-            {
-              "id": "4a5e08878b774972b4143340ac4ffe90",
-              "text": "can delete componetns from an actor",
-              "isDone": true
-            },
-            {
-              "id": "b78e5d55bdc049d8ac48dcc1d53f614d",
-              "text": "can collapse components in the inspector",
-              "isDone": true
-            },
-            {
-              "id": "fbf2e07eccc04802a35410ee37b713f4",
-              "text": "components have Start,Update,PhysicsUpdate methods Update and PhysicsUpdate Take (float delta) as a parameter for the time since the last time it was called",
-              "isDone": true
-            }
-          ],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": false,
-            "merge": false
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-10T01:18:44.3429429+00:00",
-          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
-        },
-        {
-          "id": "e5afa18e3daf4a55b91657d1844c3bd2",
-          "index": 14,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Mesh renderer",
-          "task": "the mesh renderer is the first \u0022component\u0022 and will use the framework we built above, a mesh renderer renders a mesh at the position from the actor its attached tos transform\r\n\r\na mesh renderer will accept one of a few model types (for now just fbx but we will add more) or render a primitive (sphere, cylinder, cube, capsule, plane, quad to start)",
-          "tags": [
-            "rendering",
-            "components",
-            "Actors"
-          ],
-          "files": [],
-          "requirements": [
-            {
-              "id": "038b4a6487bd48adadef0b1fbfe1ca65",
-              "text": "can add mesh renderer",
-              "isDone": true
-            },
-            {
-              "id": "62f5d9277504441c81c32af558de2c3b",
-              "text": "can render cubes",
-              "isDone": true
-            },
-            {
-              "id": "c6bc0cd600124961a97509dedbb26972",
-              "text": "can render spheres",
-              "isDone": true
-            },
-            {
-              "id": "9823e560cec34c6d989983cfeef04464",
-              "text": "can render quads",
-              "isDone": true
-            },
-            {
-              "id": "1fa69d73cd6f4e48923b8a4a1a947708",
-              "text": "can render planes",
-              "isDone": true
-            },
-            {
-              "id": "f1ded36b329543558967b018c6131b0b",
-              "text": "can render capsules",
-              "isDone": true
-            },
-            {
-              "id": "5379fc3f54a041d3b8fc6bf94fa2eb35",
-              "text": "can render cylinders",
-              "isDone": true
-            }
-          ],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": false,
-            "merge": false
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-10T01:18:37.2355825+00:00",
-          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
-        },
-        {
-          "id": "fe4f8bd7950945f0b47da4c90c806da8",
-          "index": 10,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "basic Materials",
-          "task": "lets support creating (and importing) materials",
-          "tags": [
-            "materials",
-            "rendering",
-            "assets"
-          ],
-          "files": [],
-          "requirements": [
-            {
-              "id": "5fe009c24d8c4e00a0cede1032e816cf",
-              "text": "importing a FBX should create any materials it uses and apply its textures if any are present",
-              "isDone": true
-            },
-            {
-              "id": "7cfef429c6e241419a64e85c10b90541",
-              "text": "can create materials via asset window",
-              "isDone": true
-            },
-            {
-              "id": "43975aeccf434000927a6448b2553315",
-              "text": "can set material properties via inspector if one is selected",
-              "isDone": true
-            },
-            {
-              "id": "03cf926d34ac4869b00fe4b4bf4c3829",
-              "text": "materials can be applied to any mesh renderer",
-              "isDone": true
-            }
-          ],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": false,
-            "merge": false
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-10T01:05:39.9304386+00:00",
-          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
-        },
-        {
-          "id": "a3fd796553ba47b8bf19fd7ae12e608e",
-          "index": 13,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "merge",
-          "task": "merge into main but DONT close the branch. Once the Merge is complete move on to the scipting branch",
-          "tags": [
-            "merge"
-          ],
-          "files": [],
-          "requirements": [
-            {
-              "id": "d4caecccb7774f9da89ee2ec5ceb597b",
-              "text": "merged",
-              "isDone": false
-            },
-            {
-              "id": "14161c226dcd4d11aabfcc0b03ac22f8",
-              "text": "created scripting branch",
-              "isDone": false
-            }
-          ],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": true,
-            "merge": true
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-10T01:17:34.877755+00:00",
-          "updatedAt": "2026-09-10T01:24:24.3016364+00:00"
-        }
-      ]
+      "tasks": []
     },
     {
       "id": "9463e19afcbe4cd18681afff19b840a9",
@@ -913,7 +619,7 @@
       "name": "Archived",
       "branch": null,
       "isArchive": true,
-      "isCollapsed": false,
+      "isCollapsed": true,
       "isSystem": true,
       "isLocked": false,
       "tasks": [
@@ -1220,6 +926,305 @@
           "isLocked": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:05:27.8469932+00:00",
+          "updatedAt": "2026-09-09T00:00:00+00:00"
+        },
+        {
+          "id": "dc243aec831c4dceb6e6526bc7e1b4a3",
+          "index": 9,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Importing FBX",
+          "task": "add the ability to drag an FBX into the scene view to import it as an asset",
+          "tags": [
+            "import",
+            "assets",
+            "3D",
+            "files"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "8123bb3cb8e44465b5080516e0584ec6",
+              "text": "can drag and drop files from explorer",
+              "isDone": true
+            },
+            {
+              "id": "1674c506a8454198bdf312ef7e0aa406",
+              "text": "can import FBX",
+              "isDone": true
+            },
+            {
+              "id": "7b7930e85b2b46f29bce97df1c7d4bd7",
+              "text": "also Imports Materials",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:05:33.2822087+00:00",
+          "updatedAt": "2026-09-09T00:00:00+00:00"
+        },
+        {
+          "id": "0b82c25955b64b6a86f30ed667cb9097",
+          "index": 12,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Importing Images",
+          "task": "add support for importing images to be used as textures by dragging them into the asset window OR right clicking and selecting import inside the asset window",
+          "tags": [
+            "files",
+            "assets",
+            "textures",
+            "images"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "ae82532e064346d0a9cc8bfa62cc9534",
+              "text": "jpeg",
+              "isDone": true
+            },
+            {
+              "id": "bc7262872e514129bb74a6a002f6a7b5",
+              "text": "png",
+              "isDone": true
+            },
+            {
+              "id": "e69ee8a09d5f472dabb5ceeb1c0496e3",
+              "text": "bmp",
+              "isDone": true
+            },
+            {
+              "id": "9bea2664106e4bb69221e320dcdceb90",
+              "text": "tiff",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:15:44.1816267+00:00",
+          "updatedAt": "2026-09-09T00:00:00+00:00"
+        },
+        {
+          "id": "3a566e8ff4b3446db82d469ed488c4cf",
+          "index": 15,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Component framework",
+          "task": "this is the basis for much of the engine, we can add \u0022components\u0022 to actors, such as adding a mesh renderer.",
+          "tags": [
+            "components",
+            "types",
+            "Actors"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "7e001d4c46ca48ee9eb26bb52c32cf67",
+              "text": "add component button to inspector for actors",
+              "isDone": true
+            },
+            {
+              "id": "b10a665ab13442e2ae19c2990b55c837",
+              "text": "right click blank space in actors inspector for add component",
+              "isDone": true
+            },
+            {
+              "id": "4a5e08878b774972b4143340ac4ffe90",
+              "text": "can delete componetns from an actor",
+              "isDone": true
+            },
+            {
+              "id": "b78e5d55bdc049d8ac48dcc1d53f614d",
+              "text": "can collapse components in the inspector",
+              "isDone": true
+            },
+            {
+              "id": "fbf2e07eccc04802a35410ee37b713f4",
+              "text": "components have Start,Update,PhysicsUpdate methods Update and PhysicsUpdate Take (float delta) as a parameter for the time since the last time it was called",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:18:44.3429429+00:00",
+          "updatedAt": "2026-09-09T00:00:00+00:00"
+        },
+        {
+          "id": "e5afa18e3daf4a55b91657d1844c3bd2",
+          "index": 14,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Mesh renderer",
+          "task": "the mesh renderer is the first \u0022component\u0022 and will use the framework we built above, a mesh renderer renders a mesh at the position from the actor its attached tos transform\r\n\r\na mesh renderer will accept one of a few model types (for now just fbx but we will add more) or render a primitive (sphere, cylinder, cube, capsule, plane, quad to start)",
+          "tags": [
+            "rendering",
+            "components",
+            "Actors"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "038b4a6487bd48adadef0b1fbfe1ca65",
+              "text": "can add mesh renderer",
+              "isDone": true
+            },
+            {
+              "id": "62f5d9277504441c81c32af558de2c3b",
+              "text": "can render cubes",
+              "isDone": true
+            },
+            {
+              "id": "c6bc0cd600124961a97509dedbb26972",
+              "text": "can render spheres",
+              "isDone": true
+            },
+            {
+              "id": "9823e560cec34c6d989983cfeef04464",
+              "text": "can render quads",
+              "isDone": true
+            },
+            {
+              "id": "1fa69d73cd6f4e48923b8a4a1a947708",
+              "text": "can render planes",
+              "isDone": true
+            },
+            {
+              "id": "f1ded36b329543558967b018c6131b0b",
+              "text": "can render capsules",
+              "isDone": true
+            },
+            {
+              "id": "5379fc3f54a041d3b8fc6bf94fa2eb35",
+              "text": "can render cylinders",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:18:37.2355825+00:00",
+          "updatedAt": "2026-09-09T00:00:00+00:00"
+        },
+        {
+          "id": "fe4f8bd7950945f0b47da4c90c806da8",
+          "index": 10,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "basic Materials",
+          "task": "lets support creating (and importing) materials",
+          "tags": [
+            "materials",
+            "rendering",
+            "assets"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "5fe009c24d8c4e00a0cede1032e816cf",
+              "text": "importing a FBX should create any materials it uses and apply its textures if any are present",
+              "isDone": true
+            },
+            {
+              "id": "7cfef429c6e241419a64e85c10b90541",
+              "text": "can create materials via asset window",
+              "isDone": true
+            },
+            {
+              "id": "43975aeccf434000927a6448b2553315",
+              "text": "can set material properties via inspector if one is selected",
+              "isDone": true
+            },
+            {
+              "id": "03cf926d34ac4869b00fe4b4bf4c3829",
+              "text": "materials can be applied to any mesh renderer",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:05:39.9304386+00:00",
+          "updatedAt": "2026-09-09T00:00:00+00:00"
+        },
+        {
+          "id": "a3fd796553ba47b8bf19fd7ae12e608e",
+          "index": 13,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "merge",
+          "task": "merge into main but DONT close the branch. Once the Merge is complete move on to the scipting branch",
+          "tags": [
+            "merge"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "d4caecccb7774f9da89ee2ec5ceb597b",
+              "text": "merged",
+              "isDone": true
+            },
+            {
+              "id": "14161c226dcd4d11aabfcc0b03ac22f8",
+              "text": "created scripting branch",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": true
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:17:34.877755+00:00",
           "updatedAt": "2026-09-09T00:00:00+00:00"
         }
       ]
