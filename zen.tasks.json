@@ -255,22 +255,22 @@
             {
               "id": "ae82532e064346d0a9cc8bfa62cc9534",
               "text": "jpeg",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "bc7262872e514129bb74a6a002f6a7b5",
               "text": "png",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "e69ee8a09d5f472dabb5ceeb1c0496e3",
               "text": "bmp",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "9bea2664106e4bb69221e320dcdceb90",
               "text": "tiff",
-              "isDone": false
+              "isDone": true
             }
           ],
           "flags": {
@@ -279,11 +279,11 @@
             "release": false,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:15:44.1816267+00:00",
-          "updatedAt": "2026-09-10T01:24:19.44349+00:00"
+          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
         },
         {
           "id": "3a566e8ff4b3446db82d469ed488c4cf",

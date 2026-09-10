@@ -1,10 +1,8 @@
 #include "render/Renderer.h"
+#include "assets/Image.h"
 #include "core/Log.h"
 #include "scene/Actor3D.h"
 #include "scene/Scene.h"
-
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb/stb_image.h"
 
 #include <d3d11.h>
 #include <d3dcompiler.h>
@@ -288,34 +286,31 @@ void* Renderer::loadTexture(const std::string& path) {
     if (it != textureCache_.end())
         return it->second;
 
-    int w = 0, h = 0, comp = 0;
-    stbi_uc* pixels = stbi_load(path.c_str(), &w, &h, &comp, 4);
-    if (!pixels) {
-        CR_WARN("assets", "Could not load image: " + path);
+    Image image = loadImage(path);
+    if (!image.valid()) {
         textureCache_[path] = nullptr;
         return checkerSrv_;
     }
 
     D3D11_TEXTURE2D_DESC td = {};
-    td.Width = w;
-    td.Height = h;
+    td.Width = static_cast<UINT>(image.width);
+    td.Height = static_cast<UINT>(image.height);
     td.MipLevels = 1;
     td.ArraySize = 1;
     td.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     td.SampleDesc.Count = 1;
     td.Usage = D3D11_USAGE_IMMUTABLE;
     td.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-    D3D11_SUBRESOURCE_DATA srd = {pixels, static_cast<UINT>(w * 4), 0};
+    D3D11_SUBRESOURCE_DATA srd = {image.rgba.data(), static_cast<UINT>(image.width * 4), 0};
     ID3D11Texture2D* tex = nullptr;
     ID3D11ShaderResourceView* srv = nullptr;
     if (SUCCEEDED(device_->CreateTexture2D(&td, &srd, &tex))) {
         device_->CreateShaderResourceView(tex, nullptr, &srv);
         tex->Release();
     }
-    stbi_image_free(pixels);
     textureCache_[path] = srv;
-    CR_LOG("assets", "Loaded texture " + path + " (" + std::to_string(w) + "x" +
-                         std::to_string(h) + ")");
+    CR_LOG("assets", "Loaded texture " + path + " (" + std::to_string(image.width) + "x" +
+                         std::to_string(image.height) + ")");
     return srv ? static_cast<void*>(srv) : checkerSrv_;
 }
 

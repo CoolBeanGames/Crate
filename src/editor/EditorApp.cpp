@@ -1,6 +1,8 @@
 #include "editor/EditorApp.h"
 #include "assets/FbxImport.h"
+#include "assets/Image.h"
 #include "editor/Console.h"
+#include "platform/FileDialog.h"
 #include "editor/ContextMenu.h"
 #include "editor/Theme.h"
 #include "core/Log.h"
@@ -72,13 +74,19 @@ void EditorApp::ingestDroppedFile(const std::string& path) {
         Actor* added = scene_.add(std::move(actor));
         scene_.select(added);
         CR_LOG("scene", "Added imported model '" + name + "' to the scene");
-    } else if (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "bmp" || ext == "tga" ||
-               ext == "tiff" || ext == "tif") {
-        importedAssets_.push_back(path);
-        CR_LOG("assets", "Registered image " + path +
-                             " (assign it as a Texture Path, or use the Asset Browser)");
+    } else if (isSupportedImageExt(ext)) {
+        Image probe = loadImage(path);
+        if (!probe.valid()) {
+            CR_ERROR("assets", "Could not decode image: " + path);
+            return;
+        }
+        if (std::find(importedAssets_.begin(), importedAssets_.end(), path) == importedAssets_.end())
+            importedAssets_.push_back(path);
+        CR_LOG("assets", "Imported image " + path + " (" + std::to_string(probe.width) + "x" +
+                             std::to_string(probe.height) + ")");
         if (auto* m = dynamic_cast<MeshActor*>(scene_.selected())) {
             m->texturePath = path;
+            renderer_.invalidateTexture(path);
             CR_LOG("assets", "Applied texture to '" + m->name() + "'");
         }
     } else {
@@ -627,26 +635,59 @@ static void drawConsoleChannel(Console::Channel ch) {
 
 void EditorApp::drawBottomPanel() {
     if (ImGui::Begin("Asset Browser")) {
-        ImGui::TextDisabled("Browsing: %s", assetDir_.c_str());
+        if (ImGui::Button("Import Image...")) {
+            std::string picked = platform::openFileDialog(
+                "Import Image",
+                "Images\0*.png;*.jpg;*.jpeg;*.bmp;*.tga;*.tif;*.tiff;*.gif\0All Files\0*.*\0");
+            if (!picked.empty())
+                ingestDroppedFile(picked);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Import Model...")) {
+            std::string picked =
+                platform::openFileDialog("Import Model", "FBX\0*.fbx\0All Files\0*.*\0");
+            if (!picked.empty())
+                ingestDroppedFile(picked);
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("or drag files onto the window");
         ImGui::Separator();
-        if (ImGui::BeginChild("files")) {
-            std::error_code ec;
-            fs::path base(assetDir_);
-            if (!fs::exists(base, ec)) {
-                ImGui::TextWrapped("No '%s' folder next to the executable yet. Create one and drop "
-                                   "models, textures and sounds in it.",
-                                   assetDir_.c_str());
-            } else {
-                for (const auto& entry : fs::directory_iterator(base, ec)) {
-                    const std::string label =
-                        (entry.is_directory() ? "[dir] " : "      ") +
-                        entry.path().filename().string();
-                    if (ImGui::Selectable(label.c_str()))
-                        CR_LOG("assets", "Asset picked: " + entry.path().string());
+
+        // Everything dropped here can also be dropped straight onto this panel.
+        ImGui::BeginChild("files");
+        if (importedAssets_.empty() && !fs::exists(fs::path(assetDir_))) {
+            ImGui::TextWrapped("No assets yet. Drop .fbx models or .png/.jpg/.bmp/.tiff images "
+                               "onto the window, or use the Import buttons above.");
+        }
+        std::error_code ec;
+        if (fs::exists(fs::path(assetDir_), ec)) {
+            for (const auto& entry : fs::directory_iterator(fs::path(assetDir_), ec)) {
+                std::string label = "  " + entry.path().filename().string();
+                if (ImGui::Selectable(label.c_str()))
+                    ingestDroppedFile(entry.path().string());
+            }
+        }
+        for (const std::string& a : importedAssets_) {
+            std::string name = a;
+            if (auto s = name.find_last_of("/\\"); s != std::string::npos)
+                name = name.substr(s + 1);
+            const std::string ext = lowerExt(a);
+            bool isImg = isSupportedImageExt(ext);
+            if (ImGui::Selectable(((isImg ? "[img] " : "[mesh] ") + name).c_str())) {
+                if (isImg) {
+                    if (auto* m = dynamic_cast<MeshActor*>(scene_.selected())) {
+                        m->texturePath = a;
+                        renderer_.invalidateTexture(a);
+                        CR_LOG("assets", "Applied '" + name + "' to '" + m->name() + "'");
+                    }
                 }
             }
         }
         ImGui::EndChild();
+        if (ImGui::BeginDragDropTarget()) {
+            // Handled by the OS WM_DROPFILES path; this keeps the target visible.
+            ImGui::EndDragDropTarget();
+        }
     }
     ImGui::End();
 

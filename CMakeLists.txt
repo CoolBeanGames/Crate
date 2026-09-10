@@ -38,13 +38,15 @@ add_library(crate_core STATIC
     src/render/Mesh.cpp
     src/render/Renderer.cpp
     src/assets/FbxImport.cpp
+    src/assets/Image.cpp
+    src/platform/FileDialog.cpp
     src/editor/Console.cpp
     src/editor/ContextMenu.cpp
     src/editor/Theme.cpp
     src/editor/EditorApp.cpp
 )
 target_include_directories(crate_core PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
-target_link_libraries(crate_core PUBLIC imgui ufbx)
+target_link_libraries(crate_core PUBLIC imgui ufbx comdlg32)
 
 # --- Editor executable ---------------------------------------------------
 add_executable(Crate WIN32 src/main.cpp)
@@ -76,3 +78,9 @@ target_link_libraries(fbx_tests PRIVATE crate_core)
 target_compile_definitions(fbx_tests PRIVATE
     CRATE_TEST_DATA="${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
 add_test(NAME fbx_tests COMMAND fbx_tests)
+
+add_executable(image_tests tests/image_tests.cpp)
+target_link_libraries(image_tests PRIVATE crate_core)
+target_compile_definitions(image_tests PRIVATE
+    CRATE_TEST_DATA="${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
+add_test(NAME image_tests COMMAND image_tests)
