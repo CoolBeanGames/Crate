@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "projectId": "8afe2a0217d7419db234ceda7ecb9dff",
   "name": "Crate",
-  "nextCardIndex": 47,
+  "nextCardIndex": 55,
   "latestExePath": "C:\\Users\\haptic\\Documents\\git\\Crate\\build-Release\\Crate.exe",
   "latestReleasePath": "https://github.com/CoolBeanGames/Crate/releases/tag/v0.4.0",
   "tagCatalog": [
@@ -109,6 +109,14 @@
     {
       "name": "inspector",
       "color": "#8C553E"
+    },
+    {
+      "name": "Input_Map",
+      "color": "#704F9B"
+    },
+    {
+      "name": "lighting",
+      "color": "#3F6F77"
     }
   ],
   "branches": [
@@ -192,6 +200,34 @@
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:04:06.9034488+00:00",
           "updatedAt": "2026-09-10T01:10:42.5622894+00:00"
+        },
+        {
+          "id": "c56440b816e04b25828b3ba362c3fa1e",
+          "index": 54,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "transform handles",
+          "task": "add draggable translate, rotate, and scale modes and handles to the viewport for the selected object",
+          "tags": [
+            "ui",
+            "3d",
+            "viewport"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T18:56:02.4556693+00:00",
+          "updatedAt": "2026-09-10T13:30:00.0000000+00:00"
         }
       ]
     },
@@ -203,7 +239,66 @@
       "isCollapsed": false,
       "isSystem": false,
       "isLocked": false,
-      "tasks": []
+      "tasks": [
+        {
+          "id": "be28e9f9d30f4dd59726bd6c43658ee5",
+          "index": 52,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Basic Lighting",
+          "task": "add in basic (vertex) lighting support",
+          "tags": [
+            "rendering",
+            "lighting"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "dbc829087e664b90915e718ac57c4800",
+              "text": "vertex lighting",
+              "isDone": false
+            },
+            {
+              "id": "eeaa7f724d1748d0af7e832546db1dfd",
+              "text": "point",
+              "isDone": false
+            },
+            {
+              "id": "ce79e82e59e34987bf6dae440610a697",
+              "text": "spot",
+              "isDone": false
+            },
+            {
+              "id": "1fc24c789faf4cfb9c347a4513113b8a",
+              "text": "directional",
+              "isDone": false
+            },
+            {
+              "id": "c8c495b950f245439fe8b9e85b9b878c",
+              "text": "future support for fog",
+              "isDone": false
+            },
+            {
+              "id": "949c6f24ec314b96b4688a025dc65307",
+              "text": "colors",
+              "isDone": false
+            }
+          ],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T18:54:52.3916047+00:00",
+          "updatedAt": "2026-09-10T18:55:48.7007836+00:00"
+        }
+      ]
     },
     {
       "id": "9463e19afcbe4cd18681afff19b840a9",
@@ -214,66 +309,6 @@
       "isSystem": false,
       "isLocked": false,
       "tasks": [
-        {
-          "id": "c8713673c931477ea4f690e44bb4401b",
-          "index": 45,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "update transform",
-          "task": "this script still wont do anything, the model its attached to doesnt move at all\r\n\r\nclass Test : Actor\n{\n float move_speed = 3;\n func start()\n {\n }\n\n func update(float delta)\n {\n  Vector3 p = transform.position \u002B Vector3(0,1,0);\n  transform.position = p;\n  print(\u0022update\u0022);\n }\n\n func physics_update(float delta)\n {\n }\n}",
-          "tags": [
-            "bug",
-            "task"
-          ],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": false,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-10T13:04:03.8199065+00:00",
-          "updatedAt": "2026-09-10T12:30:00.0000000+00:00"
-        },
-        {
-          "id": "0bb66d26e0414d588ca8753308b9d38c",
-          "index": 46,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "crash on new script",
-          "task": "i attempted to make a new script and when i run the game the whole thing crashes\r\n\r\nclass Test : Actor\n{\n func start()\n {\n }\n\n func update(float delta)\n {\n  transform.position.y \u002B= 1;\n }\n\n func physics_update(float delta)\n {\n }\n}",
-          "tags": [
-            "bug"
-          ],
-          "files": [
-            {
-              "id": "5eb4dab47261470ab5965ec0b3556e2c",
-              "name": "Zen-paste-20260910-080750-a96b3be3960a4632ac1e805b0b6cc100.png",
-              "relativePath": "files/Zen-paste-20260910-080750-a96b3be3960a4632ac1e805b0b6cc100.png",
-              "size": 11641
-            }
-          ],
-          "requirements": [],
-          "flags": {
-            "commit": false,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-10T13:07:07.1683815+00:00",
-          "updatedAt": "2026-09-10T12:30:00.0000000+00:00"
-        },
         {
           "id": "f86523a60f7e49db803c8d21d1381845",
           "index": 16,
@@ -297,6 +332,114 @@
           "isCollapsed": false,
           "createdAt": "2026-09-10T01:24:42.3980421+00:00",
           "updatedAt": "2026-09-10T01:26:17.0976737+00:00"
+        },
+        {
+          "id": "2c341fec325d457cbe6be1e8967a1840",
+          "index": 47,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Math functions",
+          "task": "add in (global) math functions as a child of class Math",
+          "tags": [
+            "Scripting"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "6449437cc447421aad7c120e112b05dd",
+              "text": "clamp",
+              "isDone": false
+            },
+            {
+              "id": "0ad05c2f38ba48858ad588aa2f69989d",
+              "text": "lerp",
+              "isDone": false
+            },
+            {
+              "id": "3843119c025c4a068ee3dfda9bcc05e8",
+              "text": "sine",
+              "isDone": false
+            },
+            {
+              "id": "bebd2c87865c4ccea0f4d76f08acc612",
+              "text": "cos",
+              "isDone": false
+            },
+            {
+              "id": "4374fc4e4846454e98314d8c4aa281d9",
+              "text": "tan",
+              "isDone": false
+            },
+            {
+              "id": "ae8cefd32d824cd3adaa2ca58e4bfce7",
+              "text": "rand_i",
+              "isDone": false
+            },
+            {
+              "id": "a93d9b7ca9a74d94a6703cf5d34f114e",
+              "text": "rand_f",
+              "isDone": false
+            },
+            {
+              "id": "caa8af890a1b40669e6d2fc9eb779f5c",
+              "text": "rand_i_range",
+              "isDone": false
+            },
+            {
+              "id": "b3b18a3cc74b4cb28add8a301c86e83c",
+              "text": "rand_f_range",
+              "isDone": false
+            },
+            {
+              "id": "08c88778c35249fea2cd5d2b148f5d4b",
+              "text": "exp",
+              "isDone": false
+            },
+            {
+              "id": "c799ef99e4844bec91233f2355b1dd8e",
+              "text": "sqrt",
+              "isDone": false
+            }
+          ],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T18:43:39.1779404+00:00",
+          "updatedAt": "2026-09-10T18:45:04.425261+00:00"
+        },
+        {
+          "id": "afc20949260a4de69df54369fd96bdf4",
+          "index": 48,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "signals",
+          "task": "add in signals they should work EXACTLY like godot",
+          "tags": [
+            "Scripting"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": true
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T18:45:33.3098217+00:00",
+          "updatedAt": "2026-09-10T18:46:08.7546089+00:00"
         }
       ]
     },
@@ -308,7 +451,129 @@
       "isCollapsed": false,
       "isSystem": false,
       "isLocked": false,
-      "tasks": []
+      "tasks": [
+        {
+          "id": "5cd5172b25484594960326dad35ba534",
+          "index": 50,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "reference dragging",
+          "task": "I have a mesh rendeerer actor, i tried to drag a texture to it but it doesnt accept it. the bmp doesnt show in the asset picker either",
+          "tags": [
+            "bug",
+            "assets"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T18:48:08.7959899+00:00",
+          "updatedAt": "2026-09-10T18:48:43.0678311+00:00"
+        },
+        {
+          "id": "0837094031af4d629d9af0dc33e2578c",
+          "index": 49,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "asset dragging",
+          "task": "add support for dragging fbx into the scene to spawn an asset with mesh renderer and that mesh",
+          "tags": [
+            "assets"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T18:46:27.6148496+00:00",
+          "updatedAt": "2026-09-10T18:47:05.9245501+00:00"
+        },
+        {
+          "id": "e1922dbdfac743f7b6255d340776f070",
+          "index": 51,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Input Map Asset",
+          "task": "create an input map asset, when you double click it a window pops up, you can map inputs (buttons, 2 or 4 button axis, analog axis) to strings and look up the values, \r\n\r\nbuttons : has signals for just_pressed, just_released, and pressed. maps 1 button to 1 string\r\n\r\n2 button axis : maps a positive and negative key/button to a string and returns a float, where 0 is nothing being pressed\r\n\r\n4 button axis: like a 2 button but it maps to 4 buttons and returns x/y as a vector 2.\r\n\r\nanalog axis: returns a vector 2 from a gamepad joystick.\r\n\r\nall of these are referenced with Input.get_button(name) Input.get_axis(name) so to connect a signal you would do it like this\r\n\r\nfor all button mapps add a \u0022listen\u0022 button to select whatever you hit next as well as a drop down.\r\nInput,get_button(\u0022my_button\u0022).is_just_pressed.connect(my_func);",
+          "tags": [
+            "Input",
+            "Input_Map"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "58c0348720144cdcbe25391f6ab27f97",
+              "text": "input map asset",
+              "isDone": false
+            },
+            {
+              "id": "87c4d7f157d248c586f258793523c186",
+              "text": "double click to open",
+              "isDone": false
+            },
+            {
+              "id": "e9bb3d7d52a1404f99b7c89fae453434",
+              "text": "buttons",
+              "isDone": false
+            },
+            {
+              "id": "066e7a2528ae43978fdb0bdb66aab7ac",
+              "text": "4 button axis",
+              "isDone": false
+            },
+            {
+              "id": "294fca622c1740b6a542a72cec9be9f6",
+              "text": "2 button axis",
+              "isDone": false
+            },
+            {
+              "id": "af2acfc39ab24f59becf6e2da4124ac8",
+              "text": "scripting side",
+              "isDone": false
+            },
+            {
+              "id": "7fed62bdad144e638209edeb27b2b5f8",
+              "text": "window",
+              "isDone": false
+            },
+            {
+              "id": "28b452e548f7401da9da663729fbb9c6",
+              "text": "listen for input",
+              "isDone": false
+            }
+          ],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T18:49:29.7370408+00:00",
+          "updatedAt": "2026-09-10T18:54:24.7371746+00:00"
+        }
+      ]
     },
     {
       "id": "archive",
@@ -366,6 +631,66 @@
           "isCollapsed": false,
           "createdAt": "2026-09-10T09:00:00+00:00",
           "updatedAt": "2026-09-10T00:00:00+00:00"
+        },
+        {
+          "id": "c8713673c931477ea4f690e44bb4401b",
+          "index": 45,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "update transform",
+          "task": "this script still wont do anything, the model its attached to doesnt move at all\r\n\r\nclass Test : Actor\n{\n float move_speed = 3;\n func start()\n {\n }\n\n func update(float delta)\n {\n  Vector3 p = transform.position \u002B Vector3(0,1,0);\n  transform.position = p;\n  print(\u0022update\u0022);\n }\n\n func physics_update(float delta)\n {\n }\n}",
+          "tags": [
+            "bug",
+            "task"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T13:04:03.8199065+00:00",
+          "updatedAt": "2026-09-10T12:30:00+00:00"
+        },
+        {
+          "id": "0bb66d26e0414d588ca8753308b9d38c",
+          "index": 46,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "crash on new script",
+          "task": "i attempted to make a new script and when i run the game the whole thing crashes\r\n\r\nclass Test : Actor\n{\n func start()\n {\n }\n\n func update(float delta)\n {\n  transform.position.y \u002B= 1;\n }\n\n func physics_update(float delta)\n {\n }\n}",
+          "tags": [
+            "bug"
+          ],
+          "files": [
+            {
+              "id": "5eb4dab47261470ab5965ec0b3556e2c",
+              "name": "Zen-paste-20260910-080750-a96b3be3960a4632ac1e805b0b6cc100.png",
+              "relativePath": "files/Zen-paste-20260910-080750-a96b3be3960a4632ac1e805b0b6cc100.png",
+              "size": 11641
+            }
+          ],
+          "requirements": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T13:07:07.1683815+00:00",
+          "updatedAt": "2026-09-10T12:30:00+00:00"
         },
         {
           "id": "c9d4482b33c94eeda497726091ff6dbf",
