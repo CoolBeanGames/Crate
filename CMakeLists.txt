@@ -47,3 +47,9 @@ endif()
 
 set_target_properties(Crate PROPERTIES
     VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
+# --- Tests ---------------------------------------------------------------
+enable_testing()
+add_executable(actor_tests tests/actor_tests.cpp)
+target_link_libraries(actor_tests PRIVATE crate_core)
+add_test(NAME actor_tests COMMAND actor_tests)

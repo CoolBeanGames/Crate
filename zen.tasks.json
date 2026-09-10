@@ -141,17 +141,17 @@
             {
               "id": "3aac2063308f422896ffc69b9e8f9848",
               "text": "Actor, Actor2D, Actor3D, base types implemented",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "dedc16e4997a4d42a3d44a1784a8d643",
               "text": "Actors can be added to the scene",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "03b581ce51c94dc99bbc6dee8eda6014",
               "text": "Actors can be selected and show the details in the inspector",
-              "isDone": false
+              "isDone": true
             }
           ],
           "flags": {
@@ -160,11 +160,11 @@
             "release": false,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T00:37:17.0769602+00:00",
-          "updatedAt": "2026-09-10T00:44:59.3323257+00:00"
+          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
         }
       ]
     },
