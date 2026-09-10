@@ -8,5 +8,6 @@
 third_party/** -text
 *.ps1 text eol=crlf
 *.cscript text eol=lf
-# Zen rewrites this with CRLF; keep it so it doesn't show as perpetually modified.
-zen.tasks.json text eol=crlf
+# Zen owns this file and rewrites it (CRLF, no trailing newline). Disable all
+# git eol normalization for it so it doesn't show as perpetually modified.
+zen.tasks.json -text
