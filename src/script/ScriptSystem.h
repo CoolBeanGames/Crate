@@ -70,6 +70,13 @@ public:
         return types_;
     }
 
+    // Input signal layer: a persistent signal-carrying object per input button,
+    // and per-frame dispatch of just_pressed / just_released / pressed to
+    // connected callables (call after crate::Input::poll()).
+    std::shared_ptr<ScriptObject> inputButton(const std::string& name);
+    void dispatchInput();
+    void resetInput(); // drop connections (called on Stop)
+
     // `static class` singletons: one instance each, ticked every frame while
     // playing regardless of any actor.
     void startStatics();
@@ -91,6 +98,7 @@ private:
     // don't dangle. Not listed / addable.
     std::vector<std::unique_ptr<ClassInfo>> retired_;
     std::unordered_map<std::string, std::shared_ptr<ScriptObject>> statics_;
+    std::unordered_map<std::string, std::shared_ptr<ScriptObject>> inputButtons_;
     std::vector<ScriptFile> files_;
     std::vector<TypeDoc> typeDocs_;
 };

@@ -442,6 +442,10 @@ Value Interpreter::evalMember(const Expr& e) {
     const std::string& name = e.strVal;
 
     if (obj.t == Value::T::Object && obj.obj) {
+        // Input button: just_pressed / just_released / pressed are signals.
+        if (obj.obj->builtin == "InputButton" &&
+            (name == "just_pressed" || name == "just_released" || name == "pressed"))
+            return Value::SignalRef(obj.obj, name);
         auto it = obj.obj->fields.find(name);
         if (it != obj.obj->fields.end())
             return it->second;
@@ -523,6 +527,25 @@ Value Interpreter::evalCall(const Expr& e) {
         if (objExpr.kind == ExprKind::Identifier && objExpr.strVal == "Math" &&
             !findVar("Math") && !(self_ && self_->fields.count("Math")))
             return mathCall(method, args, e.line);
+
+        // Global Input namespace.
+        if (objExpr.kind == ExprKind::Identifier && objExpr.strVal == "Input" && !findVar("Input")) {
+            std::string n = args.empty() ? std::string() : args[0].str();
+            if (method == "get_button")
+                return ctx_->inputButton ? Value::Obj(ctx_->inputButton(n)) : Value::Null_();
+            if (method == "get_axis") {
+                double x = ctx_->inputQuery ? ctx_->inputQuery(n, 3) : 0.0;
+                double y = ctx_->inputQuery ? ctx_->inputQuery(n, 4) : 0.0;
+                return makeVector("Vector2", x, y, 0);
+            }
+            if (method == "is_pressed")
+                return Value::Bool(ctx_->inputQuery && ctx_->inputQuery(n, 0) != 0.0);
+            if (method == "is_just_pressed")
+                return Value::Bool(ctx_->inputQuery && ctx_->inputQuery(n, 1) != 0.0);
+            if (method == "is_just_released")
+                return Value::Bool(ctx_->inputQuery && ctx_->inputQuery(n, 2) != 0.0);
+            throw RuntimeError("Input has no method '" + method + "'", e.line);
+        }
 
         Value obj = eval(objExpr);
 
