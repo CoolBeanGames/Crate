@@ -1,6 +1,8 @@
 #pragma once
 #include "scene/Actor.h"
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace crate {
 
@@ -41,6 +43,19 @@ public:
 
     // Total actor count excluding the root.
     int actorCount() const;
+
+    // --- Actor paths / AUUIDs ------------------------------------------------
+    // Slash-joined actor names from the root down to `actor` (root excluded),
+    // e.g. "SET/Crate". Empty if `actor` is null or the root. Sibling name
+    // clashes are disambiguated with a "#n" suffix on the later sibling.
+    std::string pathOf(const Actor* actor) const;
+
+    // The actor at a path produced by pathOf(), or nullptr.
+    Actor* atPath(const std::string& path) const;
+
+    // Current hierarchy path -> actor AUUID, for every actor in the scene.
+    // Recomputed from the live tree, so it always reflects the latest moves.
+    std::vector<std::pair<std::string, std::string>> actorTable() const;
 
     // --- Play-mode ticking ----------------------------------------------
     void startPlay() { root_->startComponents(); }

@@ -7,6 +7,7 @@
 #include "render/Camera.h"
 #include "render/Renderer.h"
 #include "scene/Scene.h"
+#include <map>
 #include <memory>
 #include <string>
 
@@ -45,7 +46,14 @@ private:
     void drawInspector();
     void drawViewport();
     void drawBottomPanel(); // Asset Browser / Engine Console / Game Console
-    void assetBrowserMenu(); // right-click menu: create / import
+    void assetBrowserMenu(); // right-click menu: create / import / new folder
+    void drawAssetFolders(); // navigable folder tree of the assets directory
+    void folderContextMenu(const std::string& relPath);
+    void drawAssetPopups();  // new folder / rename / delete / colour dialogs
+
+    void loadFolderColors();
+    void saveFolderColors();
+    unsigned int folderColor(const std::string& relPath) const; // 0 = default
 
     // Hierarchy internals.
     void drawHierarchyNode(Actor& actor);
@@ -83,6 +91,17 @@ private:
     std::vector<std::string> importedAssets_; // keys of imported models/textures
     std::string selectedMaterial_;            // asset selection (inspector shows it)
     std::string selectedAsset_;               // selected imported model/texture path
+
+    // Asset-browser folder navigation.
+    std::string assetCwd_; // current sub-folder relative to assetDir_ ("" = root)
+    std::map<std::string, unsigned int> folderColors_; // relPath -> ImU32 (0xAABBGGRR)
+    struct { std::string path; bool cut = false; } folderClip_;
+    enum class AssetDlg { None, NewFolder, RenameFolder, DeleteFolder, ColorFolder };
+    AssetDlg assetDlg_ = AssetDlg::None;
+    std::string assetDlgTarget_;   // folder relPath the dialog acts on
+    std::string assetDlgBuf_;      // name entry
+    float assetDlgColor_[4] = {0.55f, 0.49f, 1.0f, 1.0f};
+    ui::Popup assetPopup_;
     std::unique_ptr<Actor> clipboard_; // deep clone from copy/cut
     bool playing_ = false;
     bool showDemo_ = false;

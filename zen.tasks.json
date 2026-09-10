@@ -192,142 +192,6 @@
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:04:06.9034488+00:00",
           "updatedAt": "2026-09-10T01:10:42.5622894+00:00"
-        },
-        {
-          "id": "ece24b16c65c4561b6ac5b3e7d63d4af",
-          "index": 37,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "delete button",
-          "task": "add functionality for the delete button that deletes whatever is selected (scene actors/assets) when delete is pressed",
-          "tags": [
-            "ui",
-            "input"
-          ],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": false,
-            "merge": false
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-10T09:20:16.9395664+00:00",
-          "updatedAt": "2026-09-10T00:00:00.0000000+00:00"
-        },
-        {
-          "id": "c12016618f374f3abd2dc70b140dac9c",
-          "index": 40,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "popup framework",
-          "task": "create a framework for popups, support standard widgets (text entry, scroll boxes, labels, buttons, etc) we will use this for various systems and dialogs so make sure data can come in and go out. it needs to be generic and scalable.",
-          "tags": [
-            "ui"
-          ],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": true,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-10T09:24:55.259222+00:00",
-          "updatedAt": "2026-09-10T00:00:00.0000000+00:00"
-        },
-        {
-          "id": "dbaf2e894daa402199502cc5c2cc2d68",
-          "index": 38,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Create asset picker framework",
-          "task": "create a popup framework for an asset picker, when we call it we pass it a asset type, it then returns a list of all assets of that type or all scene actors with that type on attached to them. you double click one and it gets assigned to the reference. use the popup framework",
-          "tags": [
-            "ui",
-            "assets",
-            "inspector"
-          ],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": true,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-10T09:21:22.3352162+00:00",
-          "updatedAt": "2026-09-10T00:00:00.0000000+00:00"
-        },
-        {
-          "id": "69204141e6b547aa9fcabb714a7ea29b",
-          "index": 39,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "change asset references to asset pickers",
-          "task": "anywhere that asks for a type rather than a value should use the asset picker we made, for example: materials, meshes, actor references.",
-          "tags": [
-            "ui",
-            "assets",
-            "Scripting"
-          ],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": true,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-10T09:21:39.0198254+00:00",
-          "updatedAt": "2026-09-10T00:00:00.0000000+00:00"
-        },
-        {
-          "id": "f428e9f2dfc645669eac540e2269895c",
-          "index": 41,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "picker dragging",
-          "task": "anything that uses the asset picker should support assets/actors being dragged into to set it instead, as long as the type matches.\r\n\r\nif the type is a mesh for instance, we can drag an actor with a mesh renderer on it and it will be set to that specific mesh renderer.",
-          "tags": [
-            "ui",
-            "assets"
-          ],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": true,
-            "merge": true
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-10T09:27:10.9740788+00:00",
-          "updatedAt": "2026-09-10T00:00:00.0000000+00:00"
         }
       ]
     },
@@ -373,110 +237,6 @@
           "isCollapsed": false,
           "createdAt": "2026-09-10T01:24:42.3980421+00:00",
           "updatedAt": "2026-09-10T01:26:17.0976737+00:00"
-        },
-        {
-          "id": "01c13fd9f55343ecab766eb077edcd42",
-          "index": 30,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "auto indent",
-          "task": "when you are in between brackets it should automatically indent you to whatever indent level the brackets are at \u002B1",
-          "tags": [
-            "scripting"
-          ],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": true,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-10T09:13:17.1312912+00:00",
-          "updatedAt": "2026-09-10T00:00:00.0000000+00:00"
-        },
-        {
-          "id": "be372a334d384c08a28c28f6a11e4400",
-          "index": 31,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "accessing transforms",
-          "task": "transform should be a type that is a variable attached to an actor. So when i create a script it inherits from actor. so to access its rotation should be\r\ntransform.rotation (since we are accessing it from an actor we dont need \u0027this.\u0027 to access its transform",
-          "tags": [
-            "scripting"
-          ],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": true,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-10T09:13:27.1340252+00:00",
-          "updatedAt": "2026-09-10T00:00:00.0000000+00:00"
-        },
-        {
-          "id": "93fe88ff96e8422fad5c6c43fd8dc931",
-          "index": 32,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "script access",
-          "task": "inside of of viewport you have 3 buttons scene,game,scripts. but theres a button up next to stop that is used for entering the script editor. get rid of that button and just use the viewport buttons instead",
-          "tags": [
-            "script editor"
-          ],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": true,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-10T09:15:52.6145076+00:00",
-          "updatedAt": "2026-09-10T00:00:00.0000000+00:00"
-        },
-        {
-          "id": "ef936836d42e46158d5599fbf190f680",
-          "index": 33,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "auto-rename",
-          "task": "when you make a new script, rather than open it right away it should start setting the name for the script. the class it contains should have the same name automatically.",
-          "tags": [
-            "assets"
-          ],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": true,
-            "merge": true
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-10T09:17:08.1056713+00:00",
-          "updatedAt": "2026-09-10T00:00:00.0000000+00:00"
         }
       ]
     },
@@ -489,74 +249,6 @@
       "isSystem": false,
       "isLocked": false,
       "tasks": [
-        {
-          "id": "bb3dbabf2938457fb7e13c3acdae0fc0",
-          "index": 34,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "folders",
-          "task": "add folders to the asset browser",
-          "tags": [
-            "assets"
-          ],
-          "files": [],
-          "requirements": [
-            {
-              "id": "b9bd2a65a77144cdb91f146ef213ede6",
-              "text": "add folder to right click menu",
-              "isDone": false
-            },
-            {
-              "id": "32363801ccd8491cba575df0ce4b4ee4",
-              "text": "when you make a folder immediatly ask for name",
-              "isDone": false
-            },
-            {
-              "id": "a1e0cbff95ec45228b0779a11e1a4ff5",
-              "text": "can right click folder for delete, rename, cut, copy, paste, and change color",
-              "isDone": false
-            }
-          ],
-          "flags": {
-            "commit": true,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-10T09:18:02.7332995+00:00",
-          "updatedAt": "2026-09-10T09:18:55.3110246+00:00"
-        },
-        {
-          "id": "c4f2d559d45a452898b624875e80a109",
-          "index": 36,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "UUID",
-          "task": "assign every asset a UUID as soon as its created,/imported. this will be used to access the asset even if it moves. maintain an internal database that maps paths to UUIDs and whenever an asset moves update that database.",
-          "tags": [
-            "assets"
-          ],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": true,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-10T09:19:07.9235141+00:00",
-          "updatedAt": "2026-09-10T09:20:00.8821315+00:00"
-        },
         {
           "id": "7a764ad264d247a6a7021c275ef2a6b7",
           "index": 42,
@@ -578,11 +270,11 @@
             "release": true,
             "merge": true
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T09:28:51.6976967+00:00",
-          "updatedAt": "2026-09-10T09:29:46.0616448+00:00"
+          "updatedAt": "2026-09-10T10:45:00.0000000+00:00"
         }
       ]
     },
@@ -1764,6 +1456,314 @@
           "isCollapsed": false,
           "createdAt": "2026-09-10T09:00:00+00:00",
           "updatedAt": "2026-09-10T00:00:00+00:00"
+        },
+        {
+          "id": "ece24b16c65c4561b6ac5b3e7d63d4af",
+          "index": 37,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "delete button",
+          "task": "add functionality for the delete button that deletes whatever is selected (scene actors/assets) when delete is pressed",
+          "tags": [
+            "ui",
+            "input"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T09:20:16.9395664+00:00",
+          "updatedAt": "2026-09-10T00:00:00+00:00"
+        },
+        {
+          "id": "c12016618f374f3abd2dc70b140dac9c",
+          "index": 40,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "popup framework",
+          "task": "create a framework for popups, support standard widgets (text entry, scroll boxes, labels, buttons, etc) we will use this for various systems and dialogs so make sure data can come in and go out. it needs to be generic and scalable.",
+          "tags": [
+            "ui"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T09:24:55.259222+00:00",
+          "updatedAt": "2026-09-10T00:00:00+00:00"
+        },
+        {
+          "id": "dbaf2e894daa402199502cc5c2cc2d68",
+          "index": 38,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Create asset picker framework",
+          "task": "create a popup framework for an asset picker, when we call it we pass it a asset type, it then returns a list of all assets of that type or all scene actors with that type on attached to them. you double click one and it gets assigned to the reference. use the popup framework",
+          "tags": [
+            "ui",
+            "assets",
+            "inspector"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T09:21:22.3352162+00:00",
+          "updatedAt": "2026-09-10T00:00:00+00:00"
+        },
+        {
+          "id": "69204141e6b547aa9fcabb714a7ea29b",
+          "index": 39,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "change asset references to asset pickers",
+          "task": "anywhere that asks for a type rather than a value should use the asset picker we made, for example: materials, meshes, actor references.",
+          "tags": [
+            "ui",
+            "assets",
+            "Scripting"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T09:21:39.0198254+00:00",
+          "updatedAt": "2026-09-10T00:00:00+00:00"
+        },
+        {
+          "id": "f428e9f2dfc645669eac540e2269895c",
+          "index": 41,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "picker dragging",
+          "task": "anything that uses the asset picker should support assets/actors being dragged into to set it instead, as long as the type matches.\r\n\r\nif the type is a mesh for instance, we can drag an actor with a mesh renderer on it and it will be set to that specific mesh renderer.",
+          "tags": [
+            "ui",
+            "assets"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": true
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T09:27:10.9740788+00:00",
+          "updatedAt": "2026-09-10T00:00:00+00:00"
+        },
+        {
+          "id": "01c13fd9f55343ecab766eb077edcd42",
+          "index": 30,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "auto indent",
+          "task": "when you are in between brackets it should automatically indent you to whatever indent level the brackets are at \u002B1",
+          "tags": [
+            "scripting"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T09:13:17.1312912+00:00",
+          "updatedAt": "2026-09-10T00:00:00+00:00"
+        },
+        {
+          "id": "be372a334d384c08a28c28f6a11e4400",
+          "index": 31,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "accessing transforms",
+          "task": "transform should be a type that is a variable attached to an actor. So when i create a script it inherits from actor. so to access its rotation should be\r\ntransform.rotation (since we are accessing it from an actor we dont need \u0027this.\u0027 to access its transform",
+          "tags": [
+            "scripting"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T09:13:27.1340252+00:00",
+          "updatedAt": "2026-09-10T00:00:00+00:00"
+        },
+        {
+          "id": "93fe88ff96e8422fad5c6c43fd8dc931",
+          "index": 32,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "script access",
+          "task": "inside of of viewport you have 3 buttons scene,game,scripts. but theres a button up next to stop that is used for entering the script editor. get rid of that button and just use the viewport buttons instead",
+          "tags": [
+            "script editor"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T09:15:52.6145076+00:00",
+          "updatedAt": "2026-09-10T00:00:00+00:00"
+        },
+        {
+          "id": "ef936836d42e46158d5599fbf190f680",
+          "index": 33,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "auto-rename",
+          "task": "when you make a new script, rather than open it right away it should start setting the name for the script. the class it contains should have the same name automatically.",
+          "tags": [
+            "assets"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": true
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T09:17:08.1056713+00:00",
+          "updatedAt": "2026-09-10T00:00:00+00:00"
+        },
+        {
+          "id": "bb3dbabf2938457fb7e13c3acdae0fc0",
+          "index": 34,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "folders",
+          "task": "add folders to the asset browser",
+          "tags": [
+            "assets"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "b9bd2a65a77144cdb91f146ef213ede6",
+              "text": "add folder to right click menu",
+              "isDone": true
+            },
+            {
+              "id": "32363801ccd8491cba575df0ce4b4ee4",
+              "text": "when you make a folder immediatly ask for name",
+              "isDone": true
+            },
+            {
+              "id": "a1e0cbff95ec45228b0779a11e1a4ff5",
+              "text": "can right click folder for delete, rename, cut, copy, paste, and change color",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T09:18:02.7332995+00:00",
+          "updatedAt": "2026-09-10T10:00:00+00:00"
+        },
+        {
+          "id": "c4f2d559d45a452898b624875e80a109",
+          "index": 36,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "UUID",
+          "task": "assign every asset a UUID as soon as its created,/imported. this will be used to access the asset even if it moves. maintain an internal database that maps paths to UUIDs and whenever an asset moves update that database.",
+          "tags": [
+            "assets"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T09:19:07.9235141+00:00",
+          "updatedAt": "2026-09-10T10:30:00+00:00"
         }
       ]
     }

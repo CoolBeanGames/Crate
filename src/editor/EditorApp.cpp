@@ -1,4 +1,5 @@
 #include "editor/EditorApp.h"
+#include "assets/AssetDatabase.h"
 #include "assets/FbxImport.h"
 #include "assets/Image.h"
 #include "editor/Console.h"
@@ -14,6 +15,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
+#include <fstream>
 #include <functional>
 
 #include "imgui.h"
@@ -39,7 +42,9 @@ static Actor* findById(Actor& node, uint64_t id) {
 
 EditorApp::EditorApp() : scene_(Scene::makeSample()) {
     registerBuiltinComponents();
+    AssetDatabase::get().load(assetDir_);
     script::ScriptSystem::get().loadFolder(assetDir_ + "/scripts");
+    loadFolderColors();
     renderer_.setMeshLibrary(&meshLib_);
     renderer_.setMaterialLibrary(&materialLib_);
     CR_LOG("app", "Crate editor started");
@@ -70,6 +75,7 @@ void EditorApp::ingestDroppedFile(const std::string& path) {
         if (std::find(importedAssets_.begin(), importedAssets_.end(), res.key) ==
             importedAssets_.end())
             importedAssets_.push_back(res.key);
+        CR_LOG("assets", "Asset " + res.key + " -> " + AssetDatabase::get().idFor(res.key));
 
         std::string name = path;
         if (auto slash = name.find_last_of("/\\"); slash != std::string::npos)
@@ -92,6 +98,7 @@ void EditorApp::ingestDroppedFile(const std::string& path) {
         }
         if (std::find(importedAssets_.begin(), importedAssets_.end(), path) == importedAssets_.end())
             importedAssets_.push_back(path);
+        AssetDatabase::get().idFor(path);
         CR_LOG("assets", "Imported image " + path + " (" + std::to_string(probe.width) + "x" +
                              std::to_string(probe.height) + ")");
         Actor* sel = scene_.selected();
@@ -110,6 +117,7 @@ void EditorApp::ingestDroppedFile(const std::string& path) {
         if (fs::path(path) != dst)
             fs::copy_file(path, dst, fs::copy_options::overwrite_existing, ec);
         sys.loadFolder(dir);
+        AssetDatabase::get().idFor(dst.generic_string());
         CR_LOG("assets", "Imported script " + dst.filename().string());
     } else {
         CR_WARN("assets", "Unsupported drop: " + path);
@@ -569,6 +577,8 @@ void EditorApp::drawInspector() {
                                 fix(*c);
                         };
                         fix(scene_.root());
+                        AssetDatabase::get().moved("material:" + selectedMaterial_,
+                                                   "material:" + renameBuf);
                         CR_LOG("assets", "Renamed material '" + selectedMaterial_ + "' -> '" +
                                              renameBuf + "'");
                         selectedMaterial_ = renameBuf;
@@ -662,6 +672,7 @@ void EditorApp::drawInspector() {
                         renderer_.invalidateTexture(mr->texturePath);
                     if (ImGui::SmallButton("New Material##mrmat")) {
                         Material& m = materialLib_.create("Material");
+                        AssetDatabase::get().idFor("material:" + m.name);
                         mr->materialRef = m.name;
                     }
                 }
@@ -801,14 +812,64 @@ static void drawConsoleChannel(Console::Channel ch) {
     ImGui::EndChild();
 }
 
+unsigned int EditorApp::folderColor(const std::string& relPath) const {
+    auto it = folderColors_.find(relPath);
+    return it == folderColors_.end() ? 0u : it->second;
+}
+
+void EditorApp::loadFolderColors() {
+    folderColors_.clear();
+    std::ifstream in(fs::path(assetDir_) / ".foldercolors");
+    std::string line;
+    while (std::getline(in, line)) {
+        auto tab = line.find('\t');
+        if (tab == std::string::npos)
+            continue;
+        folderColors_[line.substr(0, tab)] =
+            (unsigned int)std::strtoul(line.substr(tab + 1).c_str(), nullptr, 16);
+    }
+}
+
+void EditorApp::saveFolderColors() {
+    std::error_code ec;
+    fs::create_directories(assetDir_, ec);
+    std::ofstream out(fs::path(assetDir_) / ".foldercolors", std::ios::trunc);
+    for (const auto& [p, c] : folderColors_)
+        out << p << '\t' << std::hex << c << '\n';
+}
+
 void EditorApp::assetBrowserMenu() {
     static ui::ContextMenu menu("asset_ctx");
     if (!menu.beginWindowPopup(/*overItems=*/true))
         return;
 
     menu.label("CREATE");
+    if (menu.item("New Folder")) {
+        assetDlg_ = AssetDlg::NewFolder;
+        assetDlgTarget_ = assetCwd_;
+        assetDlgBuf_ = "New Folder";
+        assetPopup_.title("New Folder").onBody([this](ui::Popup& p) {
+            p.inputText("Name", &assetDlgBuf_, true);
+        }).open();
+    }
+    if (!folderClip_.path.empty() && menu.item("Paste Folder Here")) {
+        std::error_code ec;
+        fs::path srcP(folderClip_.path);
+        fs::path dst = fs::path(assetDir_) / assetCwd_ / srcP.filename();
+        if (folderClip_.cut) {
+            fs::rename(srcP, dst, ec);
+            if (!ec)
+                AssetDatabase::get().movedPrefix(srcP.generic_string() + "/",
+                                                 dst.generic_string() + "/");
+            folderClip_.path.clear();
+        } else {
+            fs::copy(srcP, dst, fs::copy_options::recursive, ec);
+        }
+        CR_LOG("assets", ec ? "Paste failed" : "Pasted folder");
+    }
     if (menu.item("Create Material")) {
         Material& m = materialLib_.create("Material");
+        AssetDatabase::get().idFor("material:" + m.name);
         selectedMaterial_ = m.name;
         scene_.select(nullptr);
         CR_LOG("assets", "Created material '" + m.name + "'");
@@ -838,26 +899,183 @@ void EditorApp::assetBrowserMenu() {
     menu.end();
 }
 
+void EditorApp::drawAssetFolders() {
+    std::error_code ec;
+    fs::path base = fs::path(assetDir_) / assetCwd_;
+    if (!fs::exists(base, ec)) {
+        ImGui::TextWrapped("No assets folder yet. Right-click to create one.");
+        return;
+    }
+
+    // Directories first, then files.
+    std::vector<fs::directory_entry> dirs, files;
+    for (const auto& e : fs::directory_iterator(base, ec)) {
+        if (e.path().filename().string()[0] == '.')
+            continue; // hidden / sidecar
+        (e.is_directory(ec) ? dirs : files).push_back(e);
+    }
+
+    for (const auto& d : dirs) {
+        std::string name = d.path().filename().string();
+        std::string rel = assetCwd_.empty() ? name : assetCwd_ + "/" + name;
+        unsigned int col = folderColor(rel);
+        ImGui::PushID(rel.c_str());
+        if (col)
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(col));
+        bool clicked = ImGui::Selectable(("[dir]  " + name).c_str(), false,
+                                         ImGuiSelectableFlags_AllowDoubleClick);
+        if (col)
+            ImGui::PopStyleColor();
+        if (clicked && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+            assetCwd_ = rel;
+        folderContextMenu(rel);
+        ImGui::PopID();
+    }
+
+    for (const auto& f : files) {
+        std::string name = f.path().filename().string();
+        if (ImGui::Selectable(("       " + name).c_str()))
+            ingestDroppedFile(f.path().string());
+    }
+}
+
+void EditorApp::folderContextMenu(const std::string& relPath) {
+    static ui::ContextMenu menu(nullptr);
+    if (!menu.beginItemPopup())
+        return;
+    std::string name = fs::path(relPath).filename().string();
+    if (menu.item("Open"))
+        assetCwd_ = relPath;
+    menu.separator();
+    if (menu.item("Rename")) {
+        assetDlg_ = AssetDlg::RenameFolder;
+        assetDlgTarget_ = relPath;
+        assetDlgBuf_ = name;
+        assetPopup_.title("Rename Folder")
+            .onBody([this](ui::Popup& p) { p.inputText("Name", &assetDlgBuf_, true); })
+            .open();
+    }
+    if (menu.item("Delete")) {
+        assetDlg_ = AssetDlg::DeleteFolder;
+        assetDlgTarget_ = relPath;
+        assetPopup_.title("Delete Folder")
+            .okLabel("Delete")
+            .onBody([name](ui::Popup& p) {
+                p.help(("Delete '" + name + "' and everything in it? This cannot be undone.")
+                           .c_str());
+            })
+            .open();
+    }
+    menu.separator();
+    if (menu.item("Cut"))
+        folderClip_ = {(fs::path(assetDir_) / relPath).string(), true};
+    if (menu.item("Copy"))
+        folderClip_ = {(fs::path(assetDir_) / relPath).string(), false};
+    if (menu.item("Paste Into", nullptr, !folderClip_.path.empty())) {
+        std::error_code ec;
+        fs::path srcP(folderClip_.path);
+        fs::path dst = fs::path(assetDir_) / relPath / srcP.filename();
+        if (folderClip_.cut) {
+            fs::rename(srcP, dst, ec);
+            if (!ec)
+                AssetDatabase::get().movedPrefix(srcP.generic_string() + "/",
+                                                 dst.generic_string() + "/");
+            folderClip_.path.clear();
+        } else {
+            fs::copy(srcP, dst, fs::copy_options::recursive, ec);
+        }
+    }
+    menu.separator();
+    if (menu.item("Change Color...")) {
+        assetDlg_ = AssetDlg::ColorFolder;
+        assetDlgTarget_ = relPath;
+        unsigned int cur = folderColor(relPath);
+        ImVec4 c = cur ? ImGui::ColorConvertU32ToFloat4(cur) : ImVec4(0.55f, 0.49f, 1.0f, 1.0f);
+        assetDlgColor_[0] = c.x; assetDlgColor_[1] = c.y;
+        assetDlgColor_[2] = c.z; assetDlgColor_[3] = 1.0f;
+        assetPopup_.title("Folder Color")
+            .onBody([this](ui::Popup& p) {
+                ImGui::ColorPicker3("##col", assetDlgColor_);
+            })
+            .open();
+    }
+    if (folderColor(relPath) && menu.item("Clear Color")) {
+        folderColors_.erase(relPath);
+        saveFolderColors();
+    }
+    menu.end();
+}
+
+void EditorApp::drawAssetPopups() {
+    if (assetDlg_ == AssetDlg::None)
+        return;
+    ui::Popup::Result r = assetPopup_.draw();
+    if (r == ui::Popup::Result::Open)
+        return;
+
+    std::error_code ec;
+    if (r == ui::Popup::Result::Ok) {
+        switch (assetDlg_) {
+            case AssetDlg::NewFolder:
+                if (!assetDlgBuf_.empty())
+                    fs::create_directories(
+                        fs::path(assetDir_) / assetDlgTarget_ / assetDlgBuf_, ec);
+                break;
+            case AssetDlg::RenameFolder:
+                if (!assetDlgBuf_.empty()) {
+                    fs::path p = fs::path(assetDir_) / assetDlgTarget_;
+                    fs::path np = p.parent_path() / assetDlgBuf_;
+                    fs::rename(p, np, ec);
+                    if (!ec)
+                        AssetDatabase::get().movedPrefix(p.generic_string() + "/",
+                                                         np.generic_string() + "/");
+                }
+                break;
+            case AssetDlg::DeleteFolder:
+                fs::remove_all(fs::path(assetDir_) / assetDlgTarget_, ec);
+                folderColors_.erase(assetDlgTarget_);
+                saveFolderColors();
+                if (assetCwd_ == assetDlgTarget_)
+                    assetCwd_ = fs::path(assetDlgTarget_).parent_path().string();
+                break;
+            case AssetDlg::ColorFolder:
+                folderColors_[assetDlgTarget_] = ImGui::ColorConvertFloat4ToU32(
+                    ImVec4(assetDlgColor_[0], assetDlgColor_[1], assetDlgColor_[2], 1.0f));
+                saveFolderColors();
+                break;
+            default:
+                break;
+        }
+        if (ec)
+            CR_WARN("assets", "Folder operation failed: " + ec.message());
+    }
+    assetDlg_ = AssetDlg::None;
+}
+
 void EditorApp::drawBottomPanel() {
     if (ImGui::Begin("Asset Browser")) {
-        ImGui::TextDisabled("right-click for asset actions   |   or drag files onto the window");
-        ImGui::Separator();
-
-        // Everything dropped here can also be dropped straight onto this panel.
-        ImGui::BeginChild("files");
-        assetBrowserMenu(); // right-click anywhere in the list
-        if (importedAssets_.empty() && !fs::exists(fs::path(assetDir_))) {
-            ImGui::TextWrapped("No assets yet. Right-click to create or import, or drag files "
-                               "(.fbx / images / .cscript) onto the window.");
-        }
-        std::error_code ec;
-        if (fs::exists(fs::path(assetDir_), ec)) {
-            for (const auto& entry : fs::directory_iterator(fs::path(assetDir_), ec)) {
-                std::string label = "  " + entry.path().filename().string();
-                if (ImGui::Selectable(label.c_str()))
-                    ingestDroppedFile(entry.path().string());
+        // Breadcrumb.
+        if (ImGui::SmallButton("assets"))
+            assetCwd_.clear();
+        if (!assetCwd_.empty()) {
+            std::string acc;
+            for (auto part : fs::path(assetCwd_)) {
+                ImGui::SameLine(0, 2);
+                ImGui::TextDisabled("/");
+                ImGui::SameLine(0, 2);
+                acc = acc.empty() ? part.string() : acc + "/" + part.string();
+                if (ImGui::SmallButton(part.string().c_str()))
+                    assetCwd_ = acc;
             }
         }
+        ImGui::SameLine();
+        ImGui::TextDisabled("   right-click for actions   |   drag files onto the window");
+        ImGui::Separator();
+
+        ImGui::BeginChild("files");
+        assetBrowserMenu(); // right-click empty space
+        drawAssetFolders();
+
         for (const std::string& mn : materialLib_.names()) {
             if (ImGui::Selectable(("[mat] " + mn).c_str(), selectedMaterial_ == mn)) {
                 selectedMaterial_ = mn;
@@ -904,6 +1122,7 @@ void EditorApp::drawBottomPanel() {
             // Handled by the OS WM_DROPFILES path; this keeps the target visible.
             ImGui::EndDragDropTarget();
         }
+        drawAssetPopups();
     }
     ImGui::End();
 
@@ -935,6 +1154,7 @@ void EditorApp::deleteSelection() {
     if (!selectedMaterial_.empty()) {
         CR_LOG("assets", "Deleted material '" + selectedMaterial_ + "'");
         materialLib_.remove(selectedMaterial_);
+        AssetDatabase::get().forget("material:" + selectedMaterial_);
         selectedMaterial_.clear();
         return;
     }
@@ -942,6 +1162,7 @@ void EditorApp::deleteSelection() {
         auto it = std::find(importedAssets_.begin(), importedAssets_.end(), selectedAsset_);
         if (it != importedAssets_.end()) {
             CR_LOG("assets", "Removed asset '" + *it + "' from the browser");
+            AssetDatabase::get().forget(*it);
             importedAssets_.erase(it);
         }
         selectedAsset_.clear();

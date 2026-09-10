@@ -54,6 +54,7 @@ add_library(crate_core STATIC
     src/script/ScriptSystem.cpp
     src/render/Mesh.cpp
     src/render/Renderer.cpp
+    src/assets/AssetDatabase.cpp
     src/assets/FbxImport.cpp
     src/assets/Image.cpp
     src/platform/FileDialog.cpp
@@ -111,6 +112,10 @@ add_test(NAME image_tests COMMAND image_tests)
 add_executable(mesh_tests tests/mesh_tests.cpp)
 target_link_libraries(mesh_tests PRIVATE crate_core)
 add_test(NAME mesh_tests COMMAND mesh_tests)
+
+add_executable(asset_db_tests tests/asset_db_tests.cpp)
+target_link_libraries(asset_db_tests PRIVATE crate_core)
+add_test(NAME asset_db_tests COMMAND asset_db_tests)
 
 add_executable(script_tests tests/script_tests.cpp)
 target_link_libraries(script_tests PRIVATE crate_core)
