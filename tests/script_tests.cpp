@@ -225,6 +225,31 @@ static int run() {
         CHECK(threw);
     }
 
+    // --- expressions: the task 22 examples -------------------------
+    {
+        Harness h;
+        auto obj = h.load(R"(class exprs : Actor
+{
+    func run() : string
+    {
+        var out = "";
+        out = out + (1 + 2).str();            // 3
+        var x = 4; var y = 5;
+        out = out + "," + (x + y).str();       // 9
+        out = out + "," + (1 == 1).str();      // true
+        out = out + "," + (1 != 1).str();      // false
+        out = out + "," + (1 == 2).str();      // false
+        out = out + "," + ("text" + "text");   // texttext
+        out = out + "," + ("text" + 1.str());  // text1
+        out = out + "," + (10 % 3).str();      // 1
+        out = out + "," + (2.0 * 3).str();     // 6
+        return out;
+    }
+})");
+        Value r = Interpreter(&h.ctx, obj).call("run");
+        CHECK(r.str() == "3,9,true,false,false,texttext,text1,1,6");
+    }
+
     // --- classes: statics + name rules (task 20) ------------------
     {
         auto& sys = ScriptSystem::get();
