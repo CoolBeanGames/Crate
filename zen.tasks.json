@@ -325,7 +325,7 @@
             {
               "id": "4286fe75bcd54dac888b68c1ba2b30be",
               "text": "merge and stop processing",
-              "isDone": false
+              "isDone": true
             }
           ],
           "flags": {
@@ -334,11 +334,11 @@
             "release": true,
             "merge": true
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:50:21.8523643+00:00",
-          "updatedAt": "2026-09-10T01:53:10.826985+00:00"
+          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
         }
       ]
     },
