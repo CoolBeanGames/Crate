@@ -446,11 +446,11 @@
             "release": false,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T09:15:52.6145076+00:00",
-          "updatedAt": "2026-09-10T09:16:55.261462+00:00"
+          "updatedAt": "2026-09-10T00:00:00.0000000+00:00"
         },
         {
           "id": "ef936836d42e46158d5599fbf190f680",

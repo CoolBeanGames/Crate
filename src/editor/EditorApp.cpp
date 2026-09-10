@@ -191,18 +191,6 @@ void EditorApp::onFrame() {
     drawMenuBar();
     drawToolbar();
 
-    if (scriptMode_) {
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
-        ImGui::BeginChild("##scriptmode", ImVec2(0, 0), false);
-        scriptEditor_.draw();
-        ImGui::EndChild();
-        ImGui::PopStyleVar();
-        ImGui::End(); // dock host
-        if (showDemo_)
-            ImGui::ShowDemoWindow(&showDemo_);
-        return;
-    }
-
     ImGuiID dockspace_id = ImGui::GetID("CrateDockspace");
     if (ImGui::DockBuilderGetNode(dockspace_id) == nullptr) {
         ImGui::DockBuilderRemoveNode(dockspace_id);
@@ -313,16 +301,6 @@ void EditorApp::drawToolbar() {
     if (ImGui::Button("  Stop  "))
         setPlaying(false);
     ImGui::EndDisabled();
-
-    ImGui::SameLine(0, 20);
-    if (scriptMode_)
-        ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
-    if (ImGui::Button(scriptMode_ ? "  Scene  " : "  Script Editor  ")) {
-        scriptMode_ = !scriptMode_;
-        CR_LOG("app", scriptMode_ ? "Switched to Script Editor" : "Switched to Scene");
-    }
-    if (scriptMode_)
-        ImGui::PopStyleColor();
 
     ImGui::SameLine(0, 20);
     ImGui::TextDisabled("SCENE: %s   |   ACTORS: %d   |   %s", scene_.name().c_str(),
@@ -775,9 +753,11 @@ void EditorApp::drawViewport() {
                 ImGui::Dummy(size);
                 ImGui::EndTabItem();
             }
-            if (ImGui::BeginTabItem("Scripts")) {
-                ImGui::TextWrapped("Script editing binds to the Scripting branch. Selected actor: %s",
-                                   scene_.selected() ? scene_.selected()->name().c_str() : "(none)");
+            ImGuiTabItemFlags scriptsFlags =
+                openScriptsTab_ ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
+            openScriptsTab_ = false;
+            if (ImGui::BeginTabItem("Scripts", nullptr, scriptsFlags)) {
+                scriptEditor_.draw();
                 ImGui::EndTabItem();
             }
             ImGui::EndTabBar();
@@ -837,7 +817,7 @@ void EditorApp::assetBrowserMenu() {
         if (menu.item("New Script")) {
             std::string name = script::ScriptSystem::get().newScript();
             if (!name.empty()) {
-                scriptMode_ = true;
+                openScriptsTab_ = true;
                 scriptEditor_.openScript(name);
             }
         }

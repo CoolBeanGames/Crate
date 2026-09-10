@@ -31,7 +31,7 @@ public:
     // added to the scene; images are registered for use as textures.
     void ingestDroppedFile(const std::string& path);
 
-    void setScriptMode(bool on) { scriptMode_ = on; }
+    void setScriptMode(bool on) { openScriptsTab_ = on; }
 
     // Draw one editor frame. Call between ImGui::NewFrame() and ImGui::Render().
     void onFrame();
@@ -78,7 +78,7 @@ private:
     ScriptEditor scriptEditor_;
     ui::Popup renamePopup_;
     AssetPicker assetPicker_;
-    bool scriptMode_ = false;
+    bool openScriptsTab_ = false; // one-shot: select the viewport Scripts tab
     bool spinPreview_ = true;
     std::vector<std::string> importedAssets_; // keys of imported models/textures
     std::string selectedMaterial_;            // asset selection (inspector shows it)
