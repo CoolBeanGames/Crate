@@ -449,11 +449,11 @@
             "release": false,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:25:37.3311946+00:00",
-          "updatedAt": "2026-09-10T01:47:15.4925337+00:00"
+          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
         },
         {
           "id": "f9f10b41387c43bd8e52cab7a4c997fd",

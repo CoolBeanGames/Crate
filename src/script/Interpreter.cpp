@@ -89,8 +89,10 @@ Value Interpreter::runFunction(const FunctionDecl& fn, const ClassInfo* definedI
     const ClassInfo* prevDispatch = dispatchClass_;
     dispatchClass_ = definedIn ? definedIn : dispatchClass_;
     scopes_.push_back({});
-    for (size_t k = 0; k < fn.params.size(); ++k)
-        scopes_.back().vars[fn.params[k].name] = k < args.size() ? args[k] : Value::Null_();
+    for (size_t k = 0; k < fn.params.size(); ++k) {
+        Value a = k < args.size() ? args[k] : Value::Null_();
+        scopes_.back().vars[fn.params[k].name] = coerce(std::move(a), fn.params[k].type);
+    }
 
     Value result = Value::Null_();
     try {
@@ -345,8 +347,10 @@ Value Interpreter::callMethodOn(std::shared_ptr<ScriptObject> obj, const std::st
         throw RuntimeError("no base class for '" + method + "'", line);
     const ClassInfo* definedIn = nullptr;
     const FunctionDecl* fn = start->findFunction(method, &definedIn);
-    if (!fn || fn->isAbstract)
+    if (!fn)
         throw RuntimeError("method '" + method + "' not found", line);
+    if (fn->isAbstract)
+        throw RuntimeError("abstract function '" + method + "' has no override", line);
     Interpreter sub(ctx_, obj);
     return sub.runFunction(*fn, definedIn, args);
 }

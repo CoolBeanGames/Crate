@@ -187,6 +187,43 @@ static int run() {
         CHECK(r.str() == "9,4");
     }
 
+    // --- functions: params, optional return, abstract/override (task 19)
+    {
+        Harness h;
+        // abstract base; concrete override; base helper called via this.base
+        h.load(R"(class shape : Actor
+{
+    abstract func area() : float;
+    func describe() : string { return "area=" + this.area().str(); }
+})");
+        auto sq = h.load(R"(class square : shape
+{
+    float side = 3.0;
+    func area() : float { return side * side; }
+    func perimeter(int sides) { return side * sides; }
+})");
+        Interpreter i1(&h.ctx, sq);
+        CHECK(i1.call("area").num() == 9.0);
+        CHECK(i1.call("describe").str() == "area=9");
+        // no declared return type still returns a value
+        CHECK(Interpreter(&h.ctx, sq).call("perimeter", {Value::Int(4)}).num() == 12.0);
+
+        // calling the abstract directly on a class that never overrides -> error
+        Harness h2;
+        auto bad = h2.load(R"(class only_abstract : Actor
+{
+    abstract func must_impl() : int;
+    func go() : int { return this.must_impl(); }
+})");
+        bool threw = false;
+        try {
+            Interpreter(&h2.ctx, bad).call("go");
+        } catch (const std::exception&) {
+            threw = true;
+        }
+        CHECK(threw);
+    }
+
     // --- reindent --------------------------------------------------
     {
         std::string messy = "class x : Actor\n{\nfunc start()\n{\nreturn;\n}\n}\n";
