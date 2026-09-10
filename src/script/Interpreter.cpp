@@ -280,6 +280,11 @@ Value Interpreter::eval(const Expr& e) {
                 return *v;
             if (self_ && self_->fields.count(e.strVal))
                 return self_->fields[e.strVal];
+            // Every script inherits Actor, so `transform` (and `actor`) are
+            // available without `this.` -- transform exposes position /
+            // rotation / scale.
+            if ((e.strVal == "transform" || e.strVal == "actor") && self_ && self_->owner)
+                return Value::ActorRef(self_->owner);
             // a bare type name evaluates to a TypeRef
             if (ctx_->findType(e.strVal) || e.strVal == "Actor" || e.strVal == "Actor2D" ||
                 e.strVal == "Actor3D" || e.strVal == "Vector2" || e.strVal == "Vector3")

@@ -142,6 +142,27 @@ static int run() {
         CHECK(r.str() == "base+child");
     }
 
+    // --- bare `transform` / `actor` on a script (task 31) ----------
+    {
+        Harness h;
+        crate::Actor3D host("hero");
+        host.transform().rotationEuler = {0, 10, 0};
+        auto obj = h.load(R"(class xf : Actor3D
+{
+    func run() : string
+    {
+        var r = transform.rotation;
+        r.y = r.y + 5;
+        transform.rotation = r;
+        return actor.name + " " + transform.rotation.y.str();
+    }
+})");
+        obj->owner = &host;
+        Value r = Interpreter(&h.ctx, obj).call("run");
+        CHECK(r.str() == "hero 15");
+        CHECK(host.transform().rotationEuler.y == 15.0f);
+    }
+
     // --- variables: all base types (task 18) ------------------------
     {
         Harness h;

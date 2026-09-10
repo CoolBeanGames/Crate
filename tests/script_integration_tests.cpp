@@ -53,11 +53,13 @@ int main() {
         return 1;
     }
 
-    // --- New Script: template compiles + registers ------------------
+    // --- New Script: named, template compiles + registers ----------
     {
-        std::string name = sys.newScript();
-        if (name.empty()) {
-            std::printf("FAIL: newScript() returned empty\n");
+        std::string name = sys.newScript("Widget");
+        if (name != "Widget") {
+            std::printf("FAIL: newScript(\"Widget\") -> '%s'\n", name.c_str());
+            if (!name.empty())
+                std::remove(sys.file(name)->path.c_str());
             return 1;
         }
         bool inRegistry = false;

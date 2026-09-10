@@ -21,5 +21,6 @@ zen.tasks.json.bak
 
 # transient test artifact from script_integration_tests
 /assets/scripts/NewScript*.cscript
+/assets/scripts/Widget*.cscript
 /assets/scripts/Dropped.cscript
 /assets/scripts/Renamer.cscript
