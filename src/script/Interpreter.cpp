@@ -3,7 +3,10 @@
 #include "core/Math.h"
 #include "scene/Actor.h"
 
+#include <algorithm>
 #include <cmath>
+#include <cstdlib>
+#include <random>
 
 namespace crate::script {
 
@@ -494,6 +497,11 @@ Value Interpreter::evalCall(const Expr& e) {
             return callMethodOn(self_, method, std::move(args), e.line, /*viaBase=*/true);
         }
 
+        // Global helper namespace: Math.clamp(...), Math.lerp(...), etc.
+        if (objExpr.kind == ExprKind::Identifier && objExpr.strVal == "Math" &&
+            !findVar("Math") && !(self_ && self_->fields.count("Math")))
+            return mathCall(method, args, e.line);
+
         Value obj = eval(objExpr);
 
         // StaticClass.method(...)  -> call on the static singleton
@@ -548,6 +556,72 @@ Value Interpreter::evalCall(const Expr& e) {
     }
 
     throw RuntimeError("expression is not callable", e.line);
+}
+
+Value Interpreter::mathCall(const std::string& fn, std::vector<Value>& args, int line) {
+    static std::mt19937 rng{std::random_device{}()};
+    auto n = [&](size_t i) { return i < args.size() ? args[i].num() : 0.0; };
+    auto allInt = [&]() {
+        for (const auto& a : args)
+            if (a.t != Value::T::Int)
+                return false;
+        return !args.empty();
+    };
+
+    if (fn == "clamp") {
+        double v = n(0), lo = n(1), hi = n(2);
+        double r = v < lo ? lo : (v > hi ? hi : v);
+        return allInt() ? Value::Int((long long)r) : Value::Float(r);
+    }
+    if (fn == "lerp")
+        return Value::Float(n(0) + (n(1) - n(0)) * n(2));
+    if (fn == "sine" || fn == "sin")
+        return Value::Float(std::sin(n(0)));
+    if (fn == "cos" || fn == "cosine")
+        return Value::Float(std::cos(n(0)));
+    if (fn == "tan")
+        return Value::Float(std::tan(n(0)));
+    if (fn == "sqrt")
+        return Value::Float(std::sqrt(n(0)));
+    if (fn == "exp")
+        return Value::Float(std::exp(n(0)));
+    if (fn == "pow")
+        return Value::Float(std::pow(n(0), n(1)));
+    if (fn == "abs")
+        return args.size() && args[0].t == Value::T::Int ? Value::Int(std::llabs(args[0].i))
+                                                         : Value::Float(std::fabs(n(0)));
+    if (fn == "floor")
+        return Value::Float(std::floor(n(0)));
+    if (fn == "ceil")
+        return Value::Float(std::ceil(n(0)));
+    if (fn == "round")
+        return Value::Float(std::round(n(0)));
+    if (fn == "min") {
+        double r = n(0) < n(1) ? n(0) : n(1);
+        return allInt() ? Value::Int((long long)r) : Value::Float(r);
+    }
+    if (fn == "max") {
+        double r = n(0) > n(1) ? n(0) : n(1);
+        return allInt() ? Value::Int((long long)r) : Value::Float(r);
+    }
+    if (fn == "deg2rad")
+        return Value::Float(n(0) * (kPi / 180.0));
+    if (fn == "rad2deg")
+        return Value::Float(n(0) * (180.0 / kPi));
+    if (fn == "rand_f")
+        return Value::Float(std::uniform_real_distribution<double>(0.0, 1.0)(rng));
+    if (fn == "rand_i")
+        return Value::Int(std::uniform_int_distribution<long long>(0, 0x7fffffff)(rng));
+    if (fn == "rand_f_range")
+        return Value::Float(std::uniform_real_distribution<double>(n(0), n(1))(rng));
+    if (fn == "rand_i_range") {
+        long long lo = (long long)n(0), hi = (long long)n(1);
+        if (hi < lo)
+            std::swap(lo, hi);
+        return Value::Int(std::uniform_int_distribution<long long>(lo, hi)(rng)); // inclusive
+    }
+
+    throw RuntimeError("Math has no function '" + fn + "'", line);
 }
 
 Value Interpreter::builtinCall(const std::string& name, std::vector<Value>& args, int line) {

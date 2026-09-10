@@ -163,6 +163,28 @@ static int run() {
         CHECK(host.transform().rotationEuler.y == 15.0f);
     }
 
+    // --- Math.* global functions (task 47) --------------------------
+    {
+        Harness h;
+        auto obj = h.load(R"(class mathc : Actor
+{
+    func run() : string
+    {
+        var a = Math.clamp(15, 0, 10);
+        var b = Math.lerp(0.0, 10.0, 0.5);
+        var c = Math.sqrt(16.0);
+        var d = Math.max(3, 7);
+        var e = Math.abs(-4);
+        var f = Math.rand_i_range(5, 5);
+        var g = Math.pow(2.0, 3.0);
+        return a.str() + "," + b.str() + "," + c.str() + "," + d.str() + ","
+             + e.str() + "," + f.str() + "," + g.str();
+    }
+})");
+        Value r = Interpreter(&h.ctx, obj).call("run");
+        CHECK(r.str() == "10,5,4,7,4,5,8");
+    }
+
     // --- compound assignment + vector math (task 43) ----------------
     {
         Harness h;

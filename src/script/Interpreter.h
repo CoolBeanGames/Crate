@@ -99,6 +99,7 @@ private:
 
     Value* findVar(const std::string& name);
     Value builtinCall(const std::string& name, std::vector<Value>& args, int line);
+    Value mathCall(const std::string& fn, std::vector<Value>& args, int line); // Math.*
     Value actorMember(crate::Actor* a, const std::string& name, int line);
     Value callMethodOn(std::shared_ptr<ScriptObject> obj, const std::string& method,
                        std::vector<Value> args, int line, bool viaBase);
