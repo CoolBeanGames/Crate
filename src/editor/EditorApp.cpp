@@ -38,6 +38,7 @@ static Actor* findById(Actor& node, uint64_t id) {
 EditorApp::EditorApp() : scene_(Scene::makeSample()) {
     registerBuiltinComponents();
     renderer_.setMeshLibrary(&meshLib_);
+    renderer_.setMaterialLibrary(&materialLib_);
     CR_LOG("app", "Crate editor started");
     CR_LOG("scene", "Loaded sample scene with " + std::to_string(scene_.actorCount()) + " actors");
 }
@@ -58,12 +59,14 @@ void EditorApp::ingestDroppedFile(const std::string& path) {
     const std::string ext = lowerExt(path);
     if (ext == "fbx") {
         renderer_.invalidateMesh(path);
-        FbxImportResult res = importFbx(path, meshLib_);
+        FbxImportResult res = importFbx(path, meshLib_, materialLib_);
         if (!res.ok) {
             CR_ERROR("assets", "Import failed: " + (res.error.empty() ? path : res.error));
             return;
         }
-        importedAssets_.push_back(res.key);
+        if (std::find(importedAssets_.begin(), importedAssets_.end(), res.key) ==
+            importedAssets_.end())
+            importedAssets_.push_back(res.key);
 
         std::string name = path;
         if (auto slash = name.find_last_of("/\\"); slash != std::string::npos)
@@ -72,9 +75,8 @@ void EditorApp::ingestDroppedFile(const std::string& path) {
         auto mr = std::make_unique<MeshRenderer>();
         mr->usePrimitive = false;
         mr->meshPath = res.key;
-        if (const auto* mats = meshLib_.materialsFor(res.key))
-            if (!mats->empty() && !(*mats)[0].texturePath.empty())
-                mr->texturePath = (*mats)[0].texturePath;
+        if (!res.materialNames.empty())
+            mr->materialRef = res.materialNames.front();
         actor->addComponent(std::move(mr));
         Actor* added = scene_.add(std::move(actor));
         scene_.select(added);
@@ -118,6 +120,8 @@ void EditorApp::onFrame() {
         firstFrame_ = false;
     }
     const float dt = ImGui::GetIO().DeltaTime;
+    if (scene_.selected())
+        selectedMaterial_.clear(); // actor selection supersedes asset selection
 
     // "Spin preview" slowly orbits the camera so a lone object reads as 3D.
     if (spinPreview_ && !playing_ && !ImGui::IsMouseDragging(ImGuiMouseButton_Left))
@@ -500,9 +504,42 @@ void EditorApp::drawHierarchy() {
 void EditorApp::drawInspector() {
     if (ImGui::Begin("Inspector")) {
         Actor* a = scene_.selected();
+
+        // A material asset is selected in the Asset Browser: edit it here.
+        if (!a && !selectedMaterial_.empty()) {
+            Material* mat = materialLib_.find(selectedMaterial_);
+            if (!mat) {
+                selectedMaterial_.clear();
+            } else {
+                ImGui::TextDisabled("MATERIAL");
+                ImGui::SeparatorText(mat->name.c_str());
+                ImGui::ColorEdit4("Base Color", mat->baseColor);
+                ImGui::InputText("Texture", &mat->texturePath);
+                if (ImGui::Button("Browse##mattex")) {
+                    std::string p = platform::openFileDialog(
+                        "Material Texture",
+                        "Images\0*.png;*.jpg;*.jpeg;*.bmp;*.tga;*.tif;*.tiff\0All\0*.*\0");
+                    if (!p.empty()) {
+                        mat->texturePath = p;
+                        renderer_.invalidateTexture(p);
+                    }
+                }
+                ImGui::DragFloat("Emissive", &mat->emissive, 0.01f, 0.0f, 4.0f);
+                ImGui::Checkbox("Unlit", &mat->unlit);
+                ImGui::Spacing();
+                if (ImGui::Button("Delete Material")) {
+                    CR_LOG("assets", "Deleted material '" + selectedMaterial_ + "'");
+                    materialLib_.remove(selectedMaterial_);
+                    selectedMaterial_.clear();
+                }
+                ImGui::End();
+                return;
+            }
+        }
+
         if (!a) {
             ImGui::TextDisabled("Nothing selected.");
-            ImGui::TextWrapped("Select an actor in the Hierarchy or a file in the Asset Browser "
+            ImGui::TextWrapped("Select an actor in the Hierarchy or an asset in the Asset Browser "
                                "to edit its settings here.");
             ImGui::End();
             return;
@@ -559,6 +596,25 @@ void EditorApp::drawInspector() {
                 if (!comp->enabled)
                     ImGui::TextDisabled("(disabled)");
                 comp->drawInspector();
+
+                // Material picker for MeshRenderer (needs the MaterialLibrary,
+                // which the component itself does not know about).
+                if (auto* mr = dynamic_cast<MeshRenderer*>(comp.get())) {
+                    const char* cur = mr->materialRef.empty() ? "<tint only>" : mr->materialRef.c_str();
+                    if (ImGui::BeginCombo("Material", cur)) {
+                        if (ImGui::Selectable("<tint only>", mr->materialRef.empty()))
+                            mr->materialRef.clear();
+                        for (const std::string& mn : materialLib_.names())
+                            if (ImGui::Selectable(mn.c_str(), mr->materialRef == mn))
+                                mr->materialRef = mn;
+                        ImGui::EndCombo();
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("New##mrmat")) {
+                        Material& m = materialLib_.create("Material");
+                        mr->materialRef = m.name;
+                    }
+                }
                 ImGui::Unindent();
             }
             ImGui::PopID();
@@ -710,6 +766,13 @@ void EditorApp::drawBottomPanel() {
                 ingestDroppedFile(picked);
         }
         ImGui::SameLine();
+        if (ImGui::Button("Create Material")) {
+            Material& m = materialLib_.create("Material");
+            selectedMaterial_ = m.name;
+            scene_.select(nullptr);
+            CR_LOG("assets", "Created material '" + m.name + "'");
+        }
+        ImGui::SameLine();
         ImGui::TextDisabled("or drag files onto the window");
         ImGui::Separator();
 
@@ -725,6 +788,12 @@ void EditorApp::drawBottomPanel() {
                 std::string label = "  " + entry.path().filename().string();
                 if (ImGui::Selectable(label.c_str()))
                     ingestDroppedFile(entry.path().string());
+            }
+        }
+        for (const std::string& mn : materialLib_.names()) {
+            if (ImGui::Selectable(("[mat] " + mn).c_str(), selectedMaterial_ == mn)) {
+                selectedMaterial_ = mn;
+                scene_.select(nullptr);
             }
         }
         for (const std::string& a : importedAssets_) {

@@ -422,22 +422,22 @@
             {
               "id": "5fe009c24d8c4e00a0cede1032e816cf",
               "text": "importing a FBX should create any materials it uses and apply its textures if any are present",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "7cfef429c6e241419a64e85c10b90541",
               "text": "can create materials via asset window",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "43975aeccf434000927a6448b2553315",
               "text": "can set material properties via inspector if one is selected",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "03cf926d34ac4869b00fe4b4bf4c3829",
               "text": "materials can be applied to any mesh renderer",
-              "isDone": false
+              "isDone": true
             }
           ],
           "flags": {
@@ -446,11 +446,11 @@
             "release": false,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:05:39.9304386+00:00",
-          "updatedAt": "2026-09-10T01:18:16.7708473+00:00"
+          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
         },
         {
           "id": "a3fd796553ba47b8bf19fd7ae12e608e",

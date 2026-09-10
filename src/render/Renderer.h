@@ -1,4 +1,5 @@
 #pragma once
+#include "assets/MaterialLibrary.h"
 #include "assets/MeshLibrary.h"
 #include "core/Math.h"
 #include "render/Camera.h"
@@ -40,8 +41,10 @@ public:
     void shutdown();
     bool ready() const { return device_ != nullptr; }
 
-    // Imported meshes/materials are looked up here by MeshActor::meshPath.
+    // Imported geometry is looked up here by MeshRenderer::meshPath.
     void setMeshLibrary(const MeshLibrary* lib) { library_ = lib; }
+    // Materials are looked up here by MeshRenderer::materialRef.
+    void setMaterialLibrary(const MaterialLibrary* lib) { materials_ = lib; }
 
     // Drop a cached GPU mesh so a re-import is picked up.
     void invalidateMesh(const std::string& key);
@@ -95,6 +98,7 @@ private:
     ID3D11ShaderResourceView* checkerSrv_ = nullptr;
 
     const MeshLibrary* library_ = nullptr;
+    const MaterialLibrary* materials_ = nullptr;
     std::unordered_map<std::string, GpuMesh> meshCache_;
     std::unordered_map<std::string, ID3D11ShaderResourceView*> textureCache_;
 };

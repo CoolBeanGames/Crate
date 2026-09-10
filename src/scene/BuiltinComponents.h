@@ -20,7 +20,8 @@ public:
     bool usePrimitive = true;
     std::string primitive = "Cube"; // Cube/Sphere/Cylinder/Capsule/Plane/Quad
     std::string meshPath;           // imported model, used when !usePrimitive
-    std::string texturePath;        // optional albedo override
+    std::string materialRef;        // MaterialLibrary name; empty = use tint/texture
+    std::string texturePath;        // albedo override when no material is set
     float tint[4] = {1.0f, 1.0f, 1.0f, 1.0f};
     bool castShadows = true;
 

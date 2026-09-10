@@ -1,4 +1,5 @@
 #pragma once
+#include "assets/MaterialLibrary.h"
 #include "assets/MeshLibrary.h"
 #include "render/Camera.h"
 #include "render/Renderer.h"
@@ -59,10 +60,12 @@ private:
     Scene playBackup_;      // scene state captured when Play was pressed
     float physicsAccum_ = 0.0f;
     MeshLibrary meshLib_;
+    MaterialLibrary materialLib_;
     Renderer renderer_;
     OrbitCamera camera_;
     bool spinPreview_ = true;
     std::vector<std::string> importedAssets_; // keys of imported models/textures
+    std::string selectedMaterial_;            // asset selection (inspector shows it)
     std::unique_ptr<Actor> clipboard_; // deep clone from copy/cut
     bool playing_ = false;
     bool showDemo_ = false;

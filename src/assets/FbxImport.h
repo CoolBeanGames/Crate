@@ -1,6 +1,8 @@
 #pragma once
+#include "assets/MaterialLibrary.h"
 #include "assets/MeshLibrary.h"
 #include <string>
+#include <vector>
 
 namespace crate {
 
@@ -11,11 +13,12 @@ struct FbxImportResult {
     int meshNodes = 0;
     int triangles = 0;
     int materials = 0;
+    std::vector<std::string> materialNames; // names registered in MaterialLibrary
 };
 
-// Load an FBX file, merge its geometry into one MeshData, extract its materials
-// (base colour + albedo texture path), and register both in `lib` under the
-// file path. Safe to call again for the same path (re-imports).
-FbxImportResult importFbx(const std::string& path, MeshLibrary& lib);
+// Load an FBX file, merge its geometry into one MeshData (registered in
+// `meshes` under the file path), and create a MaterialLibrary entry for each
+// FBX material (base colour + albedo texture). Safe to re-import.
+FbxImportResult importFbx(const std::string& path, MeshLibrary& meshes, MaterialLibrary& materials);
 
 } // namespace crate

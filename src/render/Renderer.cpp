@@ -58,7 +58,8 @@ float4 PSMain(VSOut i) : SV_TARGET
 {
     float3 L = normalize(uLightDir.xyz);
     float ndl = saturate(dot(normalize(i.nrm), -L));
-    float3 lit = (0.25 + 0.75 * ndl) * uBaseColor.rgb;
+    float shade = lerp(0.25 + 0.75 * ndl, 1.0, uParams.z); // uParams.z = unlit
+    float3 lit = shade * uBaseColor.rgb + uParams.y;        // uParams.y = emissive
     float3 tex = lerp(float3(1,1,1), uTex.Sample(uSamp, i.uv).rgb, uParams.x);
     return float4(lit * tex, uBaseColor.a);
 }
@@ -336,20 +337,21 @@ void Renderer::drawActor(Actor& actor, const Mat4& viewProj, const Options& opt)
                  Mat4::translation(w.position);
     Mat4 mvp = model * viewProj;
 
-    // Resolve material: an imported FBX material (if any) provides the base
-    // colour and albedo texture; MeshRenderer::texturePath / tint override.
-    float baseColor[4] = {mr->tint[0] * 0.78f + 0.0f, mr->tint[1] * 0.78f, mr->tint[2] * 0.80f,
+    // Resolve material: a referenced Material asset wins; otherwise fall back to
+    // the MeshRenderer's own tint + texture.
+    float baseColor[4] = {mr->tint[0] * 0.78f, mr->tint[1] * 0.78f, mr->tint[2] * 0.80f,
                           mr->tint[3]};
     std::string texPath = mr->texturePath;
-    if (library_ && !mr->meshPath.empty()) {
-        if (const auto* mats = library_->materialsFor(mr->meshPath))
-            if (!mats->empty()) {
-                const Material& m0 = (*mats)[0];
-                for (int i = 0; i < 4; ++i)
-                    baseColor[i] = m0.baseColor[i] * mr->tint[i];
-                if (texPath.empty())
-                    texPath = m0.texturePath;
-            }
+    float emissive = 0.0f;
+    bool unlit = false;
+    if (materials_ && !mr->materialRef.empty()) {
+        if (const Material* mat = materials_->find(mr->materialRef)) {
+            for (int i = 0; i < 4; ++i)
+                baseColor[i] = mat->baseColor[i] * mr->tint[i];
+            texPath = mat->texturePath.empty() ? mr->texturePath : mat->texturePath;
+            emissive = mat->emissive;
+            unlit = mat->unlit;
+        }
     }
 
     CBData cb;
@@ -364,7 +366,9 @@ void Renderer::drawActor(Actor& actor, const Mat4& viewProj, const Options& opt)
     cb.baseColor[2] = sel ? baseColor[2] * 0.85f + 0.25f : baseColor[2];
     cb.baseColor[3] = baseColor[3];
     cb.params[0] = texPath.empty() ? 0.0f : 1.0f;
-    cb.params[1] = cb.params[2] = cb.params[3] = 0.0f;
+    cb.params[1] = emissive;
+    cb.params[2] = unlit ? 1.0f : 0.0f;
+    cb.params[3] = 0.0f;
 
     D3D11_MAPPED_SUBRESOURCE ms;
     if (SUCCEEDED(ctx_->Map(cb_, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms))) {

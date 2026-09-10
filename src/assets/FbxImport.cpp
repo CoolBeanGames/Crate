@@ -35,9 +35,10 @@ static std::string resolveTexture(const ufbx_texture* tex, const fs::path& fbxDi
     return firstNonEmpty;
 }
 
-FbxImportResult importFbx(const std::string& path, MeshLibrary& lib) {
+FbxImportResult importFbx(const std::string& path, MeshLibrary& meshes, MaterialLibrary& materials) {
     FbxImportResult r;
     r.key = path;
+    const std::string fileTag = fs::path(path).filename().string();
 
     ufbx_load_opts opts = {};
     opts.target_axes = ufbx_axes_left_handed_y_up; // match the engine's LH space
@@ -92,11 +93,11 @@ FbxImportResult importFbx(const std::string& path, MeshLibrary& lib) {
     }
     r.triangles /= 3;
 
-    std::vector<Material> mats;
     for (size_t mi = 0; mi < scene->materials.count; ++mi) {
         ufbx_material* m = scene->materials.data[mi];
-        Material mat;
-        mat.name = m->name.length ? std::string(m->name.data, m->name.length) : "Material";
+        std::string mname = m->name.length ? std::string(m->name.data, m->name.length) : "Material";
+
+        Material& mat = materials.create(fileTag + ":" + mname);
 
         const ufbx_material_map* colorMap =
             m->pbr.base_color.has_value ? &m->pbr.base_color : &m->fbx.diffuse_color;
@@ -110,9 +111,9 @@ FbxImportResult importFbx(const std::string& path, MeshLibrary& lib) {
         const ufbx_texture* tex = m->pbr.base_color.texture ? m->pbr.base_color.texture
                                                             : m->fbx.diffuse_color.texture;
         mat.texturePath = resolveTexture(tex, fbxDir);
-        mats.push_back(std::move(mat));
+        r.materialNames.push_back(mat.name);
     }
-    r.materials = static_cast<int>(mats.size());
+    r.materials = static_cast<int>(r.materialNames.size());
 
     ufbx_free_scene(scene);
 
@@ -122,8 +123,7 @@ FbxImportResult importFbx(const std::string& path, MeshLibrary& lib) {
         return r;
     }
 
-    lib.addMesh(path, std::move(merged));
-    lib.setMaterials(path, std::move(mats));
+    meshes.addMesh(path, std::move(merged));
     r.ok = true;
     CR_LOG("assets", "Imported FBX " + fs::path(path).filename().string() + " (" +
                          std::to_string(r.meshNodes) + " mesh nodes, " +

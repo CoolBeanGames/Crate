@@ -59,6 +59,9 @@ if(MSVC)
     target_compile_definitions(Crate PRIVATE UNICODE _UNICODE)
     # Keep the standard int main() entry point under the Windows subsystem.
     target_link_options(Crate PRIVATE /ENTRY:mainCRTStartup)
+    # Non-incremental links: fast enough here and avoids intermittent
+    # LNK1163 (stale COMDAT) after header changes.
+    add_link_options(/INCREMENTAL:NO)
 endif()
 
 set_target_properties(Crate PROPERTIES

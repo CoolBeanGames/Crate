@@ -15,7 +15,8 @@ using namespace crate;
 int main() {
     const std::string path = std::string(CRATE_TEST_DATA) + "/box.fbx";
     MeshLibrary lib;
-    FbxImportResult r = importFbx(path, lib);
+    MaterialLibrary mats;
+    FbxImportResult r = importFbx(path, lib, mats);
 
     if (!r.ok) {
         std::printf("FAIL import: %s\n", r.error.c_str());
@@ -35,8 +36,15 @@ int main() {
         std::printf("FAIL: expected >=12 tris, got %d\n", r.triangles);
         return 1;
     }
+    // FBX materials become MaterialLibrary entries.
+    if (r.materials > 0) {
+        if (r.materialNames.empty() || !mats.find(r.materialNames[0])) {
+            std::printf("FAIL: material not registered\n");
+            return 1;
+        }
+    }
     // Re-import must be idempotent.
-    FbxImportResult r2 = importFbx(path, lib);
+    FbxImportResult r2 = importFbx(path, lib, mats);
     if (!r2.ok || lib.findMesh(r2.key)->vertices.size() != mesh->vertices.size()) {
         std::printf("FAIL: re-import changed vertex count\n");
         return 1;
