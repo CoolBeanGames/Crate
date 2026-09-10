@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <functional>
 
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -570,10 +571,37 @@ void EditorApp::drawInspector() {
                 ImGui::DragFloat("Emissive", &mat->emissive, 0.01f, 0.0f, 4.0f);
                 ImGui::Checkbox("Unlit", &mat->unlit);
                 ImGui::Spacing();
+
+                static std::string renameBuf;
+                if (ImGui::Button("Rename")) {
+                    renameBuf = selectedMaterial_;
+                    renamePopup_.title("Rename Material")
+                        .onBody([](ui::Popup& p) {
+                            p.inputText("New name", &renameBuf, /*focusOnAppear=*/true);
+                        })
+                        .open();
+                }
+                ImGui::SameLine();
                 if (ImGui::Button("Delete Material")) {
                     CR_LOG("assets", "Deleted material '" + selectedMaterial_ + "'");
                     materialLib_.remove(selectedMaterial_);
                     selectedMaterial_.clear();
+                }
+                if (renamePopup_.draw() == ui::Popup::Result::Ok && !renameBuf.empty()) {
+                    if (materialLib_.rename(selectedMaterial_, renameBuf)) {
+                        // fix up MeshRenderer references
+                        std::function<void(Actor&)> fix = [&](Actor& n) {
+                            if (auto* mr = n.getComponent<MeshRenderer>())
+                                if (mr->materialRef == selectedMaterial_)
+                                    mr->materialRef = renameBuf;
+                            for (const auto& c : n.children())
+                                fix(*c);
+                        };
+                        fix(scene_.root());
+                        CR_LOG("assets", "Renamed material '" + selectedMaterial_ + "' -> '" +
+                                             renameBuf + "'");
+                        selectedMaterial_ = renameBuf;
+                    }
                 }
                 ImGui::End();
                 return;

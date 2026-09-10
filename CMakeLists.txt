@@ -59,6 +59,7 @@ add_library(crate_core STATIC
     src/platform/FileDialog.cpp
     src/editor/Console.cpp
     src/editor/ContextMenu.cpp
+    src/editor/Popup.cpp
     src/editor/ScriptEditor.cpp
     src/editor/Theme.cpp
     src/editor/EditorApp.cpp

@@ -34,6 +34,18 @@ public:
     void set(const std::string& name, Material m) { mats_[name] = std::move(m); }
     bool remove(const std::string& name) { return mats_.erase(name) != 0; }
 
+    // Rename a material. Fails if the new name is taken or the old one is
+    // missing. Callers must fix up MeshRenderer::materialRef.
+    bool rename(const std::string& oldName, const std::string& newName) {
+        if (oldName == newName || !mats_.count(oldName) || mats_.count(newName))
+            return false;
+        Material m = std::move(mats_[oldName]);
+        m.name = newName;
+        mats_.erase(oldName);
+        mats_[newName] = std::move(m);
+        return true;
+    }
+
     std::vector<std::string> names() const {
         std::vector<std::string> v;
         v.reserve(mats_.size());

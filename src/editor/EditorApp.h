@@ -1,6 +1,7 @@
 #pragma once
 #include "assets/MaterialLibrary.h"
 #include "assets/MeshLibrary.h"
+#include "editor/Popup.h"
 #include "editor/ScriptEditor.h"
 #include "render/Camera.h"
 #include "render/Renderer.h"
@@ -72,6 +73,7 @@ private:
     Renderer renderer_;
     OrbitCamera camera_;
     ScriptEditor scriptEditor_;
+    ui::Popup renamePopup_;
     bool scriptMode_ = false;
     bool spinPreview_ = true;
     std::vector<std::string> importedAssets_; // keys of imported models/textures
