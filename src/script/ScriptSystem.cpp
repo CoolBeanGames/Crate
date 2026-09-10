@@ -58,22 +58,34 @@ bool ScriptSystem::compile(const std::string& source, std::string* errorOut, std
             return false;
         }
 
-        auto ci = std::make_unique<ClassInfo>();
-        ci->name = decl->name;
-        ci->base = decl->base;
-        ci->isStatic = decl->isStatic;
-        ci->isAbstract = decl->isAbstract;
-        ci->decl = std::move(decl);
-        ci->indexFunctions();
+        const std::string cname = decl->name;
+
+        // Recompile IN PLACE when the class already exists: the ClassInfo object
+        // (and thus every pointer the registry lambdas and attached
+        // ScriptComponents hold) stays valid; only its AST is swapped.
+        ClassInfo* slot = nullptr;
+        auto existing = types_.find(cname);
+        if (existing != types_.end()) {
+            slot = existing->second.get();
+        } else {
+            auto up = std::make_unique<ClassInfo>();
+            slot = up.get();
+            types_[cname] = std::move(up);
+        }
+        slot->name = decl->name;
+        slot->base = decl->base;
+        slot->isStatic = decl->isStatic;
+        slot->isAbstract = decl->isAbstract;
+        slot->decl = std::move(decl);
+        slot->indexFunctions();
+        ++slot->generation;
 
         if (nameOut)
-            *nameOut = ci->name;
-        std::string cname = ci->name;
-        bool wasStatic = ci->isStatic;
-        types_[cname] = std::move(ci);
+            *nameOut = cname;
+        bool wasStatic = slot->isStatic;
         resolveBases();
         // static / abstract classes cannot be added to actors as components
-        if (!wasStatic && !types_[cname]->isAbstract)
+        if (!wasStatic && !slot->isAbstract)
             registerComponent(cname);
         if (wasStatic)
             rebuildStatic(cname);
@@ -103,9 +115,34 @@ void ScriptSystem::resolveBases() {
 void ScriptSystem::registerComponent(const std::string& className) {
     ScriptContext* ctx = &ctx_;
     const ClassInfo* cls = types_.at(className).get();
-    ComponentRegistry::get().add(className, "Scripts", [ctx, cls] {
-        return std::make_unique<ScriptComponent>(ctx, cls);
-    });
+    ComponentRegistry::get().add(
+        className, "Scripts",
+        [ctx, cls] { return std::make_unique<ScriptComponent>(ctx, cls); }, /*replace=*/true);
+}
+
+void ScriptSystem::reload() {
+    if (dir_.empty())
+        return;
+    loadFolder(dir_); // new + changed files
+
+    std::error_code ec;
+    for (auto it = files_.begin(); it != files_.end();) {
+        if (!it->path.empty() && !fs::exists(it->path, ec)) {
+            const std::string name = it->name;
+            CR_LOG("script", "Script deleted: " + name);
+            if (auto node = types_.find(name); node != types_.end()) {
+                retired_.push_back(std::move(node->second)); // keep alive for attached components
+                types_.erase(node);
+            }
+            statics_.erase(name);
+            ComponentRegistry::get().remove(name);
+            it = files_.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    resolveBases();
+    rebuildTypeDocs();
 }
 
 void ScriptSystem::rebuildStatic(const std::string& className) {
@@ -152,6 +189,7 @@ void ScriptSystem::physicsStatics(float dt) {
 }
 
 void ScriptSystem::loadFolder(const std::string& dir) {
+    dir_ = dir;
     std::error_code ec;
     if (!fs::exists(dir, ec))
         return;
@@ -188,6 +226,57 @@ void ScriptSystem::loadFolder(const std::string& dir) {
     }
 }
 
+std::string ScriptSystem::newScript() {
+    if (dir_.empty())
+        dir_ = "assets/scripts";
+    std::error_code ec;
+    fs::create_directories(dir_, ec);
+
+    // unique class + file name
+    std::string name = "NewScript";
+    for (int n = 1; (types_.count(name) || fs::exists(fs::path(dir_) / (name + ".cscript"), ec));
+         ++n)
+        name = "NewScript" + std::to_string(n);
+
+    const std::string tpl =
+        "class " + name + " : Actor\n"
+        "{\n"
+        "\tfunc start()\n"
+        "\t{\n"
+        "\t}\n"
+        "\n"
+        "\tfunc update(float delta)\n"
+        "\t{\n"
+        "\t}\n"
+        "\n"
+        "\tfunc physics_update(float delta)\n"
+        "\t{\n"
+        "\t}\n"
+        "}\n";
+
+    const std::string path = (fs::path(dir_) / (name + ".cscript")).string();
+    std::ofstream out(path, std::ios::binary);
+    if (!out) {
+        CR_ERROR("script", "Could not create " + path);
+        return {};
+    }
+    out << tpl;
+    out.close();
+
+    std::string err;
+    if (!compile(tpl, &err)) {
+        CR_ERROR("script", "New script failed to compile: " + err);
+        return {};
+    }
+    ScriptFile f;
+    f.path = path;
+    f.name = name;
+    f.source = tpl;
+    files_.push_back(std::move(f));
+    CR_LOG("script", "Created script '" + name + "'");
+    return name;
+}
+
 ScriptSystem::ScriptFile* ScriptSystem::file(const std::string& name) {
     for (auto& f : files_)
         if (f.name == name)
@@ -207,20 +296,34 @@ bool ScriptSystem::saveFile(ScriptFile& f) {
     return true;
 }
 
-void ScriptSystem::setSource(const std::string& name, std::string source) {
+std::string ScriptSystem::setSource(const std::string& name, std::string source) {
     ScriptFile* f = file(name);
     if (!f)
-        return;
+        return {};
+    const std::string oldName = f->name;
     f->source = std::move(source);
     f->dirty = true;
     std::string err, newName;
     if (compile(f->source, &err, &newName)) {
         f->error.clear();
-        if (!newName.empty())
+        if (!newName.empty() && newName != oldName) {
             f->name = newName;
+            // The class was renamed: retire the old type and drop its stale
+            // entry from the Add Component menu.
+            if (auto it = types_.find(oldName); it != types_.end()) {
+                retired_.push_back(std::move(it->second));
+                types_.erase(it);
+            }
+            statics_.erase(oldName);
+            ComponentRegistry::get().remove(oldName);
+            resolveBases();
+            rebuildTypeDocs();
+            CR_LOG("script", "Script renamed " + oldName + " -> " + newName);
+        }
     } else {
         f->error = err;
     }
+    return f->name;
 }
 
 const ScriptSystem::TypeDoc* ScriptSystem::typeDoc(const std::string& name) const {

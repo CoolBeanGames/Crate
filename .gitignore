@@ -18,3 +18,8 @@ CMakeUserPresets.json
 
 # Task-system scratch
 zen.tasks.json.bak
+
+# transient test artifact from script_integration_tests
+/assets/scripts/NewScript*.cscript
+/assets/scripts/Dropped.cscript
+/assets/scripts/Renamer.cscript

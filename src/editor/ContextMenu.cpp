@@ -20,10 +20,12 @@ bool ContextMenu::beginItemPopup() {
     return open;
 }
 
-bool ContextMenu::beginWindowPopup() {
+bool ContextMenu::beginWindowPopup(bool overItems) {
     beginStyled();
-    bool open = ImGui::BeginPopupContextWindow(id_, ImGuiPopupFlags_MouseButtonRight |
-                                                        ImGuiPopupFlags_NoOpenOverItems);
+    ImGuiPopupFlags flags = ImGuiPopupFlags_MouseButtonRight;
+    if (!overItems)
+        flags |= ImGuiPopupFlags_NoOpenOverItems;
+    bool open = ImGui::BeginPopupContextWindow(id_, flags);
     if (!open)
         ImGui::PopStyleVar(3);
     return open;

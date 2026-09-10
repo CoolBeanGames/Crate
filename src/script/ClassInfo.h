@@ -1,6 +1,7 @@
 #pragma once
 #include "script/Ast.h"
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -14,6 +15,9 @@ struct ClassInfo {
     std::string base = "Actor";
     bool isStatic = false;
     bool isAbstract = false;
+
+    // Bumped on every recompile so live ScriptComponents/objects know to reset.
+    uint32_t generation = 0;
 
     std::unique_ptr<ClassDecl> decl;          // owns fields + functions AST
     const ClassInfo* baseClass = nullptr;     // resolved script base (null if native)

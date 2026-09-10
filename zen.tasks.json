@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "projectId": "8afe2a0217d7419db234ceda7ecb9dff",
   "name": "Crate",
-  "nextCardIndex": 26,
+  "nextCardIndex": 30,
   "latestExePath": null,
   "latestReleasePath": null,
   "tagCatalog": [
@@ -339,6 +339,200 @@
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:50:21.8523643+00:00",
           "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
+        },
+        {
+          "id": "e7c8f17de1554c91bcbf2275fa97457b",
+          "index": 26,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Asset browser context menu",
+          "task": "Replace the buttons at the top of the Asset Browser with a right-click context menu whose actions are organised into sub-menus. Remove the Import Image / Import Model / Create Material buttons entirely. Use the shared ui::ContextMenu framework so this matches the rest of the app and can be reused for other panels later.\r\n\r\n- Import Asset: ONE importer that inspects the chosen file and does the right thing (fbx model, png/jpg/bmp/tiff texture, cscript script, ...). No more per-type buttons.\r\n- Create Material: makes a new material asset and selects it.\r\n- Scripting: a submenu (there will be more script kinds later) containing New Script.\r\n\r\nNew Script creates assets/scripts/<Name>.cscript from a template (a class inheriting Actor with empty start / update(float delta) / physics_update(float delta)), compiles + registers it, and opens it in the Script Editor. Names are made unique.",
+          "tags": [
+            "ui",
+            "assets",
+            "menus",
+            "scripting"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "a1a1000000004b0e9a00000000000001",
+              "text": "right-click anywhere in the asset browser opens a styled context menu",
+              "isDone": true
+            },
+            {
+              "id": "a1a1000000004b0e9a00000000000002",
+              "text": "single Import Asset action that detects the file type and imports it (model / image / script)",
+              "isDone": true
+            },
+            {
+              "id": "a1a1000000004b0e9a00000000000003",
+              "text": "Create Material in the menu",
+              "isDone": true
+            },
+            {
+              "id": "a1a1000000004b0e9a00000000000004",
+              "text": "Scripting submenu with a working New Script item",
+              "isDone": true
+            },
+            {
+              "id": "a1a1000000004b0e9a00000000000005",
+              "text": "New Script writes a compiling template, registers the component and opens it in the editor",
+              "isDone": true
+            },
+            {
+              "id": "a1a1000000004b0e9a00000000000006",
+              "text": "the old top buttons are gone",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T09:00:00.0000000+00:00",
+          "updatedAt": "2026-09-10T00:00:00.0000000+00:00"
+        },
+        {
+          "id": "bddfb1cab3e3459e847f44a5c7aa9f1b",
+          "index": 27,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Recompile scripts in place",
+          "task": "Editing a script in the Script Editor recompiles it on every change. compile() currently does types_[name] = std::move(newClassInfo), which frees the old ClassInfo while the component-registry factory lambda and every already-attached ScriptComponent still point at it -> use-after-free / crash when the script is then added to an actor or Play is pressed.\r\n\r\nFix: recompile IN PLACE. Keep the same ClassInfo object (stable pointer); swap its decl, re-resolve the base, re-index functions. Live ScriptObjects whose class changed should drop their cached state so field initialisers re-run and do_async resume indices reset.",
+          "tags": [
+            "scripting",
+            "bug"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "cc22000000004b0e9a00000000000001",
+              "text": "recompiling a script keeps its ClassInfo pointer stable",
+              "isDone": true
+            },
+            {
+              "id": "cc22000000004b0e9a00000000000002",
+              "text": "edit a script, add it to an actor, hit Play -> no crash",
+              "isDone": true
+            },
+            {
+              "id": "cc22000000004b0e9a00000000000003",
+              "text": "edit a script already attached to an actor, hit Play -> the new code runs",
+              "isDone": true
+            },
+            {
+              "id": "cc22000000004b0e9a00000000000004",
+              "text": "script objects re-run field initialisers after their class recompiles",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T09:00:00.0000000+00:00",
+          "updatedAt": "2026-09-10T00:00:00.0000000+00:00"
+        },
+        {
+          "id": "994696eaa7e24cbd8dad1f3bbc7ce286",
+          "index": 28,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Reload scripts folder",
+          "task": "assets/scripts/ is only scanned once at startup, so a .cscript created or deleted outside the editor never shows up without a restart. Add a Reload Scripts action (asset browser context menu and/or the script editor) that re-runs the folder scan: new files are compiled + registered, edited-on-disk files recompiled, deleted files removed from the list and (best effort) their component entry.",
+          "tags": [
+            "scripting",
+            "assets"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "dd28000000004b0e9a00000000000001",
+              "text": "a Reload Scripts action re-scans assets/scripts/",
+              "isDone": true
+            },
+            {
+              "id": "dd28000000004b0e9a00000000000002",
+              "text": "newly added .cscript files appear in the editor and the Add Component menu",
+              "isDone": true
+            },
+            {
+              "id": "dd28000000004b0e9a00000000000003",
+              "text": "files deleted on disk are dropped from the list",
+              "isDone": true
+            },
+            {
+              "id": "dd28000000004b0e9a00000000000004",
+              "text": "files edited on disk are recompiled",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T09:00:00.0000000+00:00",
+          "updatedAt": "2026-09-10T00:00:00.0000000+00:00"
+        },
+        {
+          "id": "b64f8fbd48f849a8bfdcbe773353c401",
+          "index": 29,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Live component reload and registry cleanup",
+          "task": "Two loose ends from live editing:\r\n1. Renaming a class inside a script leaves the old name in the Add Component menu forever (ComponentRegistry::add dedupes by name and never replaces / removes).\r\n2. A ScriptComponent already on an actor keeps running the old code until it is removed and re-added.\r\n\r\nFix: when a class is renamed, drop the old registry entry (or rename it); when a class recompiles, invalidate the cached ScriptObject on every attached ScriptComponent so edits take effect in the same session.",
+          "tags": [
+            "scripting",
+            "components"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "ee29000000004b0e9a00000000000001",
+              "text": "renaming a class in the editor removes the stale component-menu entry",
+              "isDone": true
+            },
+            {
+              "id": "ee29000000004b0e9a00000000000002",
+              "text": "a ScriptComponent attached to an actor reflects code edits without being re-added",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T09:00:00.0000000+00:00",
+          "updatedAt": "2026-09-10T00:00:00.0000000+00:00"
         }
       ]
     },

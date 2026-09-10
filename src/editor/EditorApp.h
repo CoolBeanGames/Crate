@@ -43,6 +43,7 @@ private:
     void drawInspector();
     void drawViewport();
     void drawBottomPanel(); // Asset Browser / Engine Console / Game Console
+    void assetBrowserMenu(); // right-click menu: create / import
 
     // Hierarchy internals.
     void drawHierarchyNode(Actor& actor);

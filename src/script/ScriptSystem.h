@@ -33,8 +33,18 @@ public:
 
     ScriptContext& context() { return ctx_; }
 
-    // Load every *.cscript in a folder (recursively). Safe to call repeatedly.
+    // Load every *.cscript in a folder (recursively). Safe to call repeatedly;
+    // the folder is remembered for newScript() / reload().
     void loadFolder(const std::string& dir);
+    const std::string& scriptsDir() const { return dir_; }
+
+    // Re-scan the scripts folder: new files are loaded, changed files
+    // recompiled, deleted files removed from the list / catalogue.
+    void reload();
+
+    // Create a new script from a template in the scripts folder, compile and
+    // register it. Returns the class/file name, or "" on failure.
+    std::string newScript();
 
     // Compile source into a class; registers/updates the type + component.
     // Returns false and fills `errorOut` on a parse error.
@@ -44,7 +54,9 @@ public:
     std::vector<ScriptFile>& files() { return files_; }
     ScriptFile* file(const std::string& name);
     bool saveFile(ScriptFile& f);
-    void setSource(const std::string& name, std::string source); // marks dirty, recompiles
+    // Update a script's text, recompile, and (if the class was renamed) retire
+    // the old type + menu entry. Returns the script's current name, or "".
+    std::string setSource(const std::string& name, std::string source);
 
     // Autocomplete: all type names, and members of a given type (for `x.` where
     // x is of that type). Also plain keyword/identifier completions.
@@ -71,7 +83,11 @@ private:
     void rebuildStatic(const std::string& className);
 
     ScriptContext ctx_;
+    std::string dir_; // last folder passed to loadFolder
     std::unordered_map<std::string, std::unique_ptr<ClassInfo>> types_;
+    // ClassInfos for deleted scripts, kept alive so still-attached components
+    // don't dangle. Not listed / addable.
+    std::vector<std::unique_ptr<ClassInfo>> retired_;
     std::unordered_map<std::string, std::shared_ptr<ScriptObject>> statics_;
     std::vector<ScriptFile> files_;
     std::vector<TypeDoc> typeDocs_;

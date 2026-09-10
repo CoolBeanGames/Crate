@@ -20,8 +20,14 @@ public:
 
     static ComponentRegistry& get();
 
+    // Register a component type. If `replace` is true an existing entry with
+    // the same name is overwritten (used when a script recompiles); otherwise a
+    // duplicate name is ignored.
     void add(std::string name, std::string category,
-             std::function<std::unique_ptr<Component>()> make);
+             std::function<std::unique_ptr<Component>()> make, bool replace = false);
+
+    void remove(const std::string& name);
+    bool has(const std::string& name) const;
 
     const std::vector<Entry>& entries() const { return entries_; }
     std::unique_ptr<Component> create(const std::string& name) const;
