@@ -4,7 +4,7 @@
   "name": "Crate",
   "nextCardIndex": 55,
   "latestExePath": "C:\\Users\\haptic\\Documents\\git\\Crate\\build-Release\\Crate.exe",
-  "latestReleasePath": "https://github.com/CoolBeanGames/Crate/releases/tag/v0.5.0",
+  "latestReleasePath": "https://github.com/CoolBeanGames/Crate/releases/tag/v0.6.0",
   "tagCatalog": [
     {
       "name": "bug",
@@ -350,57 +350,57 @@
             {
               "id": "6449437cc447421aad7c120e112b05dd",
               "text": "clamp",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "0ad05c2f38ba48858ad588aa2f69989d",
               "text": "lerp",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "3843119c025c4a068ee3dfda9bcc05e8",
               "text": "sine",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "bebd2c87865c4ccea0f4d76f08acc612",
               "text": "cos",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "4374fc4e4846454e98314d8c4aa281d9",
               "text": "tan",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "ae8cefd32d824cd3adaa2ca58e4bfce7",
               "text": "rand_i",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "a93d9b7ca9a74d94a6703cf5d34f114e",
               "text": "rand_f",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "caa8af890a1b40669e6d2fc9eb779f5c",
               "text": "rand_i_range",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "b3b18a3cc74b4cb28add8a301c86e83c",
               "text": "rand_f_range",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "08c88778c35249fea2cd5d2b148f5d4b",
               "text": "exp",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "c799ef99e4844bec91233f2355b1dd8e",
               "text": "sqrt",
-              "isDone": false
+              "isDone": true
             }
           ],
           "flags": {
@@ -409,11 +409,11 @@
             "release": false,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T18:43:39.1779404+00:00",
-          "updatedAt": "2026-09-10T18:45:04.425261+00:00"
+          "updatedAt": "2026-09-10T14:00:00.0000000+00:00"
         },
         {
           "id": "afc20949260a4de69df54369fd96bdf4",
@@ -435,11 +435,11 @@
             "release": true,
             "merge": true
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T18:45:33.3098217+00:00",
-          "updatedAt": "2026-09-10T18:46:08.7546089+00:00"
+          "updatedAt": "2026-09-10T14:20:00.0000000+00:00"
         }
       ]
     },

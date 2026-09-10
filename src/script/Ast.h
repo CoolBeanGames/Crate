@@ -99,6 +99,11 @@ struct FieldDecl {
     ExprPtr init;
 };
 
+struct SignalDecl {
+    std::string name;
+    std::vector<std::string> params; // names only; cScript signals are untyped
+};
+
 struct ClassDecl {
     std::string name;
     std::string base = "Actor"; // default base
@@ -106,6 +111,7 @@ struct ClassDecl {
     bool isAbstract = false;
     std::vector<FieldDecl> fields;
     std::vector<FunctionDecl> functions;
+    std::vector<SignalDecl> signals;
 };
 
 } // namespace crate::script

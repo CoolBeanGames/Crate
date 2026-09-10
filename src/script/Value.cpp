@@ -54,6 +54,8 @@ std::string Value::str() const {
                 }
             return out + "]";
         }
+        case T::Signal: return "<signal " + s + ">";
+        case T::Callable: return "<callable " + s + ">";
         case T::Object: {
             if (obj && !obj->builtin.empty()) {
                 auto g = [&](const char* n) {
@@ -82,6 +84,8 @@ const char* Value::typeName() const {
         case T::Object: return obj && !obj->builtin.empty() ? obj->builtin.c_str() : "object";
         case T::TypeRef: return "type";
         case T::Actor: return "Actor";
+        case T::Signal: return "signal";
+        case T::Callable: return "callable";
     }
     return "?";
 }
