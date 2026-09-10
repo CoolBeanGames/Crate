@@ -1,4 +1,5 @@
 #pragma once
+#include "assets/MeshLibrary.h"
 #include "core/Math.h"
 #include "render/Camera.h"
 #include "render/Mesh.h"
@@ -39,6 +40,12 @@ public:
     void shutdown();
     bool ready() const { return device_ != nullptr; }
 
+    // Imported meshes/materials are looked up here by MeshActor::meshPath.
+    void setMeshLibrary(const MeshLibrary* lib) { library_ = lib; }
+
+    // Drop a cached GPU mesh so a re-import is picked up.
+    void invalidateMesh(const std::string& key);
+
     struct Options {
         Vec3 clear{0.043f, 0.051f, 0.070f};
         Actor* highlight = nullptr; // selected actor, drawn with a tinted base colour
@@ -61,7 +68,7 @@ private:
 
     bool ensureTargets(int w, int h);
     bool compileShaders();
-    const GpuMesh& meshFor(const std::string& primitive);
+    const GpuMesh& meshFor(const std::string& key, const std::string& primitiveFallback);
     GpuMesh upload(const MeshData& data);
     void drawActor(Actor& actor, const Mat4& viewProj, const Options& opt);
     void releaseTargets();
@@ -87,7 +94,8 @@ private:
     ID3D11ShaderResourceView* whiteSrv_ = nullptr;
     ID3D11ShaderResourceView* checkerSrv_ = nullptr;
 
-    std::unordered_map<std::string, GpuMesh> primitiveCache_;
+    const MeshLibrary* library_ = nullptr;
+    std::unordered_map<std::string, GpuMesh> meshCache_;
     std::unordered_map<std::string, ID3D11ShaderResourceView*> textureCache_;
 };
 

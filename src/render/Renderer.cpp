@@ -139,11 +139,11 @@ bool Renderer::init(ID3D11Device* device, ID3D11DeviceContext* context) {
 
 void Renderer::shutdown() {
     releaseTargets();
-    for (auto& [k, m] : primitiveCache_) {
+    for (auto& [k, m] : meshCache_) {
         safeRelease(m.vb);
         safeRelease(m.ib);
     }
-    primitiveCache_.clear();
+    meshCache_.clear();
     for (auto& [k, srv] : textureCache_)
         safeRelease(srv);
     textureCache_.clear();
@@ -260,12 +260,25 @@ Renderer::GpuMesh Renderer::upload(const MeshData& data) {
     return m;
 }
 
-const Renderer::GpuMesh& Renderer::meshFor(const std::string& primitive) {
-    auto it = primitiveCache_.find(primitive);
-    if (it != primitiveCache_.end())
+const Renderer::GpuMesh& Renderer::meshFor(const std::string& key,
+                                          const std::string& primitiveFallback) {
+    const std::string& cacheKey = key.empty() ? primitiveFallback : key;
+    auto it = meshCache_.find(cacheKey);
+    if (it != meshCache_.end())
         return it->second;
-    GpuMesh m = upload(primitives::byName(primitive));
-    return primitiveCache_.emplace(primitive, m).first->second;
+
+    const MeshData* imported = (!key.empty() && library_) ? library_->findMesh(key) : nullptr;
+    GpuMesh m = upload(imported ? *imported : primitives::byName(primitiveFallback));
+    return meshCache_.emplace(cacheKey, m).first->second;
+}
+
+void Renderer::invalidateMesh(const std::string& key) {
+    auto it = meshCache_.find(key);
+    if (it != meshCache_.end()) {
+        safeRelease(it->second.vb);
+        safeRelease(it->second.ib);
+        meshCache_.erase(it);
+    }
 }
 
 void* Renderer::loadTexture(const std::string& path) {
@@ -327,6 +340,21 @@ void Renderer::drawActor(Actor& actor, const Mat4& viewProj, const Options& opt)
                  Mat4::translation(w.position);
     Mat4 mvp = model * viewProj;
 
+    // Resolve material: an imported FBX material (if any) provides the base
+    // colour and albedo texture; MeshActor::texturePath overrides the texture.
+    float baseColor[4] = {0.78f, 0.78f, 0.80f, 1.0f};
+    std::string texPath = mesh->texturePath;
+    if (library_ && !mesh->meshPath.empty()) {
+        if (const auto* mats = library_->materialsFor(mesh->meshPath))
+            if (!mats->empty()) {
+                const Material& m0 = (*mats)[0];
+                for (int i = 0; i < 4; ++i)
+                    baseColor[i] = m0.baseColor[i];
+                if (texPath.empty())
+                    texPath = m0.texturePath;
+            }
+    }
+
     CBData cb;
     // Upload row-major data as-is: HLSL's column-major reinterpretation plus
     // mul(M, v) then yields the row-vector product v * M that this math uses.
@@ -334,11 +362,11 @@ void Renderer::drawActor(Actor& actor, const Mat4& viewProj, const Options& opt)
     std::memcpy(cb.model, model.m, sizeof(cb.model));
     cb.lightDir[0] = -0.4f; cb.lightDir[1] = -0.8f; cb.lightDir[2] = -0.45f; cb.lightDir[3] = 0.0f;
     bool sel = opt.highlight == &actor;
-    cb.baseColor[0] = sel ? 0.72f : 0.78f;
-    cb.baseColor[1] = sel ? 0.66f : 0.78f;
-    cb.baseColor[2] = sel ? 1.0f : 0.80f;
-    cb.baseColor[3] = 1.0f;
-    cb.params[0] = mesh->texturePath.empty() ? 0.0f : 1.0f;
+    cb.baseColor[0] = sel ? baseColor[0] * 0.85f + 0.10f : baseColor[0];
+    cb.baseColor[1] = sel ? baseColor[1] * 0.85f + 0.05f : baseColor[1];
+    cb.baseColor[2] = sel ? baseColor[2] * 0.85f + 0.25f : baseColor[2];
+    cb.baseColor[3] = baseColor[3];
+    cb.params[0] = texPath.empty() ? 0.0f : 1.0f;
     cb.params[1] = cb.params[2] = cb.params[3] = 0.0f;
 
     D3D11_MAPPED_SUBRESOURCE ms;
@@ -347,11 +375,11 @@ void Renderer::drawActor(Actor& actor, const Mat4& viewProj, const Options& opt)
         ctx_->Unmap(cb_, 0);
     }
 
-    auto* srv = static_cast<ID3D11ShaderResourceView*>(
-        mesh->texturePath.empty() ? whiteSrv_ : loadTexture(mesh->texturePath));
+    auto* srv = static_cast<ID3D11ShaderResourceView*>(texPath.empty() ? whiteSrv_
+                                                                       : loadTexture(texPath));
     ctx_->PSSetShaderResources(0, 1, &srv);
 
-    const GpuMesh& gm = meshFor(mesh->primitive.empty() ? "Cube" : mesh->primitive);
+    const GpuMesh& gm = meshFor(mesh->meshPath, mesh->primitive.empty() ? "Cube" : mesh->primitive);
     UINT stride = sizeof(Vertex), offset = 0;
     ctx_->IASetVertexBuffers(0, 1, &gm.vb, &stride, &offset);
     ctx_->IASetIndexBuffer(gm.ib, DXGI_FORMAT_R32_UINT, 0);

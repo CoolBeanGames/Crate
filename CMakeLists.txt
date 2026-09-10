@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Crate LANGUAGES CXX)
+project(Crate LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -23,6 +23,13 @@ add_library(imgui STATIC
 target_include_directories(imgui PUBLIC ${IMGUI_DIR})
 target_link_libraries(imgui PUBLIC d3d11 dxgi d3dcompiler)
 
+# --- ufbx (vendored, single translation unit) -----------------------------
+add_library(ufbx STATIC third_party/ufbx/ufbx.c)
+target_include_directories(ufbx PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
+if(MSVC)
+    target_compile_options(ufbx PRIVATE /w) # vendored code, silence warnings
+endif()
+
 # --- Crate engine core -----------------------------------------------------
 add_library(crate_core STATIC
     src/core/Log.cpp
@@ -30,17 +37,18 @@ add_library(crate_core STATIC
     src/scene/Scene.cpp
     src/render/Mesh.cpp
     src/render/Renderer.cpp
+    src/assets/FbxImport.cpp
     src/editor/Console.cpp
     src/editor/ContextMenu.cpp
     src/editor/Theme.cpp
     src/editor/EditorApp.cpp
 )
 target_include_directories(crate_core PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
-target_link_libraries(crate_core PUBLIC imgui)
+target_link_libraries(crate_core PUBLIC imgui ufbx)
 
 # --- Editor executable ---------------------------------------------------
 add_executable(Crate WIN32 src/main.cpp)
-target_link_libraries(Crate PRIVATE crate_core)
+target_link_libraries(Crate PRIVATE crate_core shell32)
 
 if(MSVC)
     target_compile_options(crate_core PRIVATE /W4 /permissive-)
@@ -62,3 +70,9 @@ enable_testing()
 add_executable(actor_tests tests/actor_tests.cpp)
 target_link_libraries(actor_tests PRIVATE crate_core)
 add_test(NAME actor_tests COMMAND actor_tests)
+
+add_executable(fbx_tests tests/fbx_tests.cpp)
+target_link_libraries(fbx_tests PRIVATE crate_core)
+target_compile_definitions(fbx_tests PRIVATE
+    CRATE_TEST_DATA="${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
+add_test(NAME fbx_tests COMMAND fbx_tests)

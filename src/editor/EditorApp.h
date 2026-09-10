@@ -1,4 +1,5 @@
 #pragma once
+#include "assets/MeshLibrary.h"
 #include "render/Camera.h"
 #include "render/Renderer.h"
 #include "scene/Scene.h"
@@ -21,6 +22,10 @@ public:
     // Provide the shared D3D11 device (enables the 3D viewport). Optional; the
     // editor still runs without it, showing a placeholder viewport.
     void attachDevice(ID3D11Device* device, ID3D11DeviceContext* context);
+
+    // A file dropped onto the window from the OS. FBX files are imported and
+    // added to the scene; images are registered for use as textures.
+    void ingestDroppedFile(const std::string& path);
 
     // Draw one editor frame. Call between ImGui::NewFrame() and ImGui::Render().
     void onFrame();
@@ -51,9 +56,11 @@ private:
     void setPlaying(bool playing);
 
     Scene scene_;
+    MeshLibrary meshLib_;
     Renderer renderer_;
     OrbitCamera camera_;
     bool spinPreview_ = true;
+    std::vector<std::string> importedAssets_; // keys of imported models/textures
     std::unique_ptr<Actor> clipboard_; // deep clone from copy/cut
     bool playing_ = false;
     bool showDemo_ = false;

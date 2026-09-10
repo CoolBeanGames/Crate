@@ -1,10 +1,14 @@
 #include "editor/EditorApp.h"
+#include "assets/FbxImport.h"
 #include "editor/Console.h"
 #include "editor/ContextMenu.h"
 #include "editor/Theme.h"
 #include "core/Log.h"
 #include "scene/Actor2D.h"
 #include "scene/Actor3D.h"
+
+#include <algorithm>
+#include <cctype>
 
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -28,11 +32,59 @@ static Actor* findById(Actor& node, uint64_t id) {
 }
 
 EditorApp::EditorApp() : scene_(Scene::makeSample()) {
+    renderer_.setMeshLibrary(&meshLib_);
     CR_LOG("app", "Crate editor started");
     CR_LOG("scene", "Loaded sample scene with " + std::to_string(scene_.actorCount()) + " actors");
 }
 
 EditorApp::~EditorApp() = default;
+
+static std::string lowerExt(const std::string& path) {
+    auto dot = path.find_last_of('.');
+    if (dot == std::string::npos)
+        return {};
+    std::string e = path.substr(dot + 1);
+    std::transform(e.begin(), e.end(), e.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return e;
+}
+
+void EditorApp::ingestDroppedFile(const std::string& path) {
+    const std::string ext = lowerExt(path);
+    if (ext == "fbx") {
+        renderer_.invalidateMesh(path);
+        FbxImportResult res = importFbx(path, meshLib_);
+        if (!res.ok) {
+            CR_ERROR("assets", "Import failed: " + (res.error.empty() ? path : res.error));
+            return;
+        }
+        importedAssets_.push_back(res.key);
+
+        std::string name = path;
+        if (auto slash = name.find_last_of("/\\"); slash != std::string::npos)
+            name = name.substr(slash + 1);
+        auto actor = std::make_unique<MeshActor>(name);
+        actor->meshPath = res.key;
+        actor->primitive.clear();
+        if (const auto* mats = meshLib_.materialsFor(res.key))
+            if (!mats->empty() && !(*mats)[0].texturePath.empty())
+                actor->texturePath = (*mats)[0].texturePath;
+        Actor* added = scene_.add(std::move(actor));
+        scene_.select(added);
+        CR_LOG("scene", "Added imported model '" + name + "' to the scene");
+    } else if (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "bmp" || ext == "tga" ||
+               ext == "tiff" || ext == "tif") {
+        importedAssets_.push_back(path);
+        CR_LOG("assets", "Registered image " + path +
+                             " (assign it as a Texture Path, or use the Asset Browser)");
+        if (auto* m = dynamic_cast<MeshActor*>(scene_.selected())) {
+            m->texturePath = path;
+            CR_LOG("assets", "Applied texture to '" + m->name() + "'");
+        }
+    } else {
+        CR_WARN("assets", "Unsupported drop: " + path);
+    }
+}
 
 void EditorApp::attachDevice(ID3D11Device* device, ID3D11DeviceContext* context) {
     if (!device || !context) {

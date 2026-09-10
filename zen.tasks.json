@@ -210,17 +210,17 @@
             {
               "id": "8123bb3cb8e44465b5080516e0584ec6",
               "text": "can drag and drop files from explorer",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "1674c506a8454198bdf312ef7e0aa406",
               "text": "can import FBX",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "7b7930e85b2b46f29bce97df1c7d4bd7",
               "text": "also Imports Materials",
-              "isDone": false
+              "isDone": true
             }
           ],
           "flags": {
@@ -229,11 +229,11 @@
             "release": false,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:05:33.2822087+00:00",
-          "updatedAt": "2026-09-10T01:24:17.0805524+00:00"
+          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
         },
         {
           "id": "0b82c25955b64b6a86f30ed667cb9097",
