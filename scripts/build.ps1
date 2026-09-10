@@ -13,7 +13,9 @@ $ninja    = Join-Path $cmakeDir "Ninja\ninja.exe"
 $vcvars   = Join-Path $vs "VC\Auxiliary\Build\vcvars64.bat"
 
 $root  = Split-Path -Parent $PSScriptRoot
-$build = Join-Path $root "build"
+# Debug builds in build/ (the default the other scripts expect); other configs
+# get their own directory.
+$build = if ($Config -eq "Debug") { Join-Path $root "build" } else { Join-Path $root "build-$Config" }
 
 $cmd = "`"$vcvars`" && `"$cmake`" -G Ninja -S `"$root`" -B `"$build`" " +
        "-DCMAKE_MAKE_PROGRAM=`"$ninja`" -DCMAKE_BUILD_TYPE=$Config && " +
