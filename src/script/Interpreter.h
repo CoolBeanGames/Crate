@@ -89,6 +89,9 @@ private:
     Value eval(const Expr& e);
 
     Value evalBinary(const Expr& e);
+    // Arithmetic core shared by binary expressions and compound assignment.
+    // Handles numbers, string concat (+), and Vector2/Vector3 math.
+    Value arith(Tok op, const Value& a, const Value& b, int line);
     Value evalCall(const Expr& e);
     Value evalMember(const Expr& e);
     Value* lvalue(const Expr& e);       // resolves an assignable slot

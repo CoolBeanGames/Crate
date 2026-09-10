@@ -163,6 +163,54 @@ static int run() {
         CHECK(host.transform().rotationEuler.y == 15.0f);
     }
 
+    // --- compound assignment + vector math (task 43) ----------------
+    {
+        Harness h;
+        auto obj = h.load(R"(class comp : Actor
+{
+    func run() : string
+    {
+        var n = 10;
+        n += 5;
+        n -= 2;
+        n *= 3;
+        n /= 2;      // int / -> 19
+        var s = "a";
+        s += "b";
+        var v = Vector3(1, 2, 3);
+        v += Vector3(10, 20, 30);
+        var w = v - Vector3(1, 1, 1);
+        var d = Vector3(1, 2, 3) * 2;
+        return n.str() + "|" + s + "|" + v.x.str() + "," + v.y.str() + "," + v.z.str()
+             + "|" + w.y.str() + "|" + d.z.str();
+    }
+})");
+        Value r = Interpreter(&h.ctx, obj).call("run");
+        CHECK(r.str() == "19|ab|11,22,33|21|6");
+    }
+
+    // --- compound assignment on the actor transform (task 43) -------
+    {
+        Harness h;
+        crate::Actor3D host("mover");
+        host.transform().position = {0, 0, 0};
+        auto obj = h.load(R"(class tmove : Actor3D
+{
+    float speed = 3;
+    func run()
+    {
+        transform.position += Vector3(0, speed, 0);   // whole-vector proxy
+        transform.position.y += 1;                     // single component
+        transform.position.x = 5;                      // single component
+    }
+})");
+        obj->owner = &host;
+        Interpreter(&h.ctx, obj).call("run");
+        CHECK(host.transform().position.x == 5.0f);
+        CHECK(host.transform().position.y == 4.0f);
+        CHECK(host.transform().position.z == 0.0f);
+    }
+
     // --- variables: all base types (task 18) ------------------------
     {
         Harness h;
