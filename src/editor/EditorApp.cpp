@@ -8,6 +8,7 @@
 #include "core/Log.h"
 #include "scene/Actor2D.h"
 #include "scene/Actor3D.h"
+#include "scene/BuiltinComponents.h"
 #include "scene/ComponentRegistry.h"
 
 #include <algorithm>
@@ -67,12 +68,14 @@ void EditorApp::ingestDroppedFile(const std::string& path) {
         std::string name = path;
         if (auto slash = name.find_last_of("/\\"); slash != std::string::npos)
             name = name.substr(slash + 1);
-        auto actor = std::make_unique<MeshActor>(name);
-        actor->meshPath = res.key;
-        actor->primitive.clear();
+        auto actor = std::make_unique<Actor3D>(name);
+        auto mr = std::make_unique<MeshRenderer>();
+        mr->usePrimitive = false;
+        mr->meshPath = res.key;
         if (const auto* mats = meshLib_.materialsFor(res.key))
             if (!mats->empty() && !(*mats)[0].texturePath.empty())
-                actor->texturePath = (*mats)[0].texturePath;
+                mr->texturePath = (*mats)[0].texturePath;
+        actor->addComponent(std::move(mr));
         Actor* added = scene_.add(std::move(actor));
         scene_.select(added);
         CR_LOG("scene", "Added imported model '" + name + "' to the scene");
@@ -86,10 +89,11 @@ void EditorApp::ingestDroppedFile(const std::string& path) {
             importedAssets_.push_back(path);
         CR_LOG("assets", "Imported image " + path + " (" + std::to_string(probe.width) + "x" +
                              std::to_string(probe.height) + ")");
-        if (auto* m = dynamic_cast<MeshActor*>(scene_.selected())) {
-            m->texturePath = path;
+        Actor* sel = scene_.selected();
+        if (auto* mr = sel ? sel->getComponent<MeshRenderer>() : nullptr) {
+            mr->texturePath = path;
             renderer_.invalidateTexture(path);
-            CR_LOG("assets", "Applied texture to '" + m->name() + "'");
+            CR_LOG("assets", "Applied texture to '" + sel->name() + "'");
         }
     } else {
         CR_WARN("assets", "Unsupported drop: " + path);
@@ -526,19 +530,7 @@ void EditorApp::drawInspector() {
         Transform w = a->worldTransform();
         ImGui::TextDisabled("World pos  %.2f, %.2f, %.2f", w.position.x, w.position.y, w.position.z);
 
-        if (auto* m = dynamic_cast<MeshActor*>(a)) {
-            ImGui::SeparatorText("Mesh");
-            ImGui::InputText("Mesh Path", &m->meshPath);
-            const char* prims[] = {"Cube", "Sphere", "Cylinder", "Capsule", "Plane", "Quad"};
-            if (ImGui::BeginCombo("Primitive", m->primitive.c_str())) {
-                for (const char* p : prims)
-                    if (ImGui::Selectable(p, m->primitive == p))
-                        m->primitive = p;
-                ImGui::EndCombo();
-            }
-            ImGui::InputText("Texture Path", &m->texturePath);
-            ImGui::Checkbox("Cast Shadows", &m->castShadows);
-        } else if (auto* sp = dynamic_cast<SpriteActor*>(a)) {
+        if (auto* sp = dynamic_cast<SpriteActor*>(a)) {
             ImGui::SeparatorText("Sprite");
             ImGui::InputText("Texture Path", &sp->texturePath);
             ImGui::ColorEdit4("Tint", sp->tint);
@@ -743,10 +735,11 @@ void EditorApp::drawBottomPanel() {
             bool isImg = isSupportedImageExt(ext);
             if (ImGui::Selectable(((isImg ? "[img] " : "[mesh] ") + name).c_str())) {
                 if (isImg) {
-                    if (auto* m = dynamic_cast<MeshActor*>(scene_.selected())) {
-                        m->texturePath = a;
+                    Actor* sel = scene_.selected();
+                    if (auto* mr = sel ? sel->getComponent<MeshRenderer>() : nullptr) {
+                        mr->texturePath = a;
                         renderer_.invalidateTexture(a);
-                        CR_LOG("assets", "Applied '" + name + "' to '" + m->name() + "'");
+                        CR_LOG("assets", "Applied '" + name + "' to '" + sel->name() + "'");
                     }
                 }
             }
@@ -796,11 +789,18 @@ void EditorApp::setPlaying(bool playing) {
 Actor* EditorApp::spawn(const char* kind, Actor* parent) {
     std::unique_ptr<Actor> a;
     std::string k = kind;
-    if (k == "actor3d")     a = std::make_unique<Actor3D>("Actor3D");
-    else if (k == "mesh")   a = std::make_unique<MeshActor>("Mesh");
-    else if (k == "sprite") a = std::make_unique<SpriteActor>("Sprite");
-    else if (k == "ui")     a = std::make_unique<UIControlActor>("UI Control");
-    else                    a = std::make_unique<Actor>("Actor");
+    if (k == "actor3d") {
+        a = std::make_unique<Actor3D>("Actor3D");
+    } else if (k == "mesh") {
+        a = std::make_unique<Actor3D>("Mesh");
+        a->addComponent(std::make_unique<MeshRenderer>()); // defaults to a Cube
+    } else if (k == "sprite") {
+        a = std::make_unique<SpriteActor>("Sprite");
+    } else if (k == "ui") {
+        a = std::make_unique<UIControlActor>("UI Control");
+    } else {
+        a = std::make_unique<Actor>("Actor");
+    }
 
     std::string name = a->name();
     Actor* added = scene_.add(std::move(a), parent);

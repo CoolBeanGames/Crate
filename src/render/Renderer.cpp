@@ -2,6 +2,7 @@
 #include "assets/Image.h"
 #include "core/Log.h"
 #include "scene/Actor3D.h"
+#include "scene/BuiltinComponents.h"
 #include "scene/Scene.h"
 
 #include <d3d11.h>
@@ -326,8 +327,8 @@ void Renderer::drawActor(Actor& actor, const Mat4& viewProj, const Options& opt)
     for (const auto& child : actor.children())
         drawActor(*child, viewProj, opt);
 
-    auto* mesh = dynamic_cast<MeshActor*>(&actor);
-    if (!mesh || !mesh->visible())
+    auto* mr = actor.getComponent<MeshRenderer>();
+    if (!mr || !mr->enabled || !actor.visible())
         return;
 
     Transform w = actor.worldTransform();
@@ -336,15 +337,16 @@ void Renderer::drawActor(Actor& actor, const Mat4& viewProj, const Options& opt)
     Mat4 mvp = model * viewProj;
 
     // Resolve material: an imported FBX material (if any) provides the base
-    // colour and albedo texture; MeshActor::texturePath overrides the texture.
-    float baseColor[4] = {0.78f, 0.78f, 0.80f, 1.0f};
-    std::string texPath = mesh->texturePath;
-    if (library_ && !mesh->meshPath.empty()) {
-        if (const auto* mats = library_->materialsFor(mesh->meshPath))
+    // colour and albedo texture; MeshRenderer::texturePath / tint override.
+    float baseColor[4] = {mr->tint[0] * 0.78f + 0.0f, mr->tint[1] * 0.78f, mr->tint[2] * 0.80f,
+                          mr->tint[3]};
+    std::string texPath = mr->texturePath;
+    if (library_ && !mr->meshPath.empty()) {
+        if (const auto* mats = library_->materialsFor(mr->meshPath))
             if (!mats->empty()) {
                 const Material& m0 = (*mats)[0];
                 for (int i = 0; i < 4; ++i)
-                    baseColor[i] = m0.baseColor[i];
+                    baseColor[i] = m0.baseColor[i] * mr->tint[i];
                 if (texPath.empty())
                     texPath = m0.texturePath;
             }
@@ -374,7 +376,8 @@ void Renderer::drawActor(Actor& actor, const Mat4& viewProj, const Options& opt)
                                                                        : loadTexture(texPath));
     ctx_->PSSetShaderResources(0, 1, &srv);
 
-    const GpuMesh& gm = meshFor(mesh->meshPath, mesh->primitive.empty() ? "Cube" : mesh->primitive);
+    const GpuMesh& gm =
+        meshFor(mr->meshKey(), mr->primitive.empty() ? "Cube" : mr->primitive);
     UINT stride = sizeof(Vertex), offset = 0;
     ctx_->IASetVertexBuffers(0, 1, &gm.vb, &stride, &offset);
     ctx_->IASetIndexBuffer(gm.ib, DXGI_FORMAT_R32_UINT, 0);

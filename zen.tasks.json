@@ -358,37 +358,37 @@
             {
               "id": "038b4a6487bd48adadef0b1fbfe1ca65",
               "text": "can add mesh renderer",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "62f5d9277504441c81c32af558de2c3b",
               "text": "can render cubes",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "c6bc0cd600124961a97509dedbb26972",
               "text": "can render spheres",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "9823e560cec34c6d989983cfeef04464",
               "text": "can render quads",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "1fa69d73cd6f4e48923b8a4a1a947708",
               "text": "can render planes",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "f1ded36b329543558967b018c6131b0b",
               "text": "can render capsules",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "5379fc3f54a041d3b8fc6bf94fa2eb35",
               "text": "can render cylinders",
-              "isDone": false
+              "isDone": true
             }
           ],
           "flags": {
@@ -397,11 +397,11 @@
             "release": false,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:18:37.2355825+00:00",
-          "updatedAt": "2026-09-10T01:24:21.7215242+00:00"
+          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
         },
         {
           "id": "fe4f8bd7950945f0b47da4c90c806da8",

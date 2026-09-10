@@ -25,6 +25,7 @@ std::unique_ptr<Component> ComponentRegistry::create(const std::string& name) co
 
 void registerBuiltinComponents() {
     auto& r = ComponentRegistry::get();
+    r.add("Mesh Renderer", "Rendering", [] { return std::make_unique<MeshRenderer>(); });
     r.add("Spinner", "Debug", [] { return std::make_unique<SpinnerComponent>(); });
 }
 

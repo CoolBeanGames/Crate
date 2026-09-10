@@ -86,3 +86,7 @@ target_link_libraries(image_tests PRIVATE crate_core)
 target_compile_definitions(image_tests PRIVATE
     CRATE_TEST_DATA="${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
 add_test(NAME image_tests COMMAND image_tests)
+
+add_executable(mesh_tests tests/mesh_tests.cpp)
+target_link_libraries(mesh_tests PRIVATE crate_core)
+add_test(NAME mesh_tests COMMAND mesh_tests)

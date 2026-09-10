@@ -2,6 +2,9 @@
 #include "core/Log.h"
 #include "scene/Actor2D.h"
 #include "scene/Actor3D.h"
+#include "scene/BuiltinComponents.h"
+
+#include <memory>
 
 namespace crate {
 
@@ -102,20 +105,33 @@ Scene Scene::makeSample() {
 
     auto* set = s.add(std::make_unique<Actor3D>("-- SET --"));
 
-    auto crate = std::make_unique<MeshActor>("Crate");
-    crate->primitive = "Cube";
-    crate->texturePath = "assets/uv_check.bmp";
+    auto crate = std::make_unique<Actor3D>("Crate");
     crate->transform().position = {0.0f, 0.75f, 0.0f};
     crate->transform().scale = {1.5f, 1.5f, 1.5f};
+    {
+        auto mr = std::make_unique<MeshRenderer>();
+        mr->primitive = "Cube";
+        mr->texturePath = "assets/uv_check.bmp";
+        crate->addComponent(std::move(mr));
+    }
     s.add(std::move(crate), set);
 
-    auto floor = std::make_unique<MeshActor>("Floor");
-    floor->primitive = "Plane";
+    auto floor = std::make_unique<Actor3D>("Floor");
     floor->transform().scale = {6.0f, 1.0f, 6.0f};
+    {
+        auto mr = std::make_unique<MeshRenderer>();
+        mr->primitive = "Plane";
+        floor->addComponent(std::move(mr));
+    }
     s.add(std::move(floor), set);
 
     auto lamp = std::make_unique<Actor3D>("Ceiling Lamp");
     lamp->transform().position = {0.0f, 3.0f, 0.0f};
+    {
+        auto mr = std::make_unique<MeshRenderer>();
+        mr->primitive = "Sphere";
+        lamp->addComponent(std::move(mr));
+    }
     s.add(std::move(lamp), set);
 
     auto* cast = s.add(std::make_unique<Actor>("-- CAST --"));
