@@ -144,6 +144,45 @@ int main() {
     host->removeComponent(spin);
     CHECK(host->getComponent<SpinnerComponent>() == nullptr);
 
+    // --- AUUIDs: unique per instance, path map follows moves --------------
+    {
+        Actor x("x"), y("y");
+        CHECK(!x.auid().empty());
+        CHECK(x.auid() != y.auid());
+        CHECK(x.auid().size() == 36); // 8-4-4-4-12
+
+        Scene sc("s");
+        Actor* set = sc.add(std::make_unique<Actor3D>("SET"));
+        Actor* cast = sc.add(std::make_unique<Actor3D>("CAST"));
+        Actor* crate = sc.add(std::make_unique<Actor3D>("Crate"), set);
+
+        CHECK(sc.pathOf(crate) == "SET/Crate");
+        CHECK(sc.atPath("SET/Crate") == crate);
+        CHECK(sc.atPath("nope") == nullptr);
+
+        std::string crateAuid = crate->auid();
+        sc.reparent(crate, cast);
+        CHECK(sc.pathOf(crate) == "CAST/Crate");     // path changed
+        CHECK(crate->auid() == crateAuid);           // identity did not
+        CHECK(sc.atPath("SET/Crate") == nullptr);
+        CHECK(sc.atPath("CAST/Crate") == crate);
+
+        // Duplicate is a new instance -> new AUUID.
+        Actor* dup = sc.duplicate(crate);
+        CHECK(dup->auid() != crate->auid());
+
+        // Every entry in the table is a distinct AUUID.
+        auto table = sc.actorTable();
+        CHECK(table.size() == static_cast<size_t>(sc.actorCount()));
+        for (size_t i = 0; i < table.size(); ++i)
+            for (size_t j = i + 1; j < table.size(); ++j)
+                CHECK(table[i].second != table[j].second);
+
+        // Play-mode snapshot preserves AUUIDs so Stop restores identity.
+        Scene snap = sc.clone();
+        CHECK(snap.atPath("CAST/Crate")->auid() == crateAuid);
+    }
+
     std::printf("ok  %d checks passed\n", g_checks);
     return 0;
 }

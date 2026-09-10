@@ -1,11 +1,15 @@
 #include "scene/Actor.h"
+
+#include "assets/AssetDatabase.h"
+
 #include <algorithm>
 
 namespace crate {
 
 uint64_t Actor::nextId_ = 1;
 
-Actor::Actor(std::string name) : id_(nextId_++), name_(std::move(name)) {}
+Actor::Actor(std::string name)
+    : id_(nextId_++), auid_(AssetDatabase::newUuid()), name_(std::move(name)) {}
 
 Transform Actor::worldTransform() const {
     if (!parent_)
@@ -63,15 +67,17 @@ bool Actor::isDescendantOf(const Actor* other) const {
     return false;
 }
 
-std::unique_ptr<Actor> Actor::clone() const {
+std::unique_ptr<Actor> Actor::clone(bool preserveAuid) const {
     std::unique_ptr<Actor> c(cloneSelf());
     c->transform_ = transform_;
     c->visible_ = visible_;
     c->enabled_ = enabled_;
+    if (preserveAuid)
+        c->auid_ = auid_;
     for (const auto& comp : components_)
         c->addComponent(comp->clone());
     for (const auto& ch : children_)
-        c->addChild(ch->clone());
+        c->addChild(ch->clone(preserveAuid));
     return c;
 }
 

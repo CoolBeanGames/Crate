@@ -12,7 +12,7 @@ AssetDatabase& AssetDatabase::get() {
     return db;
 }
 
-std::string AssetDatabase::mint() {
+std::string AssetDatabase::newUuid() {
     static std::mt19937_64 rng{std::random_device{}()};
     static const char* hex = "0123456789abcdef";
     std::uniform_int_distribution<int> d(0, 15);
@@ -67,9 +67,9 @@ const std::string& AssetDatabase::idFor(const std::string& path) {
     auto it = pathToId_.find(path);
     if (it != pathToId_.end())
         return it->second;
-    std::string uuid = mint();
+    std::string uuid = newUuid();
     while (idToPath_.count(uuid))
-        uuid = mint();
+        uuid = newUuid();
     auto res = pathToId_.emplace(path, std::move(uuid));
     idToPath_[res.first->second] = path;
     save();

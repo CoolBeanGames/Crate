@@ -14,6 +14,9 @@ class AssetDatabase {
 public:
     static AssetDatabase& get();
 
+    // Mint a fresh random UUID (8-4-4-4-12 hex). Also used for actor AUUIDs.
+    static std::string newUuid();
+
     // Point the database at a project and load its .assetdb (if present).
     void load(const std::string& projectDir);
     void save() const;
@@ -43,7 +46,6 @@ public:
     std::vector<Entry> entries() const;
 
 private:
-    static std::string mint();
 
     std::unordered_map<std::string, std::string> pathToId_;
     std::unordered_map<std::string, std::string> idToPath_;

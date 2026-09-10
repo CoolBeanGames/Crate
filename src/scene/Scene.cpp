@@ -93,10 +93,76 @@ Actor* Scene::duplicate(Actor* actor) {
 
 int Scene::actorCount() const { return countRecursive(*root_); }
 
+namespace {
+// Name of `a` among its siblings, with a "#n" suffix when an earlier sibling
+// already uses that name (so every path segment is unambiguous).
+std::string uniqueSegment(const Actor* a) {
+    const Actor* p = a->parent();
+    if (!p)
+        return a->name();
+    int dupes = 0;
+    for (const auto& sib : p->children()) {
+        if (sib.get() == a)
+            break;
+        if (sib->name() == a->name())
+            ++dupes;
+    }
+    return dupes ? a->name() + "#" + std::to_string(dupes) : a->name();
+}
+
+void collect(const Actor& node, const std::string& prefix,
+             std::vector<std::pair<std::string, std::string>>& out) {
+    for (const auto& ch : node.children()) {
+        std::string path = prefix.empty() ? uniqueSegment(ch.get())
+                                          : prefix + "/" + uniqueSegment(ch.get());
+        out.push_back({path, ch->auid()});
+        collect(*ch, path, out);
+    }
+}
+} // namespace
+
+std::string Scene::pathOf(const Actor* actor) const {
+    if (!actor || actor == root_.get() || !actor->parent())
+        return {};
+    std::string seg = uniqueSegment(actor);
+    std::string parent = pathOf(actor->parent());
+    return parent.empty() ? seg : parent + "/" + seg;
+}
+
+Actor* Scene::atPath(const std::string& path) const {
+    if (path.empty())
+        return nullptr;
+    Actor* node = root_.get();
+    size_t start = 0;
+    while (start <= path.size()) {
+        size_t slash = path.find('/', start);
+        std::string seg = path.substr(start, slash - start);
+        Actor* next = nullptr;
+        for (const auto& ch : node->children())
+            if (uniqueSegment(ch.get()) == seg) {
+                next = ch.get();
+                break;
+            }
+        if (!next)
+            return nullptr;
+        node = next;
+        if (slash == std::string::npos)
+            break;
+        start = slash + 1;
+    }
+    return node == root_.get() ? nullptr : node;
+}
+
+std::vector<std::pair<std::string, std::string>> Scene::actorTable() const {
+    std::vector<std::pair<std::string, std::string>> out;
+    collect(*root_, "", out);
+    return out;
+}
+
 Scene Scene::clone() const {
     Scene s(name_);
     for (const auto& c : root_->children())
-        s.root_->addChild(c->clone());
+        s.root_->addChild(c->clone(/*preserveAuid=*/true));
     return s;
 }
 

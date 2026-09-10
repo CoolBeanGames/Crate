@@ -22,6 +22,12 @@ public:
     Actor& operator=(const Actor&) = delete;
 
     uint64_t id() const { return id_; }
+
+    // Stable per-instance UUID (the "AUUID"). Unique across every actor ever
+    // constructed in this process, including clones; survives renames and
+    // re-parenting. Scene::actorTable() maps current hierarchy paths to these.
+    const std::string& auid() const { return auid_; }
+
     const std::string& name() const { return name_; }
     void setName(std::string name) { name_ = std::move(name); }
 
@@ -56,8 +62,11 @@ public:
 
     bool isDescendantOf(const Actor* other) const;
 
-    // Deep copy of this actor and its whole subtree. New ids are assigned.
-    std::unique_ptr<Actor> clone() const;
+    // Deep copy of this actor and its whole subtree. A fresh numeric id is
+    // always assigned. `preserveAuid` keeps the stable AUUID (used for the
+    // play-mode snapshot so Stop restores the same actor identities); the
+    // default mints new AUUIDs, since a copy is a new instance.
+    std::unique_ptr<Actor> clone(bool preserveAuid = false) const;
 
     // --- Components --------------------------------------------------------
     const std::vector<std::unique_ptr<Component>>& components() const { return components_; }
@@ -91,6 +100,7 @@ protected:
     virtual Actor* cloneSelf() const { return new Actor(name_); }
 
     uint64_t id_;
+    std::string auid_;
     std::string name_;
     Transform transform_;
     Actor* parent_ = nullptr;
