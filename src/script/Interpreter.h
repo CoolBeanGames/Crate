@@ -33,6 +33,12 @@ struct ScriptContext {
     // Resolve the singleton instance of a `static class` by name (or null).
     std::function<std::shared_ptr<ScriptObject>(const std::string&)> getStatic;
 
+    // Persistent signal-carrying object for an input button (Input.get_button).
+    std::function<std::shared_ptr<ScriptObject>(const std::string&)> inputButton;
+    // Raw input queries: 0 = pressed, 1 = just_pressed, 2 = just_released,
+    // 3..5 = axis x/y/(unused). name in arg.
+    std::function<double(const std::string&, int)> inputQuery;
+
     const ClassInfo* findType(const std::string& n) const {
         if (!types)
             return nullptr;

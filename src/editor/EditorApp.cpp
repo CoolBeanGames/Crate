@@ -2,6 +2,7 @@
 #include "assets/AssetDatabase.h"
 #include "assets/FbxImport.h"
 #include "assets/Image.h"
+#include "input/Input.h"
 #include "editor/Console.h"
 #include "platform/FileDialog.h"
 #include "editor/ContextMenu.h"
@@ -47,6 +48,19 @@ EditorApp::EditorApp() : scene_(Scene::makeSample()) {
     script::ScriptSystem::get().loadFolder(assetDir_ + "/scripts");
     scanAssets();
     loadFolderColors();
+
+    // Load the first input map found under assets/ as the active one.
+    {
+        std::error_code ec;
+        if (fs::exists(assetDir_, ec))
+            for (const auto& e : fs::recursive_directory_iterator(assetDir_, ec))
+                if (e.is_regular_file(ec) && e.path().extension() == ".inputmap") {
+                    inputMapPath_ = e.path().generic_string();
+                    inputMap_.load(inputMapPath_);
+                    Input::get().setMap(&inputMap_);
+                    break;
+                }
+    }
     renderer_.setMeshLibrary(&meshLib_);
     renderer_.setMaterialLibrary(&materialLib_);
     CR_LOG("app", "Crate editor started");
@@ -162,6 +176,8 @@ void EditorApp::onFrame() {
 
     // Play mode: tick components (frame update + fixed-step physics).
     if (playing_) {
+        Input::get().poll();
+        script::ScriptSystem::get().dispatchInput();
         scene_.tick(dt);
         script::ScriptSystem::get().tickStatics(dt);
         physicsAccum_ += dt;
@@ -237,6 +253,8 @@ void EditorApp::onFrame() {
     drawInspector();
     drawViewport();
     drawBottomPanel();
+    if (inputMapOpen_)
+        drawInputMapEditor();
 
     if (showDemo_)
         ImGui::ShowDemoWindow(&showDemo_);
@@ -880,6 +898,145 @@ void EditorApp::drawViewportGizmo(float x, float y, float w, float h) {
 }
 
 // ---------------------------------------------------------------------------
+// Input Map editor
+// ---------------------------------------------------------------------------
+namespace {
+const char* keyLabel(int k) {
+    if (k <= 0)
+        return "<unbound>";
+    const char* n = ImGui::GetKeyName(static_cast<ImGuiKey>(k));
+    return (n && *n) ? n : "<key>";
+}
+} // namespace
+
+void EditorApp::drawInputMapEditor() {
+    // A "Listen" button set inputListenKey_; capture the next key pressed.
+    if (inputListenKey_) {
+        for (ImGuiKey k = ImGuiKey_NamedKey_BEGIN; k < ImGuiKey_NamedKey_END;
+             k = static_cast<ImGuiKey>(k + 1)) {
+            if (k >= ImGuiKey_MouseLeft && k <= ImGuiKey_MouseWheelY)
+                continue;
+            if (ImGui::IsKeyPressed(k, false)) {
+                *inputListenKey_ = static_cast<int>(k);
+                inputListenKey_ = nullptr;
+                break;
+            }
+        }
+    }
+
+    std::string title = "Input Map";
+    if (!inputMapPath_.empty())
+        title += "  -  " + fs::path(inputMapPath_).filename().string();
+    title += "###inputmap";
+
+    ImGui::SetNextWindowSize(ImVec2(460, 520), ImGuiCond_FirstUseEver);
+    if (!ImGui::Begin(title.c_str(), &inputMapOpen_)) {
+        ImGui::End();
+        return;
+    }
+
+    if (ImGui::Button("Save") && !inputMapPath_.empty()) {
+        inputMap_.save(inputMapPath_);
+        Input::get().setMap(&inputMap_);
+        CR_LOG("assets", "Saved " + fs::path(inputMapPath_).filename().string());
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled(inputListenKey_ ? "press any key..." : "map inputs to action names");
+
+    auto listenBtn = [&](const char* id, int* slot) {
+        ImGui::PushID(id);
+        if (ImGui::SmallButton(inputListenKey_ == slot ? "..." : "Listen"))
+            inputListenKey_ = (inputListenKey_ == slot) ? nullptr : slot;
+        ImGui::SameLine();
+        ImGui::TextUnformatted(keyLabel(*slot));
+        ImGui::PopID();
+    };
+
+    // --- Buttons: 1 key -> string; signals just_pressed/just_released/pressed.
+    if (ImGui::CollapsingHeader("Buttons", ImGuiTreeNodeFlags_DefaultOpen)) {
+        for (size_t i = 0; i < inputMap_.buttons.size(); ++i) {
+            ImGui::PushID((int)i);
+            auto& b = inputMap_.buttons[i];
+            ImGui::SetNextItemWidth(140);
+            ImGui::InputText("##n", &b.name);
+            ImGui::SameLine();
+            listenBtn("k", &b.key);
+            ImGui::SameLine();
+            if (ImGui::SmallButton("x"))
+                inputMap_.buttons.erase(inputMap_.buttons.begin() + i);
+            ImGui::PopID();
+        }
+        if (ImGui::SmallButton("+ Button"))
+            inputMap_.buttons.push_back({"action", 0});
+    }
+
+    // --- 2-button axis: neg/pos key -> float.
+    if (ImGui::CollapsingHeader("2-Button Axes", ImGuiTreeNodeFlags_DefaultOpen)) {
+        for (size_t i = 0; i < inputMap_.axes2.size(); ++i) {
+            ImGui::PushID(1000 + (int)i);
+            auto& a = inputMap_.axes2[i];
+            ImGui::SetNextItemWidth(140);
+            ImGui::InputText("##n", &a.name);
+            ImGui::TextUnformatted("  -");
+            ImGui::SameLine();
+            listenBtn("neg", &a.negKey);
+            ImGui::TextUnformatted("  +");
+            ImGui::SameLine();
+            listenBtn("pos", &a.posKey);
+            if (ImGui::SmallButton("x"))
+                inputMap_.axes2.erase(inputMap_.axes2.begin() + i);
+            ImGui::PopID();
+        }
+        if (ImGui::SmallButton("+ 2-Axis"))
+            inputMap_.axes2.push_back({"axis", 0, 0});
+    }
+
+    // --- 4-button axis: L/R/D/U keys -> Vector2.
+    if (ImGui::CollapsingHeader("4-Button Axes", ImGuiTreeNodeFlags_DefaultOpen)) {
+        for (size_t i = 0; i < inputMap_.axes4.size(); ++i) {
+            ImGui::PushID(2000 + (int)i);
+            auto& a = inputMap_.axes4[i];
+            ImGui::SetNextItemWidth(140);
+            ImGui::InputText("##n", &a.name);
+            ImGui::TextUnformatted("  left");  ImGui::SameLine(); listenBtn("l", &a.leftKey);
+            ImGui::TextUnformatted("  right"); ImGui::SameLine(); listenBtn("r", &a.rightKey);
+            ImGui::TextUnformatted("  down");  ImGui::SameLine(); listenBtn("d", &a.downKey);
+            ImGui::TextUnformatted("  up");    ImGui::SameLine(); listenBtn("u", &a.upKey);
+            if (ImGui::SmallButton("x"))
+                inputMap_.axes4.erase(inputMap_.axes4.begin() + i);
+            ImGui::PopID();
+        }
+        if (ImGui::SmallButton("+ 4-Axis"))
+            inputMap_.axes4.push_back({"move", 0, 0, 0, 0});
+    }
+
+    // --- Analog: gamepad stick -> Vector2.
+    if (ImGui::CollapsingHeader("Analog Axes", ImGuiTreeNodeFlags_DefaultOpen)) {
+        for (size_t i = 0; i < inputMap_.analogs.size(); ++i) {
+            ImGui::PushID(3000 + (int)i);
+            auto& a = inputMap_.analogs[i];
+            ImGui::SetNextItemWidth(140);
+            ImGui::InputText("##n", &a.name);
+            ImGui::SameLine();
+            const char* sticks[] = {"Left stick", "Right stick"};
+            ImGui::SetNextItemWidth(120);
+            ImGui::Combo("##s", &a.stick, sticks, 2);
+            ImGui::SameLine();
+            if (ImGui::SmallButton("x"))
+                inputMap_.analogs.erase(inputMap_.analogs.begin() + i);
+            ImGui::PopID();
+        }
+        if (ImGui::SmallButton("+ Analog"))
+            inputMap_.analogs.push_back({"look", 0});
+    }
+
+    ImGui::Separator();
+    ImGui::TextDisabled("Script:  Input.get_button(\"jump\").just_pressed.connect(on_jump)");
+    ImGui::TextDisabled("         Input.is_pressed(\"jump\") / Input.get_axis(\"move\")");
+    ImGui::End();
+}
+
+// ---------------------------------------------------------------------------
 // Bottom: asset browser + consoles
 // ---------------------------------------------------------------------------
 static ImU32 levelColor(Console::Level l) {
@@ -976,6 +1133,23 @@ void EditorApp::assetBrowserMenu() {
         scene_.select(nullptr);
         CR_LOG("assets", "Created material '" + m.name + "'");
     }
+    if (menu.item("Create Input Map")) {
+        std::error_code ec;
+        fs::path dir = fs::path(assetDir_) / assetCwd_;
+        fs::create_directories(dir, ec);
+        fs::path p = dir / "InputMap.inputmap";
+        for (int n = 2; fs::exists(p, ec); ++n)
+            p = dir / ("InputMap" + std::to_string(n) + ".inputmap");
+        InputMap fresh;
+        fresh.buttons.push_back({"jump", 0});
+        fresh.save(p.generic_string());
+        AssetDatabase::get().idFor(p.generic_string());
+        inputMapPath_ = p.generic_string();
+        inputMap_ = fresh;
+        Input::get().setMap(&inputMap_);
+        inputMapOpen_ = true;
+        CR_LOG("assets", "Created input map " + p.filename().string());
+    }
     if (menu.beginSub("Scripting")) {
         if (menu.item("New Script")) {
             openScriptsTab_ = true;
@@ -1059,8 +1233,19 @@ void EditorApp::drawAssetFolders() {
         std::string path = f.path().generic_string();
         std::string ext = lowerExt(name);
         bool isImg = isSupportedImageExt(ext);
-        if (ImGui::Selectable(("       " + name).c_str()))
-            ingestDroppedFile(f.path().string());
+        if (ImGui::Selectable(("       " + name).c_str(), false,
+                              ImGuiSelectableFlags_AllowDoubleClick)) {
+            if (ext == "inputmap") {
+                if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+                    inputMapPath_ = path;
+                    inputMap_.load(path);
+                    Input::get().setMap(&inputMap_);
+                    inputMapOpen_ = true;
+                }
+            } else {
+                ingestDroppedFile(f.path().string());
+            }
+        }
         // Drag a texture straight onto a component's Texture field.
         if (isImg && ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoHoldToOpenOthers)) {
             ImGui::SetDragDropPayload(pickPayloadId(PickKind::Texture), path.c_str(),
@@ -1321,6 +1506,8 @@ void EditorApp::setPlaying(bool playing) {
         playBackup_ = scene_.clone();
         physicsAccum_ = 0.0f;
         scene_.startPlay();
+        script::ScriptSystem::get().resetInput();
+        Input::get().setMap(inputMapPath_.empty() ? nullptr : &inputMap_);
         script::ScriptSystem::get().startStatics();
         CR_GAME("play", "--- Play started ---");
         CR_LOG("play", "Entered play mode");
@@ -1331,6 +1518,7 @@ void EditorApp::setPlaying(bool playing) {
         playBackup_ = Scene("");
         scene_.select(nullptr);
         script::ScriptSystem::get().resetStatics();
+        script::ScriptSystem::get().resetInput();
         (void)selName;
         CR_GAME("play", "--- Play stopped ---");
         CR_LOG("play", "Returned to edit mode (scene restored)");

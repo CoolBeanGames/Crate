@@ -66,6 +66,8 @@ add_library(crate_core STATIC
     src/assets/AssetDatabase.cpp
     src/assets/FbxImport.cpp
     src/assets/Image.cpp
+    src/input/InputMap.cpp
+    src/input/Input.cpp
     src/platform/FileDialog.cpp
     src/editor/AssetPicker.cpp
     src/editor/Console.cpp
@@ -76,7 +78,7 @@ add_library(crate_core STATIC
     src/editor/EditorApp.cpp
 )
 target_include_directories(crate_core PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
-target_link_libraries(crate_core PUBLIC imgui imgui_texteditor imguizmo ufbx comdlg32)
+target_link_libraries(crate_core PUBLIC imgui imgui_texteditor imguizmo ufbx comdlg32 xinput)
 
 # --- Editor executable ---------------------------------------------------
 add_executable(Crate WIN32 src/main.cpp)

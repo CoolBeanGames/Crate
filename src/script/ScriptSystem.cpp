@@ -2,6 +2,7 @@
 
 #include "assets/AssetDatabase.h"
 #include "core/Log.h"
+#include "input/Input.h"
 #include "scene/Actor.h"
 #include "scene/ComponentRegistry.h"
 #include "script/Format.h"
@@ -41,6 +42,18 @@ ScriptSystem::ScriptSystem() {
     ctx_.getStatic = [this](const std::string& name) -> std::shared_ptr<ScriptObject> {
         auto it = statics_.find(name);
         return it == statics_.end() ? nullptr : it->second;
+    };
+    ctx_.inputButton = [this](const std::string& name) { return inputButton(name); };
+    ctx_.inputQuery = [](const std::string& name, int what) -> double {
+        auto& in = crate::Input::get();
+        switch (what) {
+            case 0: return in.pressed(name) ? 1.0 : 0.0;
+            case 1: return in.justPressed(name) ? 1.0 : 0.0;
+            case 2: return in.justReleased(name) ? 1.0 : 0.0;
+            case 3: return in.axis(name).x;
+            case 4: return in.axis(name).y;
+        }
+        return 0.0;
     };
     rebuildTypeDocs();
 }
@@ -157,6 +170,41 @@ void ScriptSystem::resetStatics() {
     for (const auto& [name, ci] : types_)
         if (ci->isStatic)
             rebuildStatic(name);
+}
+
+std::shared_ptr<ScriptObject> ScriptSystem::inputButton(const std::string& name) {
+    auto& obj = inputButtons_[name];
+    if (!obj) {
+        obj = std::make_shared<ScriptObject>();
+        obj->builtin = "InputButton";
+    }
+    return obj;
+}
+
+void ScriptSystem::dispatchInput() {
+    for (const auto& ev : crate::Input::get().events()) {
+        auto it = inputButtons_.find(ev.button);
+        if (it == inputButtons_.end())
+            continue;
+        const char* sig = ev.kind == 1 ? "just_pressed" : ev.kind == 2 ? "just_released" : "pressed";
+        auto cit = it->second->connections.find(sig);
+        if (cit == it->second->connections.end())
+            continue;
+        for (const auto& cb : std::vector<Value>(cit->second)) {
+            auto self = cb.wobj.lock();
+            if (self)
+                try {
+                    Interpreter(&ctx_, self).call(cb.s);
+                } catch (const std::exception& ex) {
+                    CR_ERROR("script", std::string("input signal handler: ") + ex.what());
+                }
+        }
+    }
+}
+
+void ScriptSystem::resetInput() {
+    for (auto& [name, obj] : inputButtons_)
+        obj->connections.clear();
 }
 
 void ScriptSystem::startStatics() {

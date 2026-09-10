@@ -4,6 +4,7 @@
 #include "editor/AssetPicker.h"
 #include "editor/Popup.h"
 #include "editor/ScriptEditor.h"
+#include "input/InputMap.h"
 #include "render/Camera.h"
 #include "render/Renderer.h"
 #include "scene/Scene.h"
@@ -53,6 +54,7 @@ private:
     void scanAssets();       // register image/model files under assets/ as pickable
     void folderContextMenu(const std::string& relPath);
     void drawAssetPopups();  // new folder / rename / delete / colour dialogs
+    void drawInputMapEditor(); // double-click an .inputmap -> binding editor window
 
     void loadFolderColors();
     void saveFolderColors();
@@ -96,6 +98,13 @@ private:
     int gizmoOp_ = 0;
     bool gizmoLocal_ = true; // local vs world axes
     bool gizmoInit_ = false;
+
+    // Input Map editing.
+    InputMap inputMap_;         // the project's active input map
+    std::string inputMapPath_;  // file backing inputMap_ ("" = none loaded)
+    bool inputMapOpen_ = false; // the binding-editor window is showing
+    int* inputListenKey_ = nullptr; // key field currently being captured, or null
+
     std::vector<std::string> importedAssets_; // keys of imported models/textures
     std::string selectedMaterial_;            // asset selection (inspector shows it)
     std::string selectedAsset_;               // selected imported model/texture path

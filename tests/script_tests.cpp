@@ -163,6 +163,36 @@ static int run() {
         CHECK(host.transform().rotationEuler.y == 15.0f);
     }
 
+    // --- Input.* scripting API (task 51) ---------------------------
+    {
+        Harness h;
+        auto btn = std::make_shared<ScriptObject>();
+        btn->builtin = "InputButton";
+        h.ctx.inputButton = [&](const std::string&) { return btn; };
+        h.ctx.inputQuery = [](const std::string& n, int what) -> double {
+            if (n == "jump" && what == 1) return 1.0;       // just_pressed
+            if (n == "move" && what == 3) return 0.5;       // axis x
+            if (n == "move" && what == 4) return -1.0;      // axis y
+            return 0.0;
+        };
+        auto obj = h.load(R"(class inp : Actor
+{
+    var jumped = 0;
+    func on_jump() { jumped = jumped + 1; }
+    func run() : string
+    {
+        Input.get_button("jump").just_pressed.connect(on_jump);
+        var a = Input.get_axis("move");
+        var jp = Input.is_just_pressed("jump");
+        return jp.str() + "|" + a.x.str() + "," + a.y.str();
+    }
+})");
+        Value r = Interpreter(&h.ctx, obj).call("run");
+        CHECK(r.str() == "true|0.5,-1");
+        // the connect() registered a handler on the shared button object
+        CHECK(btn->connections["just_pressed"].size() == 1);
+    }
+
     // --- signals, Godot style (task 48) ----------------------------
     {
         Harness h;
