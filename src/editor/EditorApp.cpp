@@ -1,4 +1,5 @@
 #include "editor/EditorApp.h"
+#include "assets/AssetDatabase.h"
 #include "assets/FbxImport.h"
 #include "assets/Image.h"
 #include "editor/Console.h"
@@ -41,6 +42,7 @@ static Actor* findById(Actor& node, uint64_t id) {
 
 EditorApp::EditorApp() : scene_(Scene::makeSample()) {
     registerBuiltinComponents();
+    AssetDatabase::get().load(assetDir_);
     script::ScriptSystem::get().loadFolder(assetDir_ + "/scripts");
     loadFolderColors();
     renderer_.setMeshLibrary(&meshLib_);
@@ -73,6 +75,7 @@ void EditorApp::ingestDroppedFile(const std::string& path) {
         if (std::find(importedAssets_.begin(), importedAssets_.end(), res.key) ==
             importedAssets_.end())
             importedAssets_.push_back(res.key);
+        CR_LOG("assets", "Asset " + res.key + " -> " + AssetDatabase::get().idFor(res.key));
 
         std::string name = path;
         if (auto slash = name.find_last_of("/\\"); slash != std::string::npos)
@@ -95,6 +98,7 @@ void EditorApp::ingestDroppedFile(const std::string& path) {
         }
         if (std::find(importedAssets_.begin(), importedAssets_.end(), path) == importedAssets_.end())
             importedAssets_.push_back(path);
+        AssetDatabase::get().idFor(path);
         CR_LOG("assets", "Imported image " + path + " (" + std::to_string(probe.width) + "x" +
                              std::to_string(probe.height) + ")");
         Actor* sel = scene_.selected();
@@ -113,6 +117,7 @@ void EditorApp::ingestDroppedFile(const std::string& path) {
         if (fs::path(path) != dst)
             fs::copy_file(path, dst, fs::copy_options::overwrite_existing, ec);
         sys.loadFolder(dir);
+        AssetDatabase::get().idFor(dst.generic_string());
         CR_LOG("assets", "Imported script " + dst.filename().string());
     } else {
         CR_WARN("assets", "Unsupported drop: " + path);
@@ -572,6 +577,8 @@ void EditorApp::drawInspector() {
                                 fix(*c);
                         };
                         fix(scene_.root());
+                        AssetDatabase::get().moved("material:" + selectedMaterial_,
+                                                   "material:" + renameBuf);
                         CR_LOG("assets", "Renamed material '" + selectedMaterial_ + "' -> '" +
                                              renameBuf + "'");
                         selectedMaterial_ = renameBuf;
@@ -665,6 +672,7 @@ void EditorApp::drawInspector() {
                         renderer_.invalidateTexture(mr->texturePath);
                     if (ImGui::SmallButton("New Material##mrmat")) {
                         Material& m = materialLib_.create("Material");
+                        AssetDatabase::get().idFor("material:" + m.name);
                         mr->materialRef = m.name;
                     }
                 }
@@ -850,6 +858,9 @@ void EditorApp::assetBrowserMenu() {
         fs::path dst = fs::path(assetDir_) / assetCwd_ / srcP.filename();
         if (folderClip_.cut) {
             fs::rename(srcP, dst, ec);
+            if (!ec)
+                AssetDatabase::get().movedPrefix(srcP.generic_string() + "/",
+                                                 dst.generic_string() + "/");
             folderClip_.path.clear();
         } else {
             fs::copy(srcP, dst, fs::copy_options::recursive, ec);
@@ -858,6 +869,7 @@ void EditorApp::assetBrowserMenu() {
     }
     if (menu.item("Create Material")) {
         Material& m = materialLib_.create("Material");
+        AssetDatabase::get().idFor("material:" + m.name);
         selectedMaterial_ = m.name;
         scene_.select(nullptr);
         CR_LOG("assets", "Created material '" + m.name + "'");
@@ -965,6 +977,9 @@ void EditorApp::folderContextMenu(const std::string& relPath) {
         fs::path dst = fs::path(assetDir_) / relPath / srcP.filename();
         if (folderClip_.cut) {
             fs::rename(srcP, dst, ec);
+            if (!ec)
+                AssetDatabase::get().movedPrefix(srcP.generic_string() + "/",
+                                                 dst.generic_string() + "/");
             folderClip_.path.clear();
         } else {
             fs::copy(srcP, dst, fs::copy_options::recursive, ec);
@@ -1009,7 +1024,11 @@ void EditorApp::drawAssetPopups() {
             case AssetDlg::RenameFolder:
                 if (!assetDlgBuf_.empty()) {
                     fs::path p = fs::path(assetDir_) / assetDlgTarget_;
-                    fs::rename(p, p.parent_path() / assetDlgBuf_, ec);
+                    fs::path np = p.parent_path() / assetDlgBuf_;
+                    fs::rename(p, np, ec);
+                    if (!ec)
+                        AssetDatabase::get().movedPrefix(p.generic_string() + "/",
+                                                         np.generic_string() + "/");
                 }
                 break;
             case AssetDlg::DeleteFolder:
@@ -1135,6 +1154,7 @@ void EditorApp::deleteSelection() {
     if (!selectedMaterial_.empty()) {
         CR_LOG("assets", "Deleted material '" + selectedMaterial_ + "'");
         materialLib_.remove(selectedMaterial_);
+        AssetDatabase::get().forget("material:" + selectedMaterial_);
         selectedMaterial_.clear();
         return;
     }
@@ -1142,6 +1162,7 @@ void EditorApp::deleteSelection() {
         auto it = std::find(importedAssets_.begin(), importedAssets_.end(), selectedAsset_);
         if (it != importedAssets_.end()) {
             CR_LOG("assets", "Removed asset '" + *it + "' from the browser");
+            AssetDatabase::get().forget(*it);
             importedAssets_.erase(it);
         }
         selectedAsset_.clear();

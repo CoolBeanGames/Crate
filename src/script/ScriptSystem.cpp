@@ -1,5 +1,6 @@
 #include "script/ScriptSystem.h"
 
+#include "assets/AssetDatabase.h"
 #include "core/Log.h"
 #include "scene/Actor.h"
 #include "scene/ComponentRegistry.h"
@@ -283,6 +284,7 @@ std::string ScriptSystem::newScript(const std::string& className) {
     f.name = name;
     f.source = tpl;
     files_.push_back(std::move(f));
+    AssetDatabase::get().idFor(fs::path(path).generic_string());
     CR_LOG("script", "Created script '" + name + "'");
     return name;
 }
