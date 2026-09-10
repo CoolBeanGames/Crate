@@ -806,6 +806,10 @@ void EditorApp::assetBrowserMenu() {
                 scriptEditor_.openScript(name);
             }
         }
+        if (menu.item("Reload Scripts")) {
+            script::ScriptSystem::get().reload();
+            CR_LOG("script", "Rescanned assets/scripts/");
+        }
         menu.endSub();
     }
 

@@ -466,22 +466,22 @@
             {
               "id": "dd28000000004b0e9a00000000000001",
               "text": "a Reload Scripts action re-scans assets/scripts/",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "dd28000000004b0e9a00000000000002",
               "text": "newly added .cscript files appear in the editor and the Add Component menu",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "dd28000000004b0e9a00000000000003",
               "text": "files deleted on disk are dropped from the list",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "dd28000000004b0e9a00000000000004",
               "text": "files edited on disk are recompiled",
-              "isDone": false
+              "isDone": true
             }
           ],
           "flags": {
@@ -490,11 +490,11 @@
             "release": false,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T09:00:00.0000000+00:00",
-          "updatedAt": "2026-09-10T09:00:00.0000000+00:00"
+          "updatedAt": "2026-09-10T00:00:00.0000000+00:00"
         },
         {
           "id": "b64f8fbd48f849a8bfdcbe773353c401",

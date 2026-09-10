@@ -129,6 +129,15 @@ void ScriptEditor::draw() {
 }
 
 void ScriptEditor::drawSidebar() {
+    if (ImGui::SmallButton("New")) {
+        std::string name = ScriptSystem::get().newScript();
+        if (!name.empty())
+            openScript(name);
+    }
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Reload"))
+        ScriptSystem::get().reload();
+
     ImGui::TextDisabled("SCRIPTS");
     ImGui::BeginChild("scripts", ImVec2(0, 200), true);
     for (auto& f : ScriptSystem::get().files()) {

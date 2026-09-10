@@ -8,6 +8,7 @@
 #include "script/ScriptSystem.h"
 
 #include <cstdio>
+#include <fstream>
 
 using namespace crate;
 
@@ -109,6 +110,29 @@ int main() {
             return 1;
         }
         std::printf("ok  live recompile: pointer stable, object rebuilt with new code\n");
+    }
+
+    // --- reload: pick up an on-disk add, then a delete (task 28) --------
+    {
+        const std::string dir = sys.scriptsDir();
+        const std::string p = dir + "/Dropped.cscript";
+        {
+            std::ofstream o(p, std::ios::binary);
+            o << "class Dropped : Actor { func update(float d) {} }";
+        }
+        sys.reload();
+        if (!sys.file("Dropped") || !ComponentRegistry::get().has("Dropped")) {
+            std::printf("FAIL: reload did not pick up a new script\n");
+            std::remove(p.c_str());
+            return 1;
+        }
+        std::remove(p.c_str());
+        sys.reload();
+        if (sys.file("Dropped") || ComponentRegistry::get().has("Dropped")) {
+            std::printf("FAIL: reload did not drop a deleted script\n");
+            return 1;
+        }
+        std::printf("ok  reload: new script added, deleted script removed\n");
     }
 
     std::printf("ok  Mover ran: rotation.y = %.1f after play\n", y);

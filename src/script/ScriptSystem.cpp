@@ -115,9 +115,34 @@ void ScriptSystem::resolveBases() {
 void ScriptSystem::registerComponent(const std::string& className) {
     ScriptContext* ctx = &ctx_;
     const ClassInfo* cls = types_.at(className).get();
-    ComponentRegistry::get().add(className, "Scripts", [ctx, cls] {
-        return std::make_unique<ScriptComponent>(ctx, cls);
-    });
+    ComponentRegistry::get().add(
+        className, "Scripts",
+        [ctx, cls] { return std::make_unique<ScriptComponent>(ctx, cls); }, /*replace=*/true);
+}
+
+void ScriptSystem::reload() {
+    if (dir_.empty())
+        return;
+    loadFolder(dir_); // new + changed files
+
+    std::error_code ec;
+    for (auto it = files_.begin(); it != files_.end();) {
+        if (!it->path.empty() && !fs::exists(it->path, ec)) {
+            const std::string name = it->name;
+            CR_LOG("script", "Script deleted: " + name);
+            if (auto node = types_.find(name); node != types_.end()) {
+                retired_.push_back(std::move(node->second)); // keep alive for attached components
+                types_.erase(node);
+            }
+            statics_.erase(name);
+            ComponentRegistry::get().remove(name);
+            it = files_.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    resolveBases();
+    rebuildTypeDocs();
 }
 
 void ScriptSystem::rebuildStatic(const std::string& className) {
