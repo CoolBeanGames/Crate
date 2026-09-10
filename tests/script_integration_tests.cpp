@@ -78,6 +78,39 @@ int main() {
         std::printf("ok  newScript created '%s' (compiles, registered)\n", name.c_str());
     }
 
+    // --- recompile in place: pointer stable, object rebuilds (task 27) ---
+    {
+        std::string err;
+        sys.compile("class LiveEdit : Actor3D { var tag = 1; func update(float d) {} }", &err);
+        const void* p1 = sys.types().at("LiveEdit").get();
+
+        Scene s2("s2");
+        Actor* host = s2.add(std::make_unique<Actor3D>("H"));
+        host->addComponent(ComponentRegistry::get().create("LiveEdit"));
+        s2.startPlay();
+        s2.tick(0.1f);
+        auto* sc = dynamic_cast<script::ScriptComponent*>(host->components()[0].get());
+        if (sc->object()->fields.at("tag").i != 1) {
+            std::printf("FAIL: initial field wrong\n");
+            return 1;
+        }
+
+        // edit the class while it's attached and playing
+        sys.compile("class LiveEdit : Actor3D { var tag = 42; func update(float d) {} }", &err);
+        const void* p2 = sys.types().at("LiveEdit").get();
+        if (p1 != p2) {
+            std::printf("FAIL: ClassInfo pointer changed on recompile\n");
+            return 1;
+        }
+        s2.tick(0.1f); // ensureObject() should notice the new generation
+        if (sc->object()->fields.at("tag").i != 42) {
+            std::printf("FAIL: field did not pick up the edit (got %lld)\n",
+                        (long long)sc->object()->fields.at("tag").i);
+            return 1;
+        }
+        std::printf("ok  live recompile: pointer stable, object rebuilt with new code\n");
+    }
+
     std::printf("ok  Mover ran: rotation.y = %.1f after play\n", y);
     return 0;
 }

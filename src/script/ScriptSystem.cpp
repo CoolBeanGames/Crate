@@ -58,22 +58,34 @@ bool ScriptSystem::compile(const std::string& source, std::string* errorOut, std
             return false;
         }
 
-        auto ci = std::make_unique<ClassInfo>();
-        ci->name = decl->name;
-        ci->base = decl->base;
-        ci->isStatic = decl->isStatic;
-        ci->isAbstract = decl->isAbstract;
-        ci->decl = std::move(decl);
-        ci->indexFunctions();
+        const std::string cname = decl->name;
+
+        // Recompile IN PLACE when the class already exists: the ClassInfo object
+        // (and thus every pointer the registry lambdas and attached
+        // ScriptComponents hold) stays valid; only its AST is swapped.
+        ClassInfo* slot = nullptr;
+        auto existing = types_.find(cname);
+        if (existing != types_.end()) {
+            slot = existing->second.get();
+        } else {
+            auto up = std::make_unique<ClassInfo>();
+            slot = up.get();
+            types_[cname] = std::move(up);
+        }
+        slot->name = decl->name;
+        slot->base = decl->base;
+        slot->isStatic = decl->isStatic;
+        slot->isAbstract = decl->isAbstract;
+        slot->decl = std::move(decl);
+        slot->indexFunctions();
+        ++slot->generation;
 
         if (nameOut)
-            *nameOut = ci->name;
-        std::string cname = ci->name;
-        bool wasStatic = ci->isStatic;
-        types_[cname] = std::move(ci);
+            *nameOut = cname;
+        bool wasStatic = slot->isStatic;
         resolveBases();
         // static / abstract classes cannot be added to actors as components
-        if (!wasStatic && !types_[cname]->isAbstract)
+        if (!wasStatic && !slot->isAbstract)
             registerComponent(cname);
         if (wasStatic)
             rebuildStatic(cname);

@@ -418,22 +418,22 @@
             {
               "id": "cc22000000004b0e9a00000000000001",
               "text": "recompiling a script keeps its ClassInfo pointer stable",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "cc22000000004b0e9a00000000000002",
               "text": "edit a script, add it to an actor, hit Play -> no crash",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "cc22000000004b0e9a00000000000003",
               "text": "edit a script already attached to an actor, hit Play -> the new code runs",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "cc22000000004b0e9a00000000000004",
               "text": "script objects re-run field initialisers after their class recompiles",
-              "isDone": false
+              "isDone": true
             }
           ],
           "flags": {
@@ -442,11 +442,11 @@
             "release": false,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T09:00:00.0000000+00:00",
-          "updatedAt": "2026-09-10T09:00:00.0000000+00:00"
+          "updatedAt": "2026-09-10T00:00:00.0000000+00:00"
         },
         {
           "id": "994696eaa7e24cbd8dad1f3bbc7ce286",

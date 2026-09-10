@@ -8,8 +8,16 @@
 namespace crate::script {
 
 void ScriptComponent::ensureObject() {
+    // The class was recompiled since we built the object -> rebuild it so field
+    // initialisers re-run and stale do_async state is dropped.
+    if (obj_ && cls_ && cls_->generation != objGen_) {
+        obj_.reset();
+        started_ = false;
+        lastError_.clear();
+    }
     if (!obj_ && cls_) {
         obj_ = Interpreter::instantiate(ctx_, cls_, actor());
+        objGen_ = cls_->generation;
     }
     if (obj_)
         obj_->owner = actor();

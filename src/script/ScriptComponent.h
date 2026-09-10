@@ -3,6 +3,7 @@
 #include "script/ClassInfo.h"
 #include "script/Interpreter.h"
 
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -34,6 +35,7 @@ private:
     ScriptContext* ctx_ = nullptr;
     const ClassInfo* cls_ = nullptr;
     std::shared_ptr<ScriptObject> obj_;
+    uint32_t objGen_ = 0; // ClassInfo generation obj_ was built from
     bool started_ = false;
     std::string lastError_;
 };
