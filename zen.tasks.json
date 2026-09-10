@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "projectId": "8afe2a0217d7419db234ceda7ecb9dff",
   "name": "Crate",
-  "nextCardIndex": 44,
+  "nextCardIndex": 47,
   "latestExePath": "C:\\Users\\haptic\\Documents\\git\\Crate\\build-Release\\Crate.exe",
   "latestReleasePath": "https://github.com/CoolBeanGames/Crate/releases/tag/v0.4.0",
   "tagCatalog": [
@@ -214,6 +214,66 @@
       "isSystem": false,
       "isLocked": false,
       "tasks": [
+        {
+          "id": "c8713673c931477ea4f690e44bb4401b",
+          "index": 45,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "update transform",
+          "task": "this script still wont do anything, the model its attached to doesnt move at all\r\n\r\nclass Test : Actor\n{\n float move_speed = 3;\n func start()\n {\n }\n\n func update(float delta)\n {\n  Vector3 p = transform.position \u002B Vector3(0,1,0);\n  transform.position = p;\n  print(\u0022update\u0022);\n }\n\n func physics_update(float delta)\n {\n }\n}",
+          "tags": [
+            "bug",
+            "task"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T13:04:03.8199065+00:00",
+          "updatedAt": "2026-09-10T12:30:00.0000000+00:00"
+        },
+        {
+          "id": "0bb66d26e0414d588ca8753308b9d38c",
+          "index": 46,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "crash on new script",
+          "task": "i attempted to make a new script and when i run the game the whole thing crashes\r\n\r\nclass Test : Actor\n{\n func start()\n {\n }\n\n func update(float delta)\n {\n  transform.position.y \u002B= 1;\n }\n\n func physics_update(float delta)\n {\n }\n}",
+          "tags": [
+            "bug"
+          ],
+          "files": [
+            {
+              "id": "5eb4dab47261470ab5965ec0b3556e2c",
+              "name": "Zen-paste-20260910-080750-a96b3be3960a4632ac1e805b0b6cc100.png",
+              "relativePath": "files/Zen-paste-20260910-080750-a96b3be3960a4632ac1e805b0b6cc100.png",
+              "size": 11641
+            }
+          ],
+          "requirements": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T13:07:07.1683815+00:00",
+          "updatedAt": "2026-09-10T12:30:00.0000000+00:00"
+        },
         {
           "id": "f86523a60f7e49db803c8d21d1381845",
           "index": 16,

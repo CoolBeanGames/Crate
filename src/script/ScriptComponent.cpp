@@ -28,47 +28,44 @@ std::shared_ptr<ScriptObject> ScriptComponent::object() {
     return obj_;
 }
 
-void ScriptComponent::start() {
-    ensureObject();
-    if (!obj_)
+// Run one lifecycle hook, trapping every failure so a bad script can never
+// crash the editor -- the error is recorded and the component goes quiet.
+void ScriptComponent::runHook(const char* hook, bool passDt, float dt) {
+    if (!lastError_.empty())
         return;
     try {
-        Interpreter(ctx_, obj_).call("start");
-        started_ = true;
-        lastError_.clear();
+        ensureObject();
+        if (!obj_)
+            return;
+        std::vector<Value> args;
+        if (passDt)
+            args.push_back(Value::Float(dt));
+        Interpreter(ctx_, obj_).call(hook, std::move(args));
     } catch (const std::exception& ex) {
         lastError_ = ex.what();
-        CR_ERROR("script", std::string(typeName()) + ".start: " + ex.what());
+        CR_ERROR("script", std::string(typeName()) + "." + hook + ": " + ex.what());
+    } catch (...) {
+        lastError_ = "unknown error";
+        CR_ERROR("script", std::string(typeName()) + "." + hook + ": unknown error");
     }
+}
+
+void ScriptComponent::start() {
+    runHook("start", false, 0.0f);
+    if (lastError_.empty())
+        started_ = true;
 }
 
 void ScriptComponent::update(float dt) {
-    ensureObject();
-    if (!obj_ || !lastError_.empty())
-        return;
-    try {
-        if (!started_) {
-            Interpreter(ctx_, obj_).call("start");
+    if (!started_ && lastError_.empty()) {
+        runHook("start", false, 0.0f);
+        if (lastError_.empty())
             started_ = true;
-        }
-        Interpreter(ctx_, obj_).call("update", {Value::Float(dt)});
-    } catch (const std::exception& ex) {
-        lastError_ = ex.what();
-        CR_ERROR("script", std::string(typeName()) + ".update: " + ex.what());
     }
+    runHook("update", true, dt);
 }
 
-void ScriptComponent::physicsUpdate(float dt) {
-    ensureObject();
-    if (!obj_ || !lastError_.empty())
-        return;
-    try {
-        Interpreter(ctx_, obj_).call("physics_update", {Value::Float(dt)});
-    } catch (const std::exception& ex) {
-        lastError_ = ex.what();
-        CR_ERROR("script", std::string(typeName()) + ".physics_update: " + ex.what());
-    }
-}
+void ScriptComponent::physicsUpdate(float dt) { runHook("physics_update", true, dt); }
 
 void ScriptComponent::drawInspector() {
     if (!cls_) {
