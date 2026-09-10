@@ -774,6 +774,22 @@ void EditorApp::drawViewport() {
                 if (srv) {
                     ImVec2 imgPos = ImGui::GetCursorScreenPos();
                     ImGui::Image(reinterpret_cast<ImTextureID>(srv), size);
+                    if (ImGui::BeginDragDropTarget()) {
+                        if (const ImGuiPayload* p =
+                                ImGui::AcceptDragDropPayload("CRATE_FBX_PATH"))
+                            ingestDroppedFile(static_cast<const char*>(p->Data));
+                        else if (const ImGuiPayload* pm =
+                                     ImGui::AcceptDragDropPayload(pickPayloadId(PickKind::Mesh))) {
+                            std::string key(static_cast<const char*>(pm->Data));
+                            auto a = std::make_unique<Actor3D>(fs::path(key).stem().string());
+                            auto mr = std::make_unique<MeshRenderer>();
+                            mr->usePrimitive = false;
+                            mr->meshPath = key;
+                            a->addComponent(std::move(mr));
+                            scene_.select(scene_.add(std::move(a)));
+                        }
+                        ImGui::EndDragDropTarget();
+                    }
                     drawViewportGizmo(imgPos.x, imgPos.y, size.x, size.y);
                     if (ImGui::IsItemHovered() && !gizmoActive()) {
                         ImGuiIO& io = ImGui::GetIO();
@@ -1054,6 +1070,14 @@ void EditorApp::drawAssetFolders() {
             if (std::find(importedAssets_.begin(), importedAssets_.end(), path) ==
                 importedAssets_.end())
                 importedAssets_.push_back(path);
+        }
+        // Drag an FBX into the viewport to spawn a mesh actor.
+        if (ext == "fbx" &&
+            ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoHoldToOpenOthers)) {
+            std::string osPath = f.path().string();
+            ImGui::SetDragDropPayload("CRATE_FBX_PATH", osPath.c_str(), osPath.size() + 1);
+            ImGui::Text("Model  %s", name.c_str());
+            ImGui::EndDragDropSource();
         }
     }
 }
