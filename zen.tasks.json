@@ -506,17 +506,17 @@
             {
               "id": "b9bd2a65a77144cdb91f146ef213ede6",
               "text": "add folder to right click menu",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "32363801ccd8491cba575df0ce4b4ee4",
               "text": "when you make a folder immediatly ask for name",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "a1e0cbff95ec45228b0779a11e1a4ff5",
               "text": "can right click folder for delete, rename, cut, copy, paste, and change color",
-              "isDone": false
+              "isDone": true
             }
           ],
           "flags": {
@@ -525,11 +525,11 @@
             "release": false,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T09:18:02.7332995+00:00",
-          "updatedAt": "2026-09-10T09:18:55.3110246+00:00"
+          "updatedAt": "2026-09-10T10:00:00.0000000+00:00"
         },
         {
           "id": "c4f2d559d45a452898b624875e80a109",
