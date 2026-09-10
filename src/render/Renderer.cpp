@@ -8,6 +8,8 @@
 #include <d3d11.h>
 #include <d3dcompiler.h>
 
+#include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <vector>
 
@@ -20,48 +22,102 @@ template <class T> static void safeRelease(T*& p) {
     }
 }
 
-// One constant buffer shared by every draw. Matrices arrive transposed
-// (row-major CPU -> column-major HLSL).
+// One constant buffer shared by every draw. Matrices arrive row-major; HLSL's
+// column-major reinterpretation + mul(M, v) yields the row-vector product the
+// engine math uses.
+constexpr int kMaxLights = 8;
+
+struct GpuLight {
+    float pos[4];    // xyz world position (point / spot)
+    float dir[4];    // xyz forward direction (directional / spot)
+    float color[4];  // rgb = colour * intensity, w = type (0 dir, 1 point, 2 spot)
+    float params[4]; // x = range, y = cos(inner), z = cos(outer)
+};
+
 struct CBData {
     float mvp[16];
     float model[16];
-    float lightDir[4];
     float baseColor[4];
-    float params[4]; // x = useTexture
+    float params[4];    // x=useTexture y=emissive z=unlit w=lightCount
+    float ambient[4];   // rgb = ambient light
+    float fogColor[4];
+    float fogParams[4]; // x=start y=end z=enabled
+    GpuLight lights[kMaxLights];
 };
 
 static const char* kShaderSrc = R"(
+#define MAX_LIGHTS 8
+struct Light { float4 pos; float4 dir; float4 color; float4 params; };
 cbuffer CB : register(b0)
 {
     float4x4 uMVP;
     float4x4 uModel;
-    float4   uLightDir;
     float4   uBaseColor;
     float4   uParams;
+    float4   uAmbient;
+    float4   uFogColor;
+    float4   uFogParams;
+    Light    uLights[MAX_LIGHTS];
 };
 Texture2D    uTex : register(t0);
 SamplerState uSamp : register(s0);
 
 struct VSIn  { float3 pos : POSITION; float3 nrm : NORMAL; float2 uv : TEXCOORD0; };
-struct VSOut { float4 pos : SV_POSITION; float3 nrm : NORMAL; float2 uv : TEXCOORD0; };
+struct VSOut { float4 pos : SV_POSITION; float2 uv : TEXCOORD0;
+               float3 light : COLOR0; float fog : TEXCOORD1; };
+
+float3 shadeVertex(float3 wpos, float3 N)
+{
+    float3 acc = uAmbient.rgb;
+    int count = (int)uParams.w;
+    [loop] for (int k = 0; k < count; ++k)
+    {
+        Light lt = uLights[k];
+        int type = (int)lt.color.w;
+        float3 Ldir;
+        float atten = 1.0;
+        if (type == 0)
+        {
+            Ldir = -normalize(lt.dir.xyz);
+        }
+        else
+        {
+            float3 toL = lt.pos.xyz - wpos;
+            float d = length(toL);
+            Ldir = toL / max(d, 1e-4);
+            float f = saturate(1.0 - d / max(lt.params.x, 1e-4));
+            atten = f * f;
+            if (type == 2)
+            {
+                float cs = dot(-Ldir, normalize(lt.dir.xyz));
+                atten *= saturate((cs - lt.params.z) / max(lt.params.y - lt.params.z, 1e-4));
+            }
+        }
+        acc += lt.color.rgb * saturate(dot(N, Ldir)) * atten;
+    }
+    return acc;
+}
 
 VSOut VSMain(VSIn i)
 {
     VSOut o;
     o.pos = mul(uMVP, float4(i.pos, 1.0));
-    o.nrm = normalize(mul((float3x3)uModel, i.nrm));
-    o.uv  = i.uv;
+    float3 wpos = mul(uModel, float4(i.pos, 1.0)).xyz;
+    float3 N = normalize(mul((float3x3)uModel, i.nrm));
+    o.uv = i.uv;
+    o.light = (uParams.z > 0.5) ? float3(1,1,1) : shadeVertex(wpos, N);
+    o.fog = (uFogParams.z > 0.5)
+              ? saturate((uFogParams.y - o.pos.w) / max(uFogParams.y - uFogParams.x, 1e-4))
+              : 1.0;
     return o;
 }
 
 float4 PSMain(VSOut i) : SV_TARGET
 {
-    float3 L = normalize(uLightDir.xyz);
-    float ndl = saturate(dot(normalize(i.nrm), -L));
-    float shade = lerp(0.25 + 0.75 * ndl, 1.0, uParams.z); // uParams.z = unlit
-    float3 lit = shade * uBaseColor.rgb + uParams.y;        // uParams.y = emissive
     float3 tex = lerp(float3(1,1,1), uTex.Sample(uSamp, i.uv).rgb, uParams.x);
-    return float4(lit * tex, uBaseColor.a);
+    float3 col = uBaseColor.rgb * tex * i.light + uParams.y;
+    col = lerp(uFogColor.rgb, col, saturate(i.fog));
+    return float4(col, uBaseColor.a);
 }
 )";
 
@@ -354,21 +410,36 @@ void Renderer::drawActor(Actor& actor, const Mat4& viewProj, const Options& opt)
         }
     }
 
-    CBData cb;
+    CBData cb = {};
     // Upload row-major data as-is: HLSL's column-major reinterpretation plus
     // mul(M, v) then yields the row-vector product v * M that this math uses.
     std::memcpy(cb.mvp, mvp.m, sizeof(cb.mvp));
     std::memcpy(cb.model, model.m, sizeof(cb.model));
-    cb.lightDir[0] = -0.4f; cb.lightDir[1] = -0.8f; cb.lightDir[2] = -0.45f; cb.lightDir[3] = 0.0f;
     bool sel = opt.highlight == &actor;
     cb.baseColor[0] = sel ? baseColor[0] * 0.85f + 0.10f : baseColor[0];
     cb.baseColor[1] = sel ? baseColor[1] * 0.85f + 0.05f : baseColor[1];
     cb.baseColor[2] = sel ? baseColor[2] * 0.85f + 0.25f : baseColor[2];
     cb.baseColor[3] = baseColor[3];
+
+    int lightCount = static_cast<int>(std::min<size_t>(lights_.size(), kMaxLights));
     cb.params[0] = texPath.empty() ? 0.0f : 1.0f;
     cb.params[1] = emissive;
     cb.params[2] = unlit ? 1.0f : 0.0f;
-    cb.params[3] = 0.0f;
+    cb.params[3] = static_cast<float>(lightCount);
+    cb.ambient[0] = opt.ambient.x; cb.ambient[1] = opt.ambient.y; cb.ambient[2] = opt.ambient.z;
+    cb.fogColor[0] = opt.fogColor.x; cb.fogColor[1] = opt.fogColor.y; cb.fogColor[2] = opt.fogColor.z;
+    cb.fogParams[0] = opt.fogStart;
+    cb.fogParams[1] = opt.fogEnd;
+    cb.fogParams[2] = opt.fogEnabled ? 1.0f : 0.0f;
+    for (int k = 0; k < lightCount; ++k) {
+        const LightSample& s = lights_[k];
+        GpuLight& g = cb.lights[k];
+        g.pos[0] = s.pos.x; g.pos[1] = s.pos.y; g.pos[2] = s.pos.z;
+        g.dir[0] = s.dir.x; g.dir[1] = s.dir.y; g.dir[2] = s.dir.z;
+        g.color[0] = s.color.x; g.color[1] = s.color.y; g.color[2] = s.color.z;
+        g.color[3] = static_cast<float>(s.type);
+        g.params[0] = s.range; g.params[1] = s.cosInner; g.params[2] = s.cosOuter;
+    }
 
     D3D11_MAPPED_SUBRESOURCE ms;
     if (SUCCEEDED(ctx_->Map(cb_, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms))) {
@@ -386,6 +457,27 @@ void Renderer::drawActor(Actor& actor, const Mat4& viewProj, const Options& opt)
     ctx_->IASetVertexBuffers(0, 1, &gm.vb, &stride, &offset);
     ctx_->IASetIndexBuffer(gm.ib, DXGI_FORMAT_R32_UINT, 0);
     ctx_->DrawIndexed(gm.indexCount, 0, 0);
+}
+
+void Renderer::collectLights(Actor& actor) {
+    if (auto* lc = actor.getComponent<LightComponent>()) {
+        if (lc->enabled && actor.visible() && lights_.size() < kMaxLights) {
+            Transform w = actor.worldTransform();
+            Mat4 rot = Mat4::rotationEuler(w.rotationEuler);
+            LightSample s;
+            s.type = static_cast<int>(lc->type);
+            s.pos = w.position;
+            // local -Z transformed to world (row-vector: v * R => -row 2 of R).
+            s.dir = normalize(Vec3{-rot.at(2, 0), -rot.at(2, 1), -rot.at(2, 2)});
+            s.color = Vec3{lc->color[0], lc->color[1], lc->color[2]} * lc->intensity;
+            s.range = lc->range;
+            s.cosInner = std::cos(radians(lc->spotInnerDeg));
+            s.cosOuter = std::cos(radians(lc->spotOuterDeg));
+            lights_.push_back(s);
+        }
+    }
+    for (const auto& child : actor.children())
+        collectLights(*child);
 }
 
 void* Renderer::render(Scene& scene, const OrbitCamera& cam, int width, int height,
@@ -409,6 +501,10 @@ void* Renderer::render(Scene& scene, const OrbitCamera& cam, int width, int heig
     ctx_->PSSetSamplers(0, 1, &sampler_);
     ctx_->RSSetState(raster_);
     ctx_->OMSetDepthStencilState(depthState_, 0);
+
+    lights_.clear();
+    for (const auto& child : scene.root().children())
+        collectLights(*child);
 
     float aspect = height > 0 ? float(width) / float(height) : 1.0f;
     Mat4 viewProj = cam.view() * cam.proj(aspect);

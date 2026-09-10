@@ -28,6 +28,24 @@ void MeshRenderer::drawInspector() {
     ImGui::Checkbox("Cast Shadows", &castShadows);
 }
 
+void LightComponent::drawInspector() {
+    const char* kinds[] = {"Directional", "Point", "Spot"};
+    int k = static_cast<int>(type);
+    if (ImGui::Combo("Type", &k, kinds, 3))
+        type = static_cast<Type>(k);
+    ImGui::ColorEdit3("Color", color);
+    ImGui::DragFloat("Intensity", &intensity, 0.05f, 0.0f, 50.0f);
+    if (type != Type::Directional)
+        ImGui::DragFloat("Range", &range, 0.1f, 0.01f, 500.0f);
+    if (type == Type::Spot) {
+        ImGui::DragFloat("Spot inner", &spotInnerDeg, 0.5f, 0.0f, 89.0f);
+        ImGui::DragFloat("Spot outer", &spotOuterDeg, 0.5f, 0.0f, 89.0f);
+        if (spotOuterDeg < spotInnerDeg)
+            spotOuterDeg = spotInnerDeg;
+    }
+    ImGui::TextDisabled("-Z is the light's forward direction");
+}
+
 void SpinnerComponent::start() {
     CR_GAME("spinner", std::string("Spinner started on '") + actor()->name() + "'");
 }
