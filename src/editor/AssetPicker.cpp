@@ -3,12 +3,14 @@
 #include "assets/Image.h"
 #include "assets/MaterialLibrary.h"
 #include "scene/Actor.h"
+#include "scene/Actor2D.h"
 #include "scene/BuiltinComponents.h"
 
 #include "imgui.h"
 
 #include <algorithm>
 #include <cctype>
+#include <cstdint>
 #include <functional>
 
 namespace crate {
@@ -27,6 +29,44 @@ static void walkActors(Actor& node, const std::function<void(Actor&)>& fn) {
     fn(node);
     for (const auto& c : node.children())
         walkActors(*c, fn);
+}
+
+const char* pickPayloadId(PickKind kind) {
+    switch (kind) {
+        case PickKind::Material: return "AP_MATERIAL";
+        case PickKind::Mesh: return "AP_MESH";
+        case PickKind::Texture: return "AP_TEXTURE";
+        case PickKind::Actor: return "AP_ACTOR";
+    }
+    return "AP_?";
+}
+
+static Actor* findById(Actor* root, uint64_t id) {
+    Actor* hit = nullptr;
+    if (root)
+        walkActors(*root, [&](Actor& a) {
+            if (a.id() == id)
+                hit = &a;
+        });
+    return hit;
+}
+
+// Pull the reference of `kind` out of a dragged actor's components.
+static std::string refFromActor(PickKind kind, Actor& a) {
+    if (kind == PickKind::Actor)
+        return a.name();
+    if (auto* mr = a.getComponent<MeshRenderer>()) {
+        if (kind == PickKind::Mesh)
+            return mr->usePrimitive ? mr->primitive : mr->meshPath;
+        if (kind == PickKind::Texture)
+            return mr->texturePath;
+        if (kind == PickKind::Material)
+            return mr->materialRef;
+    }
+    if (kind == PickKind::Texture)
+        if (auto* sp = dynamic_cast<SpriteActor*>(&a))
+            return sp->texturePath;
+    return {};
 }
 
 void AssetPicker::rebuild(PickKind kind, const PickerSources& src) {
@@ -79,7 +119,9 @@ void AssetPicker::rebuild(PickKind kind, const PickerSources& src) {
 bool AssetPicker::field(const char* label, PickKind kind, std::string* value,
                         const PickerSources& src) {
     ImGui::PushID(label);
+    bool changed = false;
 
+    ImGui::BeginGroup();
     ImGui::TextUnformatted(value->empty() ? "<none>" : value->c_str());
     ImGui::SameLine();
     if (ImGui::SmallButton("...")) {
@@ -105,8 +147,30 @@ bool AssetPicker::field(const char* label, PickKind kind, std::string* value,
     }
     ImGui::SameLine();
     ImGui::TextDisabled("%s", label);
+    ImGui::EndGroup();
 
-    bool changed = false;
+    // Drag an asset (from the browser) or an actor (from the hierarchy) onto
+    // the field to set it, if the type matches.
+    if (ImGui::BeginDragDropTarget()) {
+        if (const ImGuiPayload* p = ImGui::AcceptDragDropPayload(pickPayloadId(kind))) {
+            std::string s(static_cast<const char*>(p->Data));
+            if (*value != s) {
+                *value = s;
+                changed = true;
+            }
+        } else if (const ImGuiPayload* pa = ImGui::AcceptDragDropPayload("CRATE_ACTOR")) {
+            uint64_t id = *static_cast<const uint64_t*>(pa->Data);
+            if (Actor* dragged = findById(src.sceneRoot, id)) {
+                std::string s = refFromActor(kind, *dragged);
+                if (!s.empty() && *value != s) {
+                    *value = s;
+                    changed = true;
+                }
+            }
+        }
+        ImGui::EndDragDropTarget();
+    }
+
     if (openField_ == label) {
         if (popup_.draw() == ui::Popup::Result::Ok && selected_ >= 0 &&
             selected_ < (int)candidates_.size()) {

@@ -323,11 +323,11 @@
             "release": true,
             "merge": true
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T09:27:10.9740788+00:00",
-          "updatedAt": "2026-09-10T09:30:00.8409693+00:00"
+          "updatedAt": "2026-09-10T00:00:00.0000000+00:00"
         }
       ]
     },

@@ -887,6 +887,12 @@ void EditorApp::drawBottomPanel() {
                 selectedAsset_.clear();
                 scene_.select(nullptr);
             }
+            if (ImGui::BeginDragDropSource()) {
+                ImGui::SetDragDropPayload(pickPayloadId(PickKind::Material), mn.c_str(),
+                                         mn.size() + 1);
+                ImGui::Text("Material  %s", mn.c_str());
+                ImGui::EndDragDropSource();
+            }
         }
         for (const std::string& a : importedAssets_) {
             std::string name = a;
@@ -907,6 +913,13 @@ void EditorApp::drawBottomPanel() {
                                "Applied '" + name + "' to '" + scene_.selected()->name() + "'");
                     }
                 }
+            }
+            if (ImGui::BeginDragDropSource()) {
+                ImGui::SetDragDropPayload(
+                    pickPayloadId(isImg ? PickKind::Texture : PickKind::Mesh), a.c_str(),
+                    a.size() + 1);
+                ImGui::Text("%s  %s", isImg ? "Texture" : "Mesh", name.c_str());
+                ImGui::EndDragDropSource();
             }
         }
         ImGui::EndChild();

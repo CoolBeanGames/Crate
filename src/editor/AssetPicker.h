@@ -12,6 +12,9 @@ class Actor;
 // What kind of reference a picker field edits.
 enum class PickKind { Material, Mesh, Texture, Actor };
 
+// Drag-drop payload id for a given kind (asset-browser rows use these).
+const char* pickPayloadId(PickKind kind);
+
 // Data sources the picker draws its candidate list from.
 struct PickerSources {
     const MaterialLibrary* materials = nullptr;
