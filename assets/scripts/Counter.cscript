@@ -1,4 +1,4 @@
-class counter : Actor
+class Counter : Actor
 {
 	var count = 0;
 	var phase = "idle";

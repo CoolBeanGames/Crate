@@ -1,4 +1,4 @@
-class my_new_actor : Actor3D
+class MyNewActor : Actor3D
 {
 	var unknown_var = 0;
 	int known_var = 1;

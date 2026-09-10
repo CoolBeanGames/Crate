@@ -1,4 +1,4 @@
-class mover : Actor3D
+class Mover : Actor3D
 {
 	float speed = 20.0;
 	var elapsed = 0;
