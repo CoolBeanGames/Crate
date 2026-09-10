@@ -97,12 +97,14 @@ Scene Scene::makeSample() {
 
     auto crate = std::make_unique<MeshActor>("Crate");
     crate->primitive = "Cube";
-    crate->transform().position = {0.0f, 0.5f, 0.0f};
+    crate->texturePath = "assets/uv_check.bmp";
+    crate->transform().position = {0.0f, 0.75f, 0.0f};
+    crate->transform().scale = {1.5f, 1.5f, 1.5f};
     s.add(std::move(crate), set);
 
     auto floor = std::make_unique<MeshActor>("Floor");
     floor->primitive = "Plane";
-    floor->transform().scale = {10.0f, 1.0f, 10.0f};
+    floor->transform().scale = {6.0f, 1.0f, 6.0f};
     s.add(std::move(floor), set);
 
     auto lamp = std::make_unique<Actor3D>("Ceiling Lamp");

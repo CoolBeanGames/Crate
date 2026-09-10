@@ -191,50 +191,6 @@
       "isLocked": false,
       "tasks": [
         {
-          "id": "d472e739de014d12b87cf4356553a1c0",
-          "index": 8,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Basic 3D rendering",
-          "task": "lets start with a basic 3D rendering framework. for now put this in the viewport but we will add more stuff later and flesh it out. Use whichever framework would be MOST performant\r\n-D3D\r\n-OpenGL\r\nor\r\n-Vulkan",
-          "tags": [
-            "rendering",
-            "3D",
-            "viewport"
-          ],
-          "files": [],
-          "requirements": [
-            {
-              "id": "8da65a3684494d369a9650cbbadb8524",
-              "text": "rendering a vertex lit cube",
-              "isDone": false
-            },
-            {
-              "id": "33ba7e59c94049529a4969ec0a0c6fbb",
-              "text": "cube rotates around",
-              "isDone": false
-            },
-            {
-              "id": "eebbcfb6ceaa457da8cfb34b3f04a94e",
-              "text": "can apply textures to the cube",
-              "isDone": false
-            }
-          ],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-10T01:05:27.8469932+00:00",
-          "updatedAt": "2026-09-10T01:24:18.2234688+00:00"
-        },
-        {
           "id": "dc243aec831c4dceb6e6526bc7e1b4a3",
           "index": 9,
           "kind": "task",
@@ -1220,6 +1176,50 @@
           "isLocked": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T01:10:56.4220575+00:00",
+          "updatedAt": "2026-09-09T00:00:00+00:00"
+        },
+        {
+          "id": "d472e739de014d12b87cf4356553a1c0",
+          "index": 8,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Basic 3D rendering",
+          "task": "lets start with a basic 3D rendering framework. for now put this in the viewport but we will add more stuff later and flesh it out. Use whichever framework would be MOST performant\r\n-D3D\r\n-OpenGL\r\nor\r\n-Vulkan",
+          "tags": [
+            "rendering",
+            "3D",
+            "viewport"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "8da65a3684494d369a9650cbbadb8524",
+              "text": "rendering a vertex lit cube",
+              "isDone": true
+            },
+            {
+              "id": "33ba7e59c94049529a4969ec0a0c6fbb",
+              "text": "cube rotates around",
+              "isDone": true
+            },
+            {
+              "id": "eebbcfb6ceaa457da8cfb34b3f04a94e",
+              "text": "can apply textures to the cube",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:05:27.8469932+00:00",
           "updatedAt": "2026-09-09T00:00:00+00:00"
         }
       ]

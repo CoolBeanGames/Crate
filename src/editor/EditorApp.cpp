@@ -32,6 +32,17 @@ EditorApp::EditorApp() : scene_(Scene::makeSample()) {
     CR_LOG("scene", "Loaded sample scene with " + std::to_string(scene_.actorCount()) + " actors");
 }
 
+EditorApp::~EditorApp() = default;
+
+void EditorApp::attachDevice(ID3D11Device* device, ID3D11DeviceContext* context) {
+    if (!device || !context) {
+        renderer_.shutdown();
+        return;
+    }
+    if (renderer_.init(device, context))
+        CR_LOG("render", "Viewport renderer attached");
+}
+
 // ---------------------------------------------------------------------------
 // Frame
 // ---------------------------------------------------------------------------
@@ -40,6 +51,9 @@ void EditorApp::onFrame() {
         CR_LOG("render", "First frame presented");
         firstFrame_ = false;
     }
+    // "Spin preview" slowly orbits the camera so a lone object reads as 3D.
+    if (spinPreview_ && !ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+        camera_.yaw += ImGui::GetIO().DeltaTime * 18.0f;
 
     // Global editor shortcuts (skipped while typing in a field).
     if (!ImGui::GetIO().WantTextInput) {
@@ -439,7 +453,14 @@ void EditorApp::drawInspector() {
         if (auto* m = dynamic_cast<MeshActor*>(a)) {
             ImGui::SeparatorText("Mesh");
             ImGui::InputText("Mesh Path", &m->meshPath);
-            ImGui::InputText("Primitive", &m->primitive);
+            const char* prims[] = {"Cube", "Sphere", "Cylinder", "Capsule", "Plane", "Quad"};
+            if (ImGui::BeginCombo("Primitive", m->primitive.c_str())) {
+                for (const char* p : prims)
+                    if (ImGui::Selectable(p, m->primitive == p))
+                        m->primitive = p;
+                ImGui::EndCombo();
+            }
+            ImGui::InputText("Texture Path", &m->texturePath);
             ImGui::Checkbox("Cast Shadows", &m->castShadows);
         } else if (auto* sp = dynamic_cast<SpriteActor*>(a)) {
             ImGui::SeparatorText("Sprite");
@@ -465,24 +486,34 @@ void EditorApp::drawViewport() {
     if (ImGui::Begin("Viewport")) {
         if (ImGui::BeginTabBar("viewport_tabs")) {
             if (ImGui::BeginTabItem("Scene View")) {
+                ImGui::Checkbox("Spin preview", &spinPreview_);
+                ImGui::SameLine();
+                ImGui::TextDisabled("drag = orbit   |   wheel = zoom");
+
                 ImVec2 size = ImGui::GetContentRegionAvail();
-                ImVec2 p0 = ImGui::GetCursorScreenPos();
-                ImDrawList* dl = ImGui::GetWindowDrawList();
-                dl->AddRectFilled(p0, ImVec2(p0.x + size.x, p0.y + size.y),
-                                  IM_COL32(0x0B, 0x0D, 0x12, 0xFF));
-                const float step = 32.0f;
-                for (float x = 0; x < size.x; x += step)
-                    dl->AddLine(ImVec2(p0.x + x, p0.y), ImVec2(p0.x + x, p0.y + size.y),
-                                IM_COL32(0x26, 0x2C, 0x38, 0x80));
-                for (float y = 0; y < size.y; y += step)
-                    dl->AddLine(ImVec2(p0.x, p0.y + y), ImVec2(p0.x + size.x, p0.y + y),
-                                IM_COL32(0x26, 0x2C, 0x38, 0x80));
-                dl->AddText(ImVec2(p0.x + 12, p0.y + 12), IM_COL32(0x8E, 0x93, 0xA3, 0xFF),
-                            "Scene View - renderer lands on the Rendering branch");
-                if (Actor* s = scene_.selected())
-                    dl->AddText(ImVec2(p0.x + 12, p0.y + 30), IM_COL32(0x8B, 0x7C, 0xFF, 0xFF),
-                                ("Selected: " + s->name()).c_str());
-                ImGui::Dummy(size);
+                int w = static_cast<int>(size.x), h = static_cast<int>(size.y);
+                Renderer::Options opt;
+                opt.highlight = scene_.selected();
+                void* srv = renderer_.ready() ? renderer_.render(scene_, camera_, w, h, opt) : nullptr;
+
+                if (srv) {
+                    ImGui::Image(reinterpret_cast<ImTextureID>(srv), size);
+                    if (ImGui::IsItemHovered()) {
+                        ImGuiIO& io = ImGui::GetIO();
+                        if (ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+                            camera_.orbit(-io.MouseDelta.x * 0.4f, io.MouseDelta.y * 0.4f);
+                        if (io.MouseWheel != 0.0f)
+                            camera_.zoom(io.MouseWheel);
+                    }
+                } else {
+                    ImVec2 p0 = ImGui::GetCursorScreenPos();
+                    ImGui::GetWindowDrawList()->AddRectFilled(
+                        p0, ImVec2(p0.x + size.x, p0.y + size.y), IM_COL32(0x0B, 0x0D, 0x12, 0xFF));
+                    ImGui::GetWindowDrawList()->AddText(ImVec2(p0.x + 12, p0.y + 12),
+                                                       IM_COL32(0x8E, 0x93, 0xA3, 0xFF),
+                                                       "Viewport renderer unavailable (no D3D11 device)");
+                    ImGui::Dummy(size);
+                }
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Game View")) {

@@ -3,8 +3,9 @@ param([string]$Out = "$env:TEMP\crate_shot.png", [int]$WaitSeconds = 5)
 $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.Drawing, System.Windows.Forms
 
-$exe = Join-Path (Split-Path -Parent $PSScriptRoot) "build\Crate.exe"
-$p = Start-Process $exe -PassThru
+$root = Split-Path -Parent $PSScriptRoot
+$exe = Join-Path $root "build\Crate.exe"
+$p = Start-Process $exe -PassThru -WorkingDirectory $root
 Start-Sleep -Seconds $WaitSeconds
 
 Add-Type @"

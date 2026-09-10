@@ -28,12 +28,14 @@ add_library(crate_core STATIC
     src/core/Log.cpp
     src/scene/Actor.cpp
     src/scene/Scene.cpp
+    src/render/Mesh.cpp
+    src/render/Renderer.cpp
     src/editor/Console.cpp
     src/editor/ContextMenu.cpp
     src/editor/Theme.cpp
     src/editor/EditorApp.cpp
 )
-target_include_directories(crate_core PUBLIC src)
+target_include_directories(crate_core PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
 target_link_libraries(crate_core PUBLIC imgui)
 
 # --- Editor executable ---------------------------------------------------
@@ -49,6 +51,11 @@ endif()
 
 set_target_properties(Crate PROPERTIES
     VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
+# Copy bundled assets next to the executable so a launched build finds them.
+add_custom_command(TARGET Crate POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets $<TARGET_FILE_DIR:Crate>/assets)
 
 # --- Tests ---------------------------------------------------------------
 enable_testing()

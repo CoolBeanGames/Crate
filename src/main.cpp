@@ -66,6 +66,7 @@ int main(int, char**) {
     ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
 
     crate::EditorApp app;
+    app.attachDevice(g_pd3dDevice, g_pd3dDeviceContext);
 
     const ImVec4 clear_col = ImVec4(0.043f, 0.051f, 0.070f, 1.0f);
     bool running = true;
@@ -110,6 +111,7 @@ int main(int, char**) {
     }
 
     CR_LOG("platform", "Shutting down");
+    app.attachDevice(nullptr, nullptr); // release renderer GPU objects before the device
     ImGui_ImplDX11_Shutdown();
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();

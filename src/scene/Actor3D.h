@@ -22,8 +22,9 @@ public:
     explicit MeshActor(std::string name = "Mesh") : Actor3D(std::move(name)) {}
     const char* typeName() const override { return "MESH"; }
 
-    std::string meshPath;           // e.g. "assets/props/crate.obj"
+    std::string meshPath;           // e.g. "assets/props/crate.fbx"
     std::string primitive = "Cube"; // used when meshPath is empty
+    std::string texturePath;        // optional albedo texture
     bool castShadows = true;
 
 protected:
@@ -31,6 +32,7 @@ protected:
         auto* m = new MeshActor(name_);
         m->meshPath = meshPath;
         m->primitive = primitive;
+        m->texturePath = texturePath;
         m->castShadows = castShadows;
         return m;
     }
