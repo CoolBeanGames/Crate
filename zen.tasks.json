@@ -4,7 +4,7 @@
   "name": "Crate",
   "nextCardIndex": 43,
   "latestExePath": null,
-  "latestReleasePath": null,
+  "latestReleasePath": "https://github.com/CoolBeanGames/Crate/releases/tag/v0.4.0",
   "tagCatalog": [
     {
       "name": "bug",
@@ -248,35 +248,7 @@
       "isCollapsed": false,
       "isSystem": false,
       "isLocked": false,
-      "tasks": [
-        {
-          "id": "7a764ad264d247a6a7021c275ef2a6b7",
-          "index": 42,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "AUUID",
-          "task": "a subset of UUID these are assigned to actors, every single one is unique and maps it by its current path. this applies to every instance of every actor.",
-          "tags": [
-            "assets",
-            "Actors"
-          ],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": true,
-            "merge": true
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-10T09:28:51.6976967+00:00",
-          "updatedAt": "2026-09-10T10:45:00.0000000+00:00"
-        }
-      ]
+      "tasks": []
     },
     {
       "id": "archive",
@@ -1764,6 +1736,33 @@
           "isCollapsed": false,
           "createdAt": "2026-09-10T09:19:07.9235141+00:00",
           "updatedAt": "2026-09-10T10:30:00+00:00"
+        },
+        {
+          "id": "7a764ad264d247a6a7021c275ef2a6b7",
+          "index": 42,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "AUUID",
+          "task": "a subset of UUID these are assigned to actors, every single one is unique and maps it by its current path. this applies to every instance of every actor.",
+          "tags": [
+            "assets",
+            "Actors"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": true
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T09:28:51.6976967+00:00",
+          "updatedAt": "2026-09-10T10:45:00+00:00"
         }
       ]
     }
