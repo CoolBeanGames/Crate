@@ -7,3 +7,5 @@
 *.fbx binary
 third_party/** -text
 *.ps1 text eol=crlf
+# Zen rewrites this with CRLF; keep it so it doesn't show as perpetually modified.
+zen.tasks.json text eol=crlf
