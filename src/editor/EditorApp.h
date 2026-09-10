@@ -60,6 +60,10 @@ private:
 
     void setPlaying(bool playing);
 
+    // Delete whatever is currently selected: a scene actor, a material asset,
+    // or an imported asset (in that priority order).
+    void deleteSelection();
+
     Scene scene_;
     Scene playBackup_;      // scene state captured when Play was pressed
     float physicsAccum_ = 0.0f;
@@ -72,6 +76,7 @@ private:
     bool spinPreview_ = true;
     std::vector<std::string> importedAssets_; // keys of imported models/textures
     std::string selectedMaterial_;            // asset selection (inspector shows it)
+    std::string selectedAsset_;               // selected imported model/texture path
     std::unique_ptr<Actor> clipboard_; // deep clone from copy/cut
     bool playing_ = false;
     bool showDemo_ = false;

@@ -214,11 +214,11 @@
             "release": false,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T09:20:16.9395664+00:00",
-          "updatedAt": "2026-09-10T09:27:13.3497116+00:00"
+          "updatedAt": "2026-09-10T00:00:00.0000000+00:00"
         },
         {
           "id": "c12016618f374f3abd2dc70b140dac9c",

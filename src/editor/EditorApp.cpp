@@ -133,8 +133,12 @@ void EditorApp::onFrame() {
         firstFrame_ = false;
     }
     const float dt = ImGui::GetIO().DeltaTime;
-    if (scene_.selected())
-        selectedMaterial_.clear(); // actor selection supersedes asset selection
+    if (scene_.selected()) {
+        // An actor selection supersedes an asset selection (kept exclusive so
+        // Delete is unambiguous).
+        selectedMaterial_.clear();
+        selectedAsset_.clear();
+    }
 
     // "Spin preview" slowly orbits the camera so a lone object reads as 3D.
     if (spinPreview_ && !playing_ && !ImGui::IsMouseDragging(ImGuiMouseButton_Left))
@@ -160,8 +164,9 @@ void EditorApp::onFrame() {
             if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_C)) copyActor(s);
             if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_X)) cutActor(s);
             if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_D)) scene_.select(scene_.duplicate(s));
-            if (ImGui::IsKeyPressed(ImGuiKey_Delete)) scene_.remove(s);
         }
+        if (ImGui::IsKeyPressed(ImGuiKey_Delete))
+            deleteSelection();
         if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_V))
             scene_.select(pasteInto(scene_.selected()));
     }
@@ -257,7 +262,8 @@ void EditorApp::drawMenuBar() {
         if (ImGui::MenuItem("Paste", "Ctrl+V", false, clipboard_ != nullptr))
             scene_.select(pasteInto(s));
         if (ImGui::MenuItem("Duplicate", "Ctrl+D", false, s)) scene_.select(scene_.duplicate(s));
-        if (ImGui::MenuItem("Delete", "Del", false, s)) scene_.remove(s);
+        bool anySel = s || !selectedMaterial_.empty() || !selectedAsset_.empty();
+        if (ImGui::MenuItem("Delete", "Del", false, anySel)) deleteSelection();
         ImGui::EndMenu();
     }
     if (ImGui::BeginMenu("View")) {
@@ -849,6 +855,7 @@ void EditorApp::drawBottomPanel() {
         for (const std::string& mn : materialLib_.names()) {
             if (ImGui::Selectable(("[mat] " + mn).c_str(), selectedMaterial_ == mn)) {
                 selectedMaterial_ = mn;
+                selectedAsset_.clear();
                 scene_.select(nullptr);
             }
         }
@@ -858,13 +865,17 @@ void EditorApp::drawBottomPanel() {
                 name = name.substr(s + 1);
             const std::string ext = lowerExt(a);
             bool isImg = isSupportedImageExt(ext);
-            if (ImGui::Selectable(((isImg ? "[img] " : "[mesh] ") + name).c_str())) {
+            if (ImGui::Selectable(((isImg ? "[img] " : "[mesh] ") + name).c_str(),
+                                  selectedAsset_ == a)) {
+                selectedAsset_ = a;
+                selectedMaterial_.clear();
                 if (isImg) {
-                    Actor* sel = scene_.selected();
-                    if (auto* mr = sel ? sel->getComponent<MeshRenderer>() : nullptr) {
+                    if (auto* mr = scene_.selected() ? scene_.selected()->getComponent<MeshRenderer>()
+                                                     : nullptr) {
                         mr->texturePath = a;
                         renderer_.invalidateTexture(a);
-                        CR_LOG("assets", "Applied '" + name + "' to '" + sel->name() + "'");
+                        CR_LOG("assets",
+                               "Applied '" + name + "' to '" + scene_.selected()->name() + "'");
                     }
                 }
             }
@@ -889,6 +900,27 @@ void EditorApp::drawBottomPanel() {
 // ---------------------------------------------------------------------------
 // Actions
 // ---------------------------------------------------------------------------
+void EditorApp::deleteSelection() {
+    if (Actor* a = scene_.selected()) {
+        scene_.remove(a);
+        return;
+    }
+    if (!selectedMaterial_.empty()) {
+        CR_LOG("assets", "Deleted material '" + selectedMaterial_ + "'");
+        materialLib_.remove(selectedMaterial_);
+        selectedMaterial_.clear();
+        return;
+    }
+    if (!selectedAsset_.empty()) {
+        auto it = std::find(importedAssets_.begin(), importedAssets_.end(), selectedAsset_);
+        if (it != importedAssets_.end()) {
+            CR_LOG("assets", "Removed asset '" + *it + "' from the browser");
+            importedAssets_.erase(it);
+        }
+        selectedAsset_.clear();
+    }
+}
+
 void EditorApp::setPlaying(bool playing) {
     if (playing_ == playing)
         return;
