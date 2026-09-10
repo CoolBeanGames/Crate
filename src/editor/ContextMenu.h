@@ -28,7 +28,9 @@ public:
 
     // Open + begin the popup. Exactly one of these per menu per frame.
     bool beginItemPopup();   // right-click the last-submitted widget
-    bool beginWindowPopup(); // right-click empty space in the current window
+    // right-click in the current window; overItems = true also opens over
+    // widgets (Selectables etc.), false only over empty space.
+    bool beginWindowPopup(bool overItems = false);
     bool beginPopup();       // only shows after openManually()
     void openManually();
 

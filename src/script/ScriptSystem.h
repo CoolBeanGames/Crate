@@ -33,8 +33,14 @@ public:
 
     ScriptContext& context() { return ctx_; }
 
-    // Load every *.cscript in a folder (recursively). Safe to call repeatedly.
+    // Load every *.cscript in a folder (recursively). Safe to call repeatedly;
+    // the folder is remembered for newScript() / reload().
     void loadFolder(const std::string& dir);
+    const std::string& scriptsDir() const { return dir_; }
+
+    // Create a new script from a template in the scripts folder, compile and
+    // register it. Returns the class/file name, or "" on failure.
+    std::string newScript();
 
     // Compile source into a class; registers/updates the type + component.
     // Returns false and fills `errorOut` on a parse error.
@@ -71,6 +77,7 @@ private:
     void rebuildStatic(const std::string& className);
 
     ScriptContext ctx_;
+    std::string dir_; // last folder passed to loadFolder
     std::unordered_map<std::string, std::unique_ptr<ClassInfo>> types_;
     std::unordered_map<std::string, std::shared_ptr<ScriptObject>> statics_;
     std::vector<ScriptFile> files_;

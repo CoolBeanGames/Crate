@@ -152,6 +152,7 @@ void ScriptSystem::physicsStatics(float dt) {
 }
 
 void ScriptSystem::loadFolder(const std::string& dir) {
+    dir_ = dir;
     std::error_code ec;
     if (!fs::exists(dir, ec))
         return;
@@ -186,6 +187,57 @@ void ScriptSystem::loadFolder(const std::string& dir) {
         if (!replaced)
             files_.push_back(std::move(f));
     }
+}
+
+std::string ScriptSystem::newScript() {
+    if (dir_.empty())
+        dir_ = "assets/scripts";
+    std::error_code ec;
+    fs::create_directories(dir_, ec);
+
+    // unique class + file name
+    std::string name = "NewScript";
+    for (int n = 1; (types_.count(name) || fs::exists(fs::path(dir_) / (name + ".cscript"), ec));
+         ++n)
+        name = "NewScript" + std::to_string(n);
+
+    const std::string tpl =
+        "class " + name + " : Actor\n"
+        "{\n"
+        "\tfunc start()\n"
+        "\t{\n"
+        "\t}\n"
+        "\n"
+        "\tfunc update(float delta)\n"
+        "\t{\n"
+        "\t}\n"
+        "\n"
+        "\tfunc physics_update(float delta)\n"
+        "\t{\n"
+        "\t}\n"
+        "}\n";
+
+    const std::string path = (fs::path(dir_) / (name + ".cscript")).string();
+    std::ofstream out(path, std::ios::binary);
+    if (!out) {
+        CR_ERROR("script", "Could not create " + path);
+        return {};
+    }
+    out << tpl;
+    out.close();
+
+    std::string err;
+    if (!compile(tpl, &err)) {
+        CR_ERROR("script", "New script failed to compile: " + err);
+        return {};
+    }
+    ScriptFile f;
+    f.path = path;
+    f.name = name;
+    f.source = tpl;
+    files_.push_back(std::move(f));
+    CR_LOG("script", "Created script '" + name + "'");
+    return name;
 }
 
 ScriptSystem::ScriptFile* ScriptSystem::file(const std::string& name) {

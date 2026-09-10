@@ -360,32 +360,32 @@
             {
               "id": "a1a1000000004b0e9a00000000000001",
               "text": "right-click anywhere in the asset browser opens a styled context menu",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "a1a1000000004b0e9a00000000000002",
               "text": "single Import Asset action that detects the file type and imports it (model / image / script)",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "a1a1000000004b0e9a00000000000003",
               "text": "Create Material in the menu",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "a1a1000000004b0e9a00000000000004",
               "text": "Scripting submenu with a working New Script item",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "a1a1000000004b0e9a00000000000005",
               "text": "New Script writes a compiling template, registers the component and opens it in the editor",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "a1a1000000004b0e9a00000000000006",
               "text": "the old top buttons are gone",
-              "isDone": false
+              "isDone": true
             }
           ],
           "flags": {
@@ -394,11 +394,11 @@
             "release": false,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T09:00:00.0000000+00:00",
-          "updatedAt": "2026-09-10T09:00:00.0000000+00:00"
+          "updatedAt": "2026-09-10T00:00:00.0000000+00:00"
         },
         {
           "id": "bddfb1cab3e3459e847f44a5c7aa9f1b",

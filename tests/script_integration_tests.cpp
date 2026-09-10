@@ -52,6 +52,32 @@ int main() {
         return 1;
     }
 
+    // --- New Script: template compiles + registers ------------------
+    {
+        std::string name = sys.newScript();
+        if (name.empty()) {
+            std::printf("FAIL: newScript() returned empty\n");
+            return 1;
+        }
+        bool inRegistry = false;
+        for (const auto& e : ComponentRegistry::get().entries())
+            if (e.name == name)
+                inRegistry = true;
+        if (!inRegistry || !sys.file(name)) {
+            std::printf("FAIL: new script '%s' not registered / no file\n", name.c_str());
+            return 1;
+        }
+        // the template must have the three lifecycle hooks
+        auto* ci = sys.types().at(name).get();
+        if (!ci->findFunction("start") || !ci->findFunction("update") ||
+            !ci->findFunction("physics_update")) {
+            std::printf("FAIL: template missing lifecycle functions\n");
+            return 1;
+        }
+        std::remove(sys.file(name)->path.c_str()); // don't leave it in the repo
+        std::printf("ok  newScript created '%s' (compiles, registered)\n", name.c_str());
+    }
+
     std::printf("ok  Mover ran: rotation.y = %.1f after play\n", y);
     return 0;
 }

@@ -99,6 +99,17 @@ void EditorApp::ingestDroppedFile(const std::string& path) {
             renderer_.invalidateTexture(path);
             CR_LOG("assets", "Applied texture to '" + sel->name() + "'");
         }
+    } else if (ext == "cscript") {
+        // Copy the script into the project's scripts folder and load it.
+        auto& sys = script::ScriptSystem::get();
+        std::string dir = sys.scriptsDir().empty() ? (assetDir_ + "/scripts") : sys.scriptsDir();
+        std::error_code ec;
+        fs::create_directories(dir, ec);
+        fs::path dst = fs::path(dir) / fs::path(path).filename();
+        if (fs::path(path) != dst)
+            fs::copy_file(path, dst, fs::copy_options::overwrite_existing, ec);
+        sys.loadFolder(dir);
+        CR_LOG("assets", "Imported script " + dst.filename().string());
     } else {
         CR_WARN("assets", "Unsupported drop: " + path);
     }
@@ -775,38 +786,53 @@ static void drawConsoleChannel(Console::Channel ch) {
     ImGui::EndChild();
 }
 
+void EditorApp::assetBrowserMenu() {
+    static ui::ContextMenu menu("asset_ctx");
+    if (!menu.beginWindowPopup(/*overItems=*/true))
+        return;
+
+    menu.label("CREATE");
+    if (menu.item("Create Material")) {
+        Material& m = materialLib_.create("Material");
+        selectedMaterial_ = m.name;
+        scene_.select(nullptr);
+        CR_LOG("assets", "Created material '" + m.name + "'");
+    }
+    if (menu.beginSub("Scripting")) {
+        if (menu.item("New Script")) {
+            std::string name = script::ScriptSystem::get().newScript();
+            if (!name.empty()) {
+                scriptMode_ = true;
+                scriptEditor_.openScript(name);
+            }
+        }
+        menu.endSub();
+    }
+
+    menu.separator();
+    menu.label("IMPORT");
+    if (menu.item("Import Asset...")) {
+        std::string picked = platform::openFileDialog(
+            "Import Asset",
+            "All supported\0*.fbx;*.png;*.jpg;*.jpeg;*.bmp;*.tga;*.tif;*.tiff;*.gif;*.cscript\0"
+            "All Files\0*.*\0");
+        if (!picked.empty())
+            ingestDroppedFile(picked);
+    }
+    menu.end();
+}
+
 void EditorApp::drawBottomPanel() {
     if (ImGui::Begin("Asset Browser")) {
-        if (ImGui::Button("Import Image...")) {
-            std::string picked = platform::openFileDialog(
-                "Import Image",
-                "Images\0*.png;*.jpg;*.jpeg;*.bmp;*.tga;*.tif;*.tiff;*.gif\0All Files\0*.*\0");
-            if (!picked.empty())
-                ingestDroppedFile(picked);
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Import Model...")) {
-            std::string picked =
-                platform::openFileDialog("Import Model", "FBX\0*.fbx\0All Files\0*.*\0");
-            if (!picked.empty())
-                ingestDroppedFile(picked);
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Create Material")) {
-            Material& m = materialLib_.create("Material");
-            selectedMaterial_ = m.name;
-            scene_.select(nullptr);
-            CR_LOG("assets", "Created material '" + m.name + "'");
-        }
-        ImGui::SameLine();
-        ImGui::TextDisabled("or drag files onto the window");
+        ImGui::TextDisabled("right-click for asset actions   |   or drag files onto the window");
         ImGui::Separator();
 
         // Everything dropped here can also be dropped straight onto this panel.
         ImGui::BeginChild("files");
+        assetBrowserMenu(); // right-click anywhere in the list
         if (importedAssets_.empty() && !fs::exists(fs::path(assetDir_))) {
-            ImGui::TextWrapped("No assets yet. Drop .fbx models or .png/.jpg/.bmp/.tiff images "
-                               "onto the window, or use the Import buttons above.");
+            ImGui::TextWrapped("No assets yet. Right-click to create or import, or drag files "
+                               "(.fbx / images / .cscript) onto the window.");
         }
         std::error_code ec;
         if (fs::exists(fs::path(assetDir_), ec)) {
