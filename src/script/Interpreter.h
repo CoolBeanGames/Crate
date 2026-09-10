@@ -99,6 +99,13 @@ private:
 
     Value* findVar(const std::string& name);
     Value builtinCall(const std::string& name, std::vector<Value>& args, int line);
+    Value mathCall(const std::string& fn, std::vector<Value>& args, int line); // Math.*
+
+    // Signals (Godot-style): connect / disconnect / emit / is_connected.
+    Value signalCall(const Value& sig, const std::string& method, std::vector<Value> args, int line);
+    Value invokeCallable(const Value& fn, std::vector<Value> args, int line);
+    void emitSignal(const std::shared_ptr<ScriptObject>& owner, const std::string& name,
+                    std::vector<Value> args, int line);
     Value actorMember(crate::Actor* a, const std::string& name, int line);
     Value callMethodOn(std::shared_ptr<ScriptObject> obj, const std::string& method,
                        std::vector<Value> args, int line, bool viaBase);

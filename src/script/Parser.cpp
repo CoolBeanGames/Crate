@@ -55,7 +55,23 @@ std::unique_ptr<ClassDecl> Parser::parseClass() {
 
     while (!check(Tok::RBrace) && !check(Tok::End)) {
         bool isAbstract = accept(Tok::KwAbstract);
-        if (check(Tok::KwFunc)) {
+        if (check(Tok::KwSignal)) {
+            advance();
+            SignalDecl sig;
+            sig.name = expect(Tok::Identifier, "signal name").text;
+            if (accept(Tok::LParen)) {
+                if (!check(Tok::RParen)) {
+                    do {
+                        // "type name" or just "name"
+                        std::string first = expect(Tok::Identifier, "signal parameter").text;
+                        sig.params.push_back(check(Tok::Identifier) ? advance().text : first);
+                    } while (accept(Tok::Comma));
+                }
+                expect(Tok::RParen, "')'");
+            }
+            accept(Tok::Semicolon);
+            cls->signals.push_back(std::move(sig));
+        } else if (check(Tok::KwFunc)) {
             cls->functions.push_back(parseFunction(isAbstract));
         } else if (accept(Tok::KwVar)) {
             cls->fields.push_back(parseField(""));

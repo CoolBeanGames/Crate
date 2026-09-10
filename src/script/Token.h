@@ -18,7 +18,7 @@ enum class Tok {
     // keywords
     KwClass, KwFunc, KwVar, KwReturn, KwIf, KwElse, KwSwitch, KwCase, KwDefault,
     KwDo, KwDoAsync, KwTrue, KwFalse, KwNull, KwStatic, KwAbstract, KwThis, KwBase,
-    KwBreak, KwContinue,
+    KwBreak, KwContinue, KwSignal,
     Unknown,
 };
 

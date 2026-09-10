@@ -26,6 +26,7 @@ static const std::unordered_map<std::string, Tok>& keywords() {
         {"false", Tok::KwFalse},   {"null", Tok::KwNull},       {"static", Tok::KwStatic},
         {"abstract", Tok::KwAbstract}, {"this", Tok::KwThis},   {"base", Tok::KwBase},
         {"break", Tok::KwBreak},   {"continue", Tok::KwContinue},
+        {"signal", Tok::KwSignal},
     };
     return k;
 }

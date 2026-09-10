@@ -16,16 +16,21 @@ struct ScriptObject;
 // A dynamically typed cScript value. `var` variables and untyped expressions
 // hold one of these; typed declarations are checked/coerced on assignment.
 struct Value {
-    enum class T { Null, Bool, Int, Float, Char, String, Array, Object, TypeRef, Actor };
+    enum class T {
+        Null, Bool, Int, Float, Char, String, Array, Object, TypeRef, Actor,
+        Signal,   // obj = owner ScriptObject, s = signal name
+        Callable, // obj = bound self (may be null), s = method name
+    };
     T t = T::Null;
 
     bool b = false;
     long long i = 0;
     double f = 0.0;
-    std::string s; // String contents, Char (1 char), or TypeRef name
+    std::string s; // String contents, Char (1 char), TypeRef / Signal / Callable name
 
     std::shared_ptr<std::vector<Value>> arr;
     std::shared_ptr<ScriptObject> obj;
+    std::weak_ptr<ScriptObject> wobj; // Callable's bound self (weak: no ref cycle)
     crate::Actor* actor = nullptr;
 
     static Value Null_() { return {}; }
@@ -48,6 +53,20 @@ struct Value {
         x.obj = std::move(o);
         return x;
     }
+    static Value SignalRef(std::shared_ptr<ScriptObject> owner, std::string name) {
+        Value x;
+        x.t = T::Signal;
+        x.obj = std::move(owner);
+        x.s = std::move(name);
+        return x;
+    }
+    static Value Fn(const std::shared_ptr<ScriptObject>& boundSelf, std::string method) {
+        Value x;
+        x.t = T::Callable;
+        x.wobj = boundSelf;
+        x.s = std::move(method);
+        return x;
+    }
 
     bool truthy() const;
     double num() const;     // numeric coercion (Int/Float/Bool/Char)
@@ -62,6 +81,8 @@ struct ScriptObject {
     const ClassInfo* cls = nullptr;
     std::string builtin;                       // "Vector2" / "Vector3" when cls == null
     std::unordered_map<std::string, Value> fields;
+    // signal name -> connected callables (Value::Callable entries).
+    std::unordered_map<std::string, std::vector<Value>> connections;
     crate::Actor* owner = nullptr;             // owning actor for script components
 
     // do_async suspension: which top-level do_async of which method is paused.
