@@ -38,29 +38,47 @@ public:
     Actor* parent() const { return parent_; }
     const std::vector<std::unique_ptr<Actor>>& children() const { return children_; }
 
-    // Attach an already-owned actor as a child of this one. Returns a raw
-    // pointer for convenient selection/inspection; ownership stays in the tree.
-    Actor* addChild(std::unique_ptr<Actor> child);
+    // Attach an already-owned actor as a child. `index` < 0 appends; otherwise
+    // the child is inserted at that position (clamped). Returns a raw pointer for
+    // convenient selection/inspection; ownership stays in the tree.
+    Actor* addChild(std::unique_ptr<Actor> child, int index = -1);
 
     // Detach a child and return ownership to the caller (nullptr if not found).
     std::unique_ptr<Actor> removeChild(Actor* child);
 
-    // Re-parent this actor under newParent, preserving ownership. Passing the
-    // scene root's null is not allowed here; Scene handles root membership.
+    // Re-parent this actor under newParent, preserving ownership. Scene::reparent
+    // is the higher-level entry point (keeps world transform, handles the root).
     void reparent(Actor* newParent);
+
+    // Position of this actor among its parent's children, or -1 if unparented.
+    int indexInParent() const;
 
     bool isDescendantOf(const Actor* other) const;
 
+    // Deep copy of this actor and its whole subtree. New ids are assigned.
+    std::unique_ptr<Actor> clone() const;
+
+    // --- Flags -------------------------------------------------------------
     void setVisible(bool v) { visible_ = v; }
     bool visible() const { return visible_; }
 
+    // Enabled actors tick (Start/Update); disabled ones are inert but still
+    // shown in the hierarchy. Independent of visibility.
+    void setEnabled(bool v) { enabled_ = v; }
+    bool enabled() const { return enabled_; }
+
 protected:
+    // Create a copy of just this node (own type + own fields, no children,
+    // fresh id). Overridden by every concrete type.
+    virtual Actor* cloneSelf() const { return new Actor(name_); }
+
     uint64_t id_;
     std::string name_;
     Transform transform_;
     Actor* parent_ = nullptr;
     std::vector<std::unique_ptr<Actor>> children_;
     bool visible_ = true;
+    bool enabled_ = true;
 
 private:
     static uint64_t nextId_;

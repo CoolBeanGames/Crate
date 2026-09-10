@@ -1,5 +1,6 @@
 #pragma once
 #include "scene/Scene.h"
+#include <memory>
 #include <string>
 
 namespace crate {
@@ -22,17 +23,32 @@ private:
     void drawHierarchy();
     void drawInspector();
     void drawViewport();
-    void drawBottomPanel();     // Asset Browser / Engine Console / Game Console
+    void drawBottomPanel(); // Asset Browser / Engine Console / Game Console
+
+    // Hierarchy internals.
     void drawHierarchyNode(Actor& actor);
+    void drawReparentDropTarget(Actor& parent, int insertIndex); // thin line between rows
+    bool hierarchyContextMenu(Actor& actor); // returns true if the actor was deleted
+    bool acceptActorDrop(Actor* newParent, int index); // returns true if a drop happened
+
+    // Scene actions (all logged, all undo-friendly in spirit).
+    Actor* spawn(const char* kind, Actor* parent);
+    void copyActor(Actor* a);
+    void cutActor(Actor* a);
+    Actor* pasteInto(Actor* parent);
+    void reparentToNewNode(Actor* a);
 
     void setPlaying(bool playing);
-    void spawn(const char* kind);
 
     Scene scene_;
+    std::unique_ptr<Actor> clipboard_; // deep clone from copy/cut
     bool playing_ = false;
     bool showDemo_ = false;
+    bool firstFrame_ = true;
     std::string assetDir_ = "assets";
-    char renameBuf_[128] = {0};
+
+    // Drag/drop bookkeeping for the hierarchy.
+    uint64_t dragActorId_ = 0; // actor currently being dragged (0 = none)
 };
 
 } // namespace crate

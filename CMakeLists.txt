@@ -25,9 +25,11 @@ target_link_libraries(imgui PUBLIC d3d11 dxgi d3dcompiler)
 
 # --- Crate engine core -----------------------------------------------------
 add_library(crate_core STATIC
+    src/core/Log.cpp
     src/scene/Actor.cpp
     src/scene/Scene.cpp
     src/editor/Console.cpp
+    src/editor/ContextMenu.cpp
     src/editor/Theme.cpp
     src/editor/EditorApp.cpp
 )

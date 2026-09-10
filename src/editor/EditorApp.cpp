@@ -1,6 +1,8 @@
 #include "editor/EditorApp.h"
 #include "editor/Console.h"
+#include "editor/ContextMenu.h"
 #include "editor/Theme.h"
+#include "core/Log.h"
 #include "scene/Actor2D.h"
 #include "scene/Actor3D.h"
 
@@ -13,17 +15,44 @@
 namespace crate {
 namespace fs = std::filesystem;
 
+static const char* kActorPayload = "CRATE_ACTOR";
+
+// Resolve an actor by id anywhere in the tree.
+static Actor* findById(Actor& node, uint64_t id) {
+    if (node.id() == id)
+        return &node;
+    for (const auto& c : node.children())
+        if (Actor* hit = findById(*c, id))
+            return hit;
+    return nullptr;
+}
+
 EditorApp::EditorApp() : scene_(Scene::makeSample()) {
-    Console::get().info(Console::Channel::Engine, "Crate editor started.");
-    Console::get().info(Console::Channel::Engine,
-                        "Loaded sample scene with " + std::to_string(scene_.actorCount()) +
-                            " actors.");
+    CR_LOG("app", "Crate editor started");
+    CR_LOG("scene", "Loaded sample scene with " + std::to_string(scene_.actorCount()) + " actors");
 }
 
 // ---------------------------------------------------------------------------
 // Frame
 // ---------------------------------------------------------------------------
 void EditorApp::onFrame() {
+    if (firstFrame_) {
+        CR_LOG("render", "First frame presented");
+        firstFrame_ = false;
+    }
+
+    // Global editor shortcuts (skipped while typing in a field).
+    if (!ImGui::GetIO().WantTextInput) {
+        if (Actor* s = scene_.selected()) {
+            if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_C)) copyActor(s);
+            if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_X)) cutActor(s);
+            if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_D)) scene_.select(scene_.duplicate(s));
+            if (ImGui::IsKeyPressed(ImGuiKey_Delete)) scene_.remove(s);
+        }
+        if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_V))
+            scene_.select(pasteInto(scene_.selected()));
+    }
+
     ImGuiViewport* vp = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(vp->WorkPos);
     ImGui::SetNextWindowSize(vp->WorkSize);
@@ -85,22 +114,25 @@ void EditorApp::drawMenuBar() {
     if (ImGui::BeginMenu("File")) {
         if (ImGui::MenuItem("New Scene")) {
             scene_ = Scene("Untitled");
-            Console::get().info(Console::Channel::Engine, "New scene created.");
+            CR_LOG("scene", "New scene created");
         }
         if (ImGui::MenuItem("Load Sample Scene")) {
             scene_ = Scene::makeSample();
-            Console::get().info(Console::Channel::Engine, "Reloaded sample scene.");
+            CR_LOG("scene", "Reloaded sample scene");
         }
         ImGui::Separator();
-        if (ImGui::MenuItem("Save", "Ctrl+S")) {
-            Console::get().warn(Console::Channel::Engine,
-                                "Scene serialization arrives with the Data branch.");
-        }
+        if (ImGui::MenuItem("Save", "Ctrl+S"))
+            CR_WARN("scene", "Scene serialization arrives with the Data branch");
         ImGui::EndMenu();
     }
     if (ImGui::BeginMenu("Edit")) {
-        if (ImGui::MenuItem("Delete Selected", "Del", false, scene_.selected() != nullptr))
-            scene_.remove(scene_.selected());
+        Actor* s = scene_.selected();
+        if (ImGui::MenuItem("Cut", "Ctrl+X", false, s)) cutActor(s);
+        if (ImGui::MenuItem("Copy", "Ctrl+C", false, s)) copyActor(s);
+        if (ImGui::MenuItem("Paste", "Ctrl+V", false, clipboard_ != nullptr))
+            scene_.select(pasteInto(s));
+        if (ImGui::MenuItem("Duplicate", "Ctrl+D", false, s)) scene_.select(scene_.duplicate(s));
+        if (ImGui::MenuItem("Delete", "Del", false, s)) scene_.remove(s);
         ImGui::EndMenu();
     }
     if (ImGui::BeginMenu("View")) {
@@ -108,11 +140,12 @@ void EditorApp::drawMenuBar() {
         ImGui::EndMenu();
     }
     if (ImGui::BeginMenu("Object")) {
-        if (ImGui::MenuItem("Create Empty Actor")) spawn("actor");
-        if (ImGui::MenuItem("Create 3D Actor"))    spawn("actor3d");
-        if (ImGui::MenuItem("Create Mesh"))        spawn("mesh");
-        if (ImGui::MenuItem("Create Sprite"))      spawn("sprite");
-        if (ImGui::MenuItem("Create UI Control"))  spawn("ui");
+        Actor* p = scene_.selected();
+        if (ImGui::MenuItem("Create Empty Actor")) scene_.select(spawn("actor", p));
+        if (ImGui::MenuItem("Create 3D Actor"))    scene_.select(spawn("actor3d", p));
+        if (ImGui::MenuItem("Create Mesh"))        scene_.select(spawn("mesh", p));
+        if (ImGui::MenuItem("Create Sprite"))      scene_.select(spawn("sprite", p));
+        if (ImGui::MenuItem("Create UI Control"))  scene_.select(spawn("ui", p));
         ImGui::EndMenu();
     }
     if (ImGui::BeginMenu("Window")) {
@@ -120,12 +153,10 @@ void EditorApp::drawMenuBar() {
         ImGui::EndMenu();
     }
 
-    // Right-aligned settings affordance.
     float w = ImGui::GetContentRegionAvail().x;
     ImGui::SameLine(ImGui::GetCursorPosX() + w - 90.0f);
     if (ImGui::BeginMenu("Settings")) {
-        ImGuiIO& io = ImGui::GetIO();
-        ImGui::Text("Frame: %.1f FPS", io.Framerate);
+        ImGui::Text("Frame: %.1f FPS", ImGui::GetIO().Framerate);
         ImGui::Checkbox("ImGui Demo", &showDemo_);
         ImGui::EndMenu();
     }
@@ -161,10 +192,101 @@ void EditorApp::drawToolbar() {
 }
 
 // ---------------------------------------------------------------------------
-// Left: hierarchy
+// Left: hierarchy (with drag & drop reparenting)
 // ---------------------------------------------------------------------------
+bool EditorApp::acceptActorDrop(Actor* newParent, int index) {
+    bool moved = false;
+    if (const ImGuiPayload* p = ImGui::AcceptDragDropPayload(kActorPayload)) {
+        uint64_t id = *static_cast<const uint64_t*>(p->Data);
+        if (Actor* dragged = findById(scene_.root(), id)) {
+            moved = scene_.reparent(dragged, newParent, index, /*keepWorld=*/true);
+            if (moved)
+                scene_.select(dragged);
+        }
+    }
+    return moved;
+}
+
+// A thin horizontal band on the boundary before a row: dropping here inserts the
+// dragged actor as a sibling at `insertIndex` under `parent`.
+void EditorApp::drawReparentDropTarget(Actor& parent, int insertIndex) {
+    const ImGuiPayload* active = ImGui::GetDragDropPayload();
+    if (!active || !active->IsDataType(kActorPayload))
+        return;
+    ImVec2 p = ImGui::GetCursorScreenPos();
+    float x0 = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMin().x;
+    float x1 = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x;
+    ImRect band(ImVec2(x0, p.y - 3.0f), ImVec2(x1, p.y + 3.0f));
+    ImGuiID tid = ImGui::GetID(&parent) + static_cast<ImGuiID>(insertIndex) + 1u;
+    if (ImGui::BeginDragDropTargetCustom(band, tid)) {
+        ImGui::GetForegroundDrawList()->AddLine(ImVec2(x0, p.y), ImVec2(x1, p.y),
+                                                IM_COL32(0x8B, 0x7C, 0xFF, 0xFF), 2.0f);
+        Actor* np = (&parent == &scene_.root()) ? nullptr : &parent;
+        acceptActorDrop(np, insertIndex);
+        ImGui::EndDragDropTarget();
+    }
+}
+
+// Returns true if `a` was removed from the scene (caller must stop touching it).
+bool EditorApp::hierarchyContextMenu(Actor& a) {
+    // Null id -> the popup binds to the last-submitted item (this row), so each
+    // row gets its own popup instance.
+    static ui::ContextMenu menu(nullptr);
+    if (!menu.beginItemPopup())
+        return false;
+    scene_.select(&a);
+    Actor* rootPtr = &scene_.root();
+    bool cut = false, del = false; // destructive: applied after the menu closes
+
+    menu.label("EDIT");
+    if (menu.item("Cut", "Ctrl+X")) cut = true;
+    if (menu.item("Copy", "Ctrl+C")) copyActor(&a);
+    if (menu.item("Paste", "Ctrl+V", clipboard_ != nullptr)) scene_.select(pasteInto(&a));
+    if (menu.item("Duplicate", "Ctrl+D")) scene_.select(scene_.duplicate(&a));
+    if (menu.item("Delete", "Del")) del = true;
+
+    menu.separator();
+    menu.label("HIERARCHY");
+    if (menu.beginSub("Add New Child")) {
+        if (menu.item("Empty Actor")) scene_.select(spawn("actor", &a));
+        if (menu.item("3D Actor"))    scene_.select(spawn("actor3d", &a));
+        if (menu.item("Mesh"))        scene_.select(spawn("mesh", &a));
+        if (menu.item("Sprite"))      scene_.select(spawn("sprite", &a));
+        if (menu.item("UI Control"))  scene_.select(spawn("ui", &a));
+        menu.endSub();
+    }
+    if (menu.item("Reparent To New Node")) reparentToNewNode(&a);
+    if (menu.item("Unparent To Root", nullptr, a.parent() != rootPtr))
+        scene_.reparent(&a, nullptr, -1, true);
+
+    menu.separator();
+    menu.label("STATE");
+    if (menu.checkable("Visible", a.visible())) {
+        a.setVisible(!a.visible());
+        CR_LOG("scene", (a.visible() ? "Showed '" : "Hid '") + a.name() + "'");
+    }
+    if (menu.checkable("Enabled", a.enabled())) {
+        a.setEnabled(!a.enabled());
+        CR_LOG("scene", (a.enabled() ? "Enabled '" : "Disabled '") + a.name() + "'");
+    }
+    menu.end();
+
+    if (cut) {
+        cutActor(&a);
+        return true;
+    }
+    if (del) {
+        scene_.remove(&a);
+        return true;
+    }
+    return false;
+}
+
 void EditorApp::drawHierarchyNode(Actor& actor) {
     ImGui::PushID(static_cast<int>(actor.id()));
+
+    // "Where it will go" boundary target before this row.
+    drawReparentDropTarget(*actor.parent(), actor.indexInParent());
 
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanFullWidth |
                                ImGuiTreeNodeFlags_DefaultOpen;
@@ -173,36 +295,56 @@ void EditorApp::drawHierarchyNode(Actor& actor) {
     if (scene_.selected() == &actor)
         flags |= ImGuiTreeNodeFlags_Selected;
 
+    const bool isDragSource = dragActorId_ == actor.id();
+    const bool dimmed = isDragSource || !actor.visible() || !actor.enabled();
+    if (dimmed)
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+
     bool open = ImGui::TreeNodeEx(actor.name().c_str(), flags);
+
+    if (dimmed)
+        ImGui::PopStyleColor();
+
     if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
         scene_.select(&actor);
 
-    ImGui::SameLine();
-    ImGui::TextDisabled("%s", actor.typeName());
-
-    if (ImGui::BeginPopupContextItem("actor_ctx")) {
-        scene_.select(&actor);
-        if (ImGui::MenuItem("Add Child Mesh")) {
-            Actor* c = scene_.add(std::make_unique<MeshActor>("Mesh"), &actor);
-            scene_.select(c);
-        }
-        if (ImGui::MenuItem("Delete")) {
-            ImGui::EndPopup();
-            if (open) ImGui::TreePop();
-            ImGui::PopID();
-            scene_.remove(&actor);
-            return;
-        }
-        ImGui::EndPopup();
+    // Drag source: carries the actor id, shows a ghost label ("where it was").
+    if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoHoldToOpenOthers)) {
+        uint64_t id = actor.id();
+        ImGui::SetDragDropPayload(kActorPayload, &id, sizeof(id));
+        dragActorId_ = id;
+        ImGui::Text("Move  %s", actor.name().c_str());
+        ImGui::EndDragDropSource();
     }
 
+    // Drop ON this row: reparent the dragged actor as a child (appended).
+    if (ImGui::BeginDragDropTarget()) {
+        acceptActorDrop(&actor, -1);
+        ImGui::EndDragDropTarget();
+    }
+
+    // Context menu binds to this row (must come before any SameLine item).
+    // If it deletes the actor, unwind the ImGui stack and stop.
+    if (hierarchyContextMenu(actor)) {
+        if (open)
+            ImGui::TreePop();
+        ImGui::PopID();
+        return;
+    }
+
+    // Trailing metadata.
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s%s%s", actor.typeName(), actor.visible() ? "" : "  (hidden)",
+                        actor.enabled() ? "" : "  (disabled)");
+
     if (open) {
-        // Copy child pointers first: deletion during iteration is possible.
         std::vector<Actor*> kids;
         for (const auto& c : actor.children())
             kids.push_back(c.get());
         for (Actor* c : kids)
             drawHierarchyNode(*c);
+        // Boundary target after the last child = append under `actor`.
+        drawReparentDropTarget(actor, static_cast<int>(actor.children().size()));
         ImGui::TreePop();
     }
     ImGui::PopID();
@@ -211,17 +353,25 @@ void EditorApp::drawHierarchyNode(Actor& actor) {
 void EditorApp::drawHierarchy() {
     if (ImGui::Begin("Hierarchy")) {
         if (ImGui::Button("+ Add")) ImGui::OpenPopup("add_actor");
-        if (ImGui::BeginPopup("add_actor")) {
-            if (ImGui::MenuItem("Empty Actor")) spawn("actor");
-            if (ImGui::MenuItem("3D Actor"))    spawn("actor3d");
-            if (ImGui::MenuItem("Mesh"))        spawn("mesh");
-            if (ImGui::MenuItem("Sprite"))      spawn("sprite");
-            if (ImGui::MenuItem("UI Control"))  spawn("ui");
-            ImGui::EndPopup();
+        {
+            static ui::ContextMenu addMenu("add_actor");
+            if (addMenu.beginPopup()) {
+                Actor* p = scene_.selected();
+                if (addMenu.item("Empty Actor")) scene_.select(spawn("actor", p));
+                if (addMenu.item("3D Actor"))    scene_.select(spawn("actor3d", p));
+                if (addMenu.item("Mesh"))        scene_.select(spawn("mesh", p));
+                if (addMenu.item("Sprite"))      scene_.select(spawn("sprite", p));
+                if (addMenu.item("UI Control"))  scene_.select(spawn("ui", p));
+                addMenu.end();
+            }
         }
         ImGui::SameLine();
         ImGui::TextDisabled("%d objects", scene_.actorCount());
         ImGui::Separator();
+
+        // Reset drag tracking each frame; the source sets it again while active.
+        if (!ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+            dragActorId_ = 0;
 
         if (ImGui::BeginChild("tree")) {
             std::vector<Actor*> roots;
@@ -230,9 +380,20 @@ void EditorApp::drawHierarchy() {
             for (Actor* c : roots)
                 drawHierarchyNode(*c);
 
-            if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
-                !ImGui::IsAnyItemHovered())
-                scene_.select(nullptr);
+            // Trailing target under the root (append at end).
+            drawReparentDropTarget(scene_.root(), static_cast<int>(scene_.root().children().size()));
+
+            // Empty space below the tree: drop here to unparent to the root.
+            ImVec2 avail = ImGui::GetContentRegionAvail();
+            if (avail.y > 4.0f) {
+                ImGui::InvisibleButton("##empty_drop", ImVec2(-1, avail.y));
+                if (ImGui::BeginDragDropTarget()) {
+                    acceptActorDrop(nullptr, -1);
+                    ImGui::EndDragDropTarget();
+                }
+                if (ImGui::IsItemClicked())
+                    scene_.select(nullptr);
+            }
         }
         ImGui::EndChild();
     }
@@ -259,9 +420,12 @@ void EditorApp::drawInspector() {
             a->setName(name);
         ImGui::TextDisabled("%s   |   id %llu", a->typeName(),
                             static_cast<unsigned long long>(a->id()));
+
         bool vis = a->visible();
-        if (ImGui::Checkbox("Visible", &vis))
-            a->setVisible(vis);
+        if (ImGui::Checkbox("Visible", &vis)) a->setVisible(vis);
+        ImGui::SameLine();
+        bool en = a->enabled();
+        if (ImGui::Checkbox("Enabled", &en)) a->setEnabled(en);
 
         ImGui::SeparatorText("Transform");
         Transform& t = a->transform();
@@ -295,7 +459,7 @@ void EditorApp::drawInspector() {
 }
 
 // ---------------------------------------------------------------------------
-// Middle: viewport (Scene View / Game View / Scripts)
+// Middle: viewport
 // ---------------------------------------------------------------------------
 void EditorApp::drawViewport() {
     if (ImGui::Begin("Viewport")) {
@@ -306,7 +470,6 @@ void EditorApp::drawViewport() {
                 ImDrawList* dl = ImGui::GetWindowDrawList();
                 dl->AddRectFilled(p0, ImVec2(p0.x + size.x, p0.y + size.y),
                                   IM_COL32(0x0B, 0x0D, 0x12, 0xFF));
-                // Faint grid so the empty viewport still reads as a 3D space.
                 const float step = 32.0f;
                 for (float x = 0; x < size.x; x += step)
                     dl->AddLine(ImVec2(p0.x + x, p0.y), ImVec2(p0.x + x, p0.y + size.y),
@@ -315,7 +478,7 @@ void EditorApp::drawViewport() {
                     dl->AddLine(ImVec2(p0.x, p0.y + y), ImVec2(p0.x + size.x, p0.y + y),
                                 IM_COL32(0x26, 0x2C, 0x38, 0x80));
                 dl->AddText(ImVec2(p0.x + 12, p0.y + 12), IM_COL32(0x8E, 0x93, 0xA3, 0xFF),
-                            "Scene View — renderer lands on the Rendering branch");
+                            "Scene View - renderer lands on the Rendering branch");
                 if (Actor* s = scene_.selected())
                     dl->AddText(ImVec2(p0.x + 12, p0.y + 30), IM_COL32(0x8B, 0x7C, 0xFF, 0xFF),
                                 ("Selected: " + s->name()).c_str());
@@ -365,6 +528,10 @@ static void drawConsoleChannel(Console::Channel ch) {
         for (const auto& e : Console::get().entries()) {
             if (e.channel != ch)
                 continue;
+            ImGui::TextDisabled("%8.3f", e.time);
+            ImGui::SameLine();
+            ImGui::TextColored(ImColor(0x8B, 0x7C, 0xFF).Value, "%-8s", e.category.c_str());
+            ImGui::SameLine();
             ImGui::PushStyleColor(ImGuiCol_Text, levelColor(e.level));
             ImGui::TextUnformatted(e.text.c_str());
             ImGui::PopStyleColor();
@@ -392,8 +559,7 @@ void EditorApp::drawBottomPanel() {
                         (entry.is_directory() ? "[dir] " : "      ") +
                         entry.path().filename().string();
                     if (ImGui::Selectable(label.c_str()))
-                        Console::get().info(Console::Channel::Engine,
-                                            "Asset picked: " + entry.path().string());
+                        CR_LOG("assets", "Asset picked: " + entry.path().string());
                 }
             }
         }
@@ -418,16 +584,15 @@ void EditorApp::setPlaying(bool playing) {
         return;
     playing_ = playing;
     if (playing_) {
-        Console::get().info(Console::Channel::Game, "--- Play started ---");
-        Console::get().info(Console::Channel::Engine, "Entered play mode.");
+        CR_GAME("play", "--- Play started ---");
+        CR_LOG("play", "Entered play mode");
     } else {
-        Console::get().info(Console::Channel::Game, "--- Play stopped ---");
-        Console::get().info(Console::Channel::Engine, "Returned to edit mode.");
+        CR_GAME("play", "--- Play stopped ---");
+        CR_LOG("play", "Returned to edit mode");
     }
 }
 
-void EditorApp::spawn(const char* kind) {
-    Actor* parent = scene_.selected();
+Actor* EditorApp::spawn(const char* kind, Actor* parent) {
     std::unique_ptr<Actor> a;
     std::string k = kind;
     if (k == "actor3d")     a = std::make_unique<Actor3D>("Actor3D");
@@ -438,9 +603,43 @@ void EditorApp::spawn(const char* kind) {
 
     std::string name = a->name();
     Actor* added = scene_.add(std::move(a), parent);
-    scene_.select(added);
-    Console::get().info(Console::Channel::Engine,
-                        "Spawned " + name + (parent ? " under " + parent->name() : ""));
+    CR_LOG("scene", "Spawned " + name + (parent ? " under '" + parent->name() + "'" : ""));
+    return added;
+}
+
+void EditorApp::copyActor(Actor* a) {
+    if (!scene_.contains(a))
+        return;
+    clipboard_ = a->clone();
+    CR_LOG("edit", "Copied '" + a->name() + "'");
+}
+
+void EditorApp::cutActor(Actor* a) {
+    if (!scene_.contains(a))
+        return;
+    clipboard_ = a->clone();
+    CR_LOG("edit", "Cut '" + a->name() + "'");
+    scene_.remove(a);
+}
+
+Actor* EditorApp::pasteInto(Actor* parent) {
+    if (!clipboard_)
+        return scene_.selected();
+    Actor* pasted = scene_.add(clipboard_->clone(), scene_.contains(parent) ? parent : nullptr);
+    CR_LOG("edit", "Pasted '" + pasted->name() + "'");
+    return pasted;
+}
+
+void EditorApp::reparentToNewNode(Actor* a) {
+    if (!scene_.contains(a))
+        return;
+    Actor* parent = a->parent();
+    bool parentIsRoot = parent == &scene_.root();
+    int idx = a->indexInParent();
+    Actor* node = scene_.add(std::make_unique<Actor>("Group"), parentIsRoot ? nullptr : parent, idx);
+    scene_.reparent(a, node, -1, true);
+    scene_.select(node);
+    CR_LOG("scene", "Wrapped '" + a->name() + "' in a new node");
 }
 
 } // namespace crate

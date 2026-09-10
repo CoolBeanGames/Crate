@@ -8,6 +8,7 @@
 
 #include "editor/EditorApp.h"
 #include "editor/Theme.h"
+#include "core/Log.h"
 
 #include "imgui.h"
 #include "backends/imgui_impl_win32.h"
@@ -58,6 +59,8 @@ int main(int, char**) {
     io.IniFilename = "crate_editor.ini";
 
     crate::ApplyZenTheme();
+    crate::log::enableStdoutMirror();
+    CR_LOG("platform", "D3D11 device + swap chain created");
 
     ImGui_ImplWin32_Init(hwnd);
     ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
@@ -106,6 +109,7 @@ int main(int, char**) {
         g_SwapChainOccluded = (hr == DXGI_STATUS_OCCLUDED);
     }
 
+    CR_LOG("platform", "Shutting down");
     ImGui_ImplDX11_Shutdown();
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();

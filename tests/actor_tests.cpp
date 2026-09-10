@@ -6,6 +6,7 @@
 #include "scene/Scene.h"
 
 #include <cassert>
+#include <cmath>
 #include <cstdio>
 
 using namespace crate;
@@ -70,6 +71,46 @@ int main() {
     // Sample scene builds.
     Scene sample = Scene::makeSample();
     CHECK(sample.actorCount() > 4);
+
+    // --- reparent keeps world transform -----------------------------------
+    Scene r("r");
+    auto* p1 = r.add(std::make_unique<Actor3D>("p1"));
+    p1->transform().position = {5.0f, 0.0f, 0.0f};
+    auto* p2 = r.add(std::make_unique<Actor3D>("p2"));
+    p2->transform().position = {0.0f, 8.0f, 0.0f};
+    auto* leaf = r.add(std::make_unique<Actor3D>("leaf"), p1);
+    leaf->transform().position = {1.0f, 0.0f, 0.0f};
+    Transform before = leaf->worldTransform();
+    CHECK(r.reparent(leaf, p2, -1, true));
+    CHECK(leaf->parent() == p2);
+    Transform after = leaf->worldTransform();
+    CHECK(std::abs(after.position.x - before.position.x) < 0.001f);
+    CHECK(std::abs(after.position.y - before.position.y) < 0.001f);
+
+    // Reparent rejects cycles.
+    CHECK(!r.reparent(p2, leaf, -1, true));
+
+    // Unparent to root.
+    CHECK(r.reparent(leaf, nullptr, -1, true));
+    CHECK(leaf->parent() == &r.root());
+
+    // --- duplicate makes a deep, independent copy -------------------------
+    Scene d("d");
+    auto* orig = d.add(std::make_unique<MeshActor>("orig"));
+    static_cast<MeshActor*>(orig)->primitive = "Sphere";
+    d.add(std::make_unique<Actor3D>("origChild"), orig);
+    int countBefore = d.actorCount();
+    Actor* dup = d.duplicate(orig);
+    CHECK(dup != nullptr);
+    CHECK(d.actorCount() == countBefore * 2);
+    CHECK(dup->children().size() == 1);
+    CHECK(static_cast<MeshActor*>(dup)->primitive == "Sphere");
+    CHECK(dup->id() != orig->id());
+
+    // --- enabled flag is independent of visible --------------------------
+    orig->setEnabled(false);
+    CHECK(!orig->enabled());
+    CHECK(orig->visible());
 
     std::printf("ok  %d checks passed\n", g_checks);
     return 0;

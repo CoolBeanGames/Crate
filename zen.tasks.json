@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "projectId": "8afe2a0217d7419db234ceda7ecb9dff",
   "name": "Crate",
-  "nextCardIndex": 4,
+  "nextCardIndex": 26,
   "tagCatalog": [
     {
       "name": "bug",
@@ -27,6 +27,74 @@
     {
       "name": "Data",
       "color": "#8A4F78"
+    },
+    {
+      "name": "scene tree",
+      "color": "#3F6F77"
+    },
+    {
+      "name": "menus",
+      "color": "#3F6F77"
+    },
+    {
+      "name": "rendering",
+      "color": "#815B32"
+    },
+    {
+      "name": "3D",
+      "color": "#6557B8"
+    },
+    {
+      "name": "viewport",
+      "color": "#8C553E"
+    },
+    {
+      "name": "import",
+      "color": "#8A4F78"
+    },
+    {
+      "name": "assets",
+      "color": "#2F7A68"
+    },
+    {
+      "name": "files",
+      "color": "#2F7A68"
+    },
+    {
+      "name": "materials",
+      "color": "#6557B8"
+    },
+    {
+      "name": "textures",
+      "color": "#8C553E"
+    },
+    {
+      "name": "images",
+      "color": "#6557B8"
+    },
+    {
+      "name": "merge",
+      "color": "#3F6F77"
+    },
+    {
+      "name": "components",
+      "color": "#2F7A68"
+    },
+    {
+      "name": "types",
+      "color": "#704F9B"
+    },
+    {
+      "name": "script editor",
+      "color": "#6557B8"
+    },
+    {
+      "name": "windows",
+      "color": "#704F9B"
+    },
+    {
+      "name": "cScript",
+      "color": "#386D9A"
     }
   ],
   "branches": [
@@ -59,10 +127,840 @@
           },
           "isDone": false,
           "isLocked": false,
-          "isCollapsed": false,
+          "isCollapsed": true,
           "createdAt": "2026-09-10T00:36:52.7890665+00:00",
-          "updatedAt": "2026-09-10T00:46:15.5942426+00:00"
+          "updatedAt": "2026-09-10T01:10:44.1560669+00:00"
         },
+        {
+          "id": "d063b2a4610c4432a04c05845bbd146a",
+          "index": 6,
+          "kind": "note",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Ensure we are adding system log",
+          "task": "As we built the engine make sure we are building out the basics of the system log, and logging what the engine is doing",
+          "tags": [],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:03:31.0947377+00:00",
+          "updatedAt": "2026-09-10T01:10:43.3135053+00:00"
+        },
+        {
+          "id": "e130e7ca7bc34fe5a7f296b11247e8d0",
+          "index": 7,
+          "kind": "note",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Component system",
+          "task": "Actors will consist of components which will be built out in other branches and merged to main. Components are the building blocks of everything. \r\n\r\nMesh renderers are a component\r\nSprites are a component\r\ntextboxes are a component\r\nRigidbodies and colliders are components\r\n\r\nEach of these can be added to obejcts and add the actual functionality.",
+          "tags": [],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:04:06.9034488+00:00",
+          "updatedAt": "2026-09-10T01:10:42.5622894+00:00"
+        }
+      ]
+    },
+    {
+      "id": "14dbcb46c5b14e9e93f502f4c7f020dc",
+      "name": "Rendering",
+      "branch": "rendering",
+      "isArchive": false,
+      "isCollapsed": false,
+      "isSystem": false,
+      "isLocked": false,
+      "tasks": [
+        {
+          "id": "d472e739de014d12b87cf4356553a1c0",
+          "index": 8,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Basic 3D rendering",
+          "task": "lets start with a basic 3D rendering framework. for now put this in the viewport but we will add more stuff later and flesh it out. Use whichever framework would be MOST performant\r\n-D3D\r\n-OpenGL\r\nor\r\n-Vulkan",
+          "tags": [
+            "rendering",
+            "3D",
+            "viewport"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "8da65a3684494d369a9650cbbadb8524",
+              "text": "rendering a vertex lit cube",
+              "isDone": false
+            },
+            {
+              "id": "33ba7e59c94049529a4969ec0a0c6fbb",
+              "text": "cube rotates around",
+              "isDone": false
+            },
+            {
+              "id": "eebbcfb6ceaa457da8cfb34b3f04a94e",
+              "text": "can apply textures to the cube",
+              "isDone": false
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:05:27.8469932+00:00",
+          "updatedAt": "2026-09-10T01:24:18.2234688+00:00"
+        },
+        {
+          "id": "dc243aec831c4dceb6e6526bc7e1b4a3",
+          "index": 9,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Importing FBX",
+          "task": "add the ability to drag an FBX into the scene view to import it as an asset",
+          "tags": [
+            "import",
+            "assets",
+            "3D",
+            "files"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "8123bb3cb8e44465b5080516e0584ec6",
+              "text": "can drag and drop files from explorer",
+              "isDone": false
+            },
+            {
+              "id": "1674c506a8454198bdf312ef7e0aa406",
+              "text": "can import FBX",
+              "isDone": false
+            },
+            {
+              "id": "7b7930e85b2b46f29bce97df1c7d4bd7",
+              "text": "also Imports Materials",
+              "isDone": false
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:05:33.2822087+00:00",
+          "updatedAt": "2026-09-10T01:24:17.0805524+00:00"
+        },
+        {
+          "id": "0b82c25955b64b6a86f30ed667cb9097",
+          "index": 12,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Importing Images",
+          "task": "add support for importing images to be used as textures by dragging them into the asset window OR right clicking and selecting import inside the asset window",
+          "tags": [
+            "files",
+            "assets",
+            "textures",
+            "images"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "ae82532e064346d0a9cc8bfa62cc9534",
+              "text": "jpeg",
+              "isDone": false
+            },
+            {
+              "id": "bc7262872e514129bb74a6a002f6a7b5",
+              "text": "png",
+              "isDone": false
+            },
+            {
+              "id": "e69ee8a09d5f472dabb5ceeb1c0496e3",
+              "text": "bmp",
+              "isDone": false
+            },
+            {
+              "id": "9bea2664106e4bb69221e320dcdceb90",
+              "text": "tiff",
+              "isDone": false
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:15:44.1816267+00:00",
+          "updatedAt": "2026-09-10T01:24:19.44349+00:00"
+        },
+        {
+          "id": "3a566e8ff4b3446db82d469ed488c4cf",
+          "index": 15,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Component framework",
+          "task": "this is the basis for much of the engine, we can add \u0022components\u0022 to actors, such as adding a mesh renderer.",
+          "tags": [
+            "components",
+            "types",
+            "Actors"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "7e001d4c46ca48ee9eb26bb52c32cf67",
+              "text": "add component button to inspector for actors",
+              "isDone": false
+            },
+            {
+              "id": "b10a665ab13442e2ae19c2990b55c837",
+              "text": "right click blank space in actors inspector for add component",
+              "isDone": false
+            },
+            {
+              "id": "4a5e08878b774972b4143340ac4ffe90",
+              "text": "can delete componetns from an actor",
+              "isDone": false
+            },
+            {
+              "id": "b78e5d55bdc049d8ac48dcc1d53f614d",
+              "text": "can collapse components in the inspector",
+              "isDone": false
+            },
+            {
+              "id": "fbf2e07eccc04802a35410ee37b713f4",
+              "text": "components have Start,Update,PhysicsUpdate methods Update and PhysicsUpdate Take (float delta) as a parameter for the time since the last time it was called",
+              "isDone": false
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:18:44.3429429+00:00",
+          "updatedAt": "2026-09-10T01:24:20.6119766+00:00"
+        },
+        {
+          "id": "e5afa18e3daf4a55b91657d1844c3bd2",
+          "index": 14,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Mesh renderer",
+          "task": "the mesh renderer is the first \u0022component\u0022 and will use the framework we built above, a mesh renderer renders a mesh at the position from the actor its attached tos transform\r\n\r\na mesh renderer will accept one of a few model types (for now just fbx but we will add more) or render a primitive (sphere, cylinder, cube, capsule, plane, quad to start)",
+          "tags": [
+            "rendering",
+            "components",
+            "Actors"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "038b4a6487bd48adadef0b1fbfe1ca65",
+              "text": "can add mesh renderer",
+              "isDone": false
+            },
+            {
+              "id": "62f5d9277504441c81c32af558de2c3b",
+              "text": "can render cubes",
+              "isDone": false
+            },
+            {
+              "id": "c6bc0cd600124961a97509dedbb26972",
+              "text": "can render spheres",
+              "isDone": false
+            },
+            {
+              "id": "9823e560cec34c6d989983cfeef04464",
+              "text": "can render quads",
+              "isDone": false
+            },
+            {
+              "id": "1fa69d73cd6f4e48923b8a4a1a947708",
+              "text": "can render planes",
+              "isDone": false
+            },
+            {
+              "id": "f1ded36b329543558967b018c6131b0b",
+              "text": "can render capsules",
+              "isDone": false
+            },
+            {
+              "id": "5379fc3f54a041d3b8fc6bf94fa2eb35",
+              "text": "can render cylinders",
+              "isDone": false
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:18:37.2355825+00:00",
+          "updatedAt": "2026-09-10T01:24:21.7215242+00:00"
+        },
+        {
+          "id": "fe4f8bd7950945f0b47da4c90c806da8",
+          "index": 10,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "basic Materials",
+          "task": "lets support creating (and importing) materials",
+          "tags": [
+            "materials",
+            "rendering",
+            "assets"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "5fe009c24d8c4e00a0cede1032e816cf",
+              "text": "importing a FBX should create any materials it uses and apply its textures if any are present",
+              "isDone": false
+            },
+            {
+              "id": "7cfef429c6e241419a64e85c10b90541",
+              "text": "can create materials via asset window",
+              "isDone": false
+            },
+            {
+              "id": "43975aeccf434000927a6448b2553315",
+              "text": "can set material properties via inspector if one is selected",
+              "isDone": false
+            },
+            {
+              "id": "03cf926d34ac4869b00fe4b4bf4c3829",
+              "text": "materials can be applied to any mesh renderer",
+              "isDone": false
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:05:39.9304386+00:00",
+          "updatedAt": "2026-09-10T01:18:16.7708473+00:00"
+        },
+        {
+          "id": "a3fd796553ba47b8bf19fd7ae12e608e",
+          "index": 13,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "merge",
+          "task": "merge into main but DONT close the branch. Once the Merge is complete move on to the scipting branch",
+          "tags": [
+            "merge"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "d4caecccb7774f9da89ee2ec5ceb597b",
+              "text": "merged",
+              "isDone": false
+            },
+            {
+              "id": "14161c226dcd4d11aabfcc0b03ac22f8",
+              "text": "created scripting branch",
+              "isDone": false
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": true
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:17:34.877755+00:00",
+          "updatedAt": "2026-09-10T01:24:24.3016364+00:00"
+        }
+      ]
+    },
+    {
+      "id": "9463e19afcbe4cd18681afff19b840a9",
+      "name": "Scripting",
+      "branch": "scripting",
+      "isArchive": false,
+      "isCollapsed": false,
+      "isSystem": false,
+      "isLocked": false,
+      "tasks": [
+        {
+          "id": "f86523a60f7e49db803c8d21d1381845",
+          "index": 16,
+          "kind": "note",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "We are going to create a custom scripting engine",
+          "task": "the code at compile time will compile down to native c\u002B\u002B, although in the editor just interprit the script literally to speed processing up. We will have an in engine script editor. Scripting will be a blend of C# and GDscript",
+          "tags": [],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T01:24:42.3980421+00:00",
+          "updatedAt": "2026-09-10T01:26:17.0976737+00:00"
+        },
+        {
+          "id": "6609d0f151d540b18a5c0be924409863",
+          "index": 17,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Basic scripting",
+          "task": "We need to maintain a \u0022dictionary\u0022 of types for various systems to look up. it should provide data on type names, child methods, parameters, etc for auto complete. \r\n\r\nCreating a script adds a new type and component to the system. All scripts will inherit from Actor but can be edited to inherit from Actor2D or Actor3D or anything else that already inherits from Actor (including custom scripts). Doing this comes with text completion.\r\n\r\nattached is a sample cScript of what it should look like.",
+          "tags": [
+            "Scripting"
+          ],
+          "files": [
+            {
+              "id": "26733f5a91f0463a9f5ed5a235d53dbf",
+              "name": "sample_script.cscript",
+              "relativePath": "files/sample_script.cscript",
+              "size": 378
+            }
+          ],
+          "requirements": [
+            {
+              "id": "8a4b7d74cc254914a69161ebb867d08c",
+              "text": "basic script format .cscript (crate script)",
+              "isDone": false
+            },
+            {
+              "id": "1a0ef6fa1a814b44860c5bfbf0cd0948",
+              "text": "all scripts have Start Update and Physics Update Functions",
+              "isDone": false
+            },
+            {
+              "id": "36160867ac1045b185550d8b44e25af7",
+              "text": "code blocks use curley brackets {}",
+              "isDone": false
+            },
+            {
+              "id": "4bc41f563da54a449c8db49b212b0bfa",
+              "text": "each bracket increases indentation automatically",
+              "isDone": false
+            },
+            {
+              "id": "61d23bdb4c8446d5aed3e2590ec2aefc",
+              "text": "var untyped to be interpreited at runtime",
+              "isDone": false
+            },
+            {
+              "id": "23acf86232e04ee48117c72778b51422",
+              "text": "things can also be implicity typed",
+              "isDone": false
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:25:29.3205373+00:00",
+          "updatedAt": "2026-09-10T01:34:26.3891213+00:00"
+        },
+        {
+          "id": "6cca33174cbd4050b7cb25aeb49b59cf",
+          "index": 23,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Script editor",
+          "task": "at the top in the main window is a button to switch to script editor mode, The script editor has a list of all scripts on the left, clicking one opens that script. Below that is a list of all functions in the script.\r\n\r\nthe rest of the window is the script itself, the requirements for that are listed below.",
+          "tags": [
+            "scripting",
+            "script editor",
+            "windows",
+            "ui"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "112ddf8184604f0d89925703b8a85ddc",
+              "text": "lined interface",
+              "isDone": false
+            },
+            {
+              "id": "b452ff95aac245c286b48111a3379d6c",
+              "text": "auto complete for known types,variables,functions,classes",
+              "isDone": false
+            },
+            {
+              "id": "d4bc460c95864887be5fc7c803f002f5",
+              "text": "color hilight for keywords or types (also strings and numbers)",
+              "isDone": false
+            },
+            {
+              "id": "a085e834e0854e31bf50c249a9d327c4",
+              "text": "auto save on play, save button, ctrl \u002B s support",
+              "isDone": false
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:29:31.2023123+00:00",
+          "updatedAt": "2026-09-10T01:31:30.1481081+00:00"
+        },
+        {
+          "id": "7e2c34d418d045babea4c82560238226",
+          "index": 18,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "variables",
+          "task": "here we will setup base system types used for all or most components, as well as some of the data they will use.\r\n\r\nnote, the syntax for a base class is uppercase first letter. \u0027ie Actor\u0022 returns the global type actor, its what you should set your variable as to use a Actor reference. Lowercase is for instance \u0027ie actor\u0022 which returns the actor. for instance.\r\n\r\nActor a = this.actor; would return the actor base of the type.\r\n\r\nif the object has a component that inherits from actor you can get it with this.get_component(type_of(Actor)); which returns the actor (or whatever type you give it). Or\r\nActor a = this.actor;\r\nActor b = a.get_component(type_of(Actor));\r\n\r\nin that case get_component is a function of Actor, which a is an instance of. type_of is a global function which is used to pass a type.\r\n\r\nArrays can take any type even in the same array, and can be accessed via array_name[index] which returns it.",
+          "tags": [
+            "scripting",
+            "cScript",
+            "types",
+            "data"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "bacf6fd604a4406cacdb8d685b615cf2",
+              "text": "implimented int",
+              "isDone": false
+            },
+            {
+              "id": "50c8c39ed4194ebf8d93d588fa4de019",
+              "text": "implimented float",
+              "isDone": false
+            },
+            {
+              "id": "503227ae2afb4dbf8079db5fe2eb7ebc",
+              "text": "implimented string",
+              "isDone": false
+            },
+            {
+              "id": "a85fea407bd8464ea49f70195a6ffb49",
+              "text": "implimented char",
+              "isDone": false
+            },
+            {
+              "id": "ab9fec779fff417d816ca9a87b19a084",
+              "text": "implimented array",
+              "isDone": false
+            },
+            {
+              "id": "327a77d2404845469a504f8eb85a5d1c",
+              "text": "implemented Vector3",
+              "isDone": false
+            },
+            {
+              "id": "7081a7ebd7b3425982e95cdd572e7da3",
+              "text": "implimented  Vector2 (a vector 3 with z disabled)",
+              "isDone": false
+            },
+            {
+              "id": "db868c6c9a6b4cf49c5028849bb1df4c",
+              "text": "implimented Actor",
+              "isDone": false
+            },
+            {
+              "id": "4eeb6f27867d40a0ab09e2c58fc20fce",
+              "text": "implimented Actor2D (just the type, we are actually hooking this one up yet)",
+              "isDone": false
+            },
+            {
+              "id": "2a2a8e7cc7134cb1828d4c67d324f815",
+              "text": "implimented Actor3D",
+              "isDone": false
+            },
+            {
+              "id": "132bfe2a473b4fd48867bb51862b88a3",
+              "text": "implimented bool",
+              "isDone": false
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:25:33.5372597+00:00",
+          "updatedAt": "2026-09-10T01:41:33.8791279+00:00"
+        },
+        {
+          "id": "7ffe86adde734e868accb2ed9e22255b",
+          "index": 19,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "functions",
+          "task": "functions can be created freely with the func keyword a name and any  number of parameters. This then registeres that function for autocomplete, even in other scripts that reference the type the funciton is used in.\r\n\r\nsyntax is\r\nfunc func_name(parameter_type param) : return_type\r\n{\r\n   code;\r\n}\r\n\r\nif no return type is specified you can still return whatever you want it just isnt required.\r\n\r\nfunctions can be abstract and if they are they MUST be overriden in any inherited classes and cannot be called until they are,\r\n\r\noveridden functions are called like this.\r\nthis.base.function_name();\r\n\r\nyou override a function by simply creating one with the same name but without the abstract keyword.",
+          "tags": [
+            "Scripting"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:25:37.3311946+00:00",
+          "updatedAt": "2026-09-10T01:47:15.4925337+00:00"
+        },
+        {
+          "id": "f9f10b41387c43bd8e52cab7a4c997fd",
+          "index": 20,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "classes",
+          "task": "classes are the types that actually get implemented and added to auto complete. classes can inherit from other classes or be inherited from. they can also be set to static (meaning instances CANNOT be made of them, they can be called from anywhere, and the update,start always run even if not instanced on any actors. Also they CANNOT be instanced on an actor and only 1 instance runs ever)\r\n\r\nthey can also be abstract which means they cannot be instanced and MUST be overriden. Each class must have a unique name that doesnt start with a number but does start with an Uppercase letter.",
+          "tags": [
+            "Scripting"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "3e67fa7bfe7f4a62b2416343f3bc0cf4",
+              "text": "classes implimented",
+              "isDone": false
+            },
+            {
+              "id": "8780b8062a814679835686bd449ed671",
+              "text": "statics implimented",
+              "isDone": false
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:25:43.3710568+00:00",
+          "updatedAt": "2026-09-10T01:45:43.8566601+00:00"
+        },
+        {
+          "id": "dabb8759e31c43248f9875d2de933606",
+          "index": 22,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "expressions",
+          "task": "expressions are ways to compare values, or change them\r\n1 \u002B 2 is an expression that returns 3\r\nx \u002B y returns the sum of 2 variables\r\n1 == 1 returns true\r\n1 != 1 returns false\r\n1 == 2 returns false\r\n\r\n\u0022text\u0022 \u002B \u0022text\u0022 returns \u0027texttext\u0027\r\n\r\nall types (except string and char) should have .str() functions that return it as a string\r\n\r\n\u0022text\u0022 \u002B 1.str() would then return \u0022text1\u0022",
+          "tags": [
+            "task"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:25:59.1808498+00:00",
+          "updatedAt": "2026-09-10T01:50:11.5572448+00:00"
+        },
+        {
+          "id": "7f1c731ee84e4417a3f43069df7c2cbe",
+          "index": 24,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "processing",
+          "task": "add loops and control structures",
+          "tags": [
+            "task"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "c23de4095555478490a5cac7bcf9de83",
+              "text": "do(while) {} : for as long is while is true loop through the brackets",
+              "isDone": false
+            },
+            {
+              "id": "d924cd44277a47c394ed2d49472cccc9",
+              "text": "do_async(while) {} : similar to do except only process 1 cycle per frame",
+              "isDone": false
+            },
+            {
+              "id": "082804971edf43219d434f21e7b980e5",
+              "text": "if(exp) {} if expression is true process the brackets otherwise skip",
+              "isDone": false
+            },
+            {
+              "id": "f442b8ec060446cab02c454974a61b4b",
+              "text": "if(exp) {} else {} if expressions is false, skip the first bracket and do the second",
+              "isDone": false
+            },
+            {
+              "id": "8850fad1dba4411c8c5f5f5e8e9cfca4",
+              "text": "switch(value) case 1: {} - if value is 1, process case 1 brackets, otherwise check other cases or default if none are true",
+              "isDone": false
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:50:16.9498468+00:00",
+          "updatedAt": "2026-09-10T01:53:09.8102835+00:00"
+        },
+        {
+          "id": "43edb2e6d1ea421cacb9983ea2eb1214",
+          "index": 25,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "merge",
+          "task": "merge this into main, but dont close this branc. once done stop processing.",
+          "tags": [
+            "merge"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "4286fe75bcd54dac888b68c1ba2b30be",
+              "text": "merge and stop processing",
+              "isDone": false
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": true
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:50:21.8523643+00:00",
+          "updatedAt": "2026-09-10T01:53:10.826985+00:00"
+        }
+      ]
+    },
+    {
+      "id": "2b668c739ffe45aaa32fa229a7aff5ed",
+      "name": "Assets",
+      "branch": "assets",
+      "isArchive": false,
+      "isCollapsed": false,
+      "isSystem": false,
+      "isLocked": false,
+      "tasks": []
+    },
+    {
+      "id": "archive",
+      "name": "Archived",
+      "branch": null,
+      "isArchive": true,
+      "isCollapsed": false,
+      "isSystem": true,
+      "isLocked": false,
+      "tasks": [
         {
           "id": "c9d4482b33c94eeda497726091ff6dbf",
           "index": 2,
@@ -120,7 +1018,7 @@
           "isLocked": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T00:37:04.4617862+00:00",
-          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
+          "updatedAt": "2026-09-09T00:00:00+00:00"
         },
         {
           "id": "7a39a4295dcf4fc09ae2939996fa9b6f",
@@ -164,49 +1062,167 @@
           "isLocked": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T00:37:17.0769602+00:00",
-          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
+          "updatedAt": "2026-09-09T00:00:00+00:00"
+        },
+        {
+          "id": "ea44d314c8114b14b578289dfe842389",
+          "index": 4,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Add drag and drop to reparent",
+          "task": "In the scene tree, actors should be able to be dragged onto another actor (with visual indicators) to reparent them to that actor",
+          "tags": [
+            "scene tree",
+            "ui"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "de1411007dcb435e8556d65e71d426fc",
+              "text": "visual indicator of where the actor originally was",
+              "isDone": true
+            },
+            {
+              "id": "c018d1aab3af4f9ea278ab155853600d",
+              "text": "indicator of where it will be",
+              "isDone": true
+            },
+            {
+              "id": "c34203078061494dbf833b2bd71d2df5",
+              "text": "ability to drag them BETWEEN other actors if dropped between them or reparented if dropped ON them",
+              "isDone": true
+            },
+            {
+              "id": "c951f66364d54940a2bb18c764ca3251",
+              "text": "ability to unparent by dragging into empty space",
+              "isDone": true
+            },
+            {
+              "id": "6c10daa3fac3408c8aad38ddec848976",
+              "text": "transform adjusts to relect new local transforms relative to parent (or root if no parent)",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:01:20.8620906+00:00",
+          "updatedAt": "2026-09-09T00:00:00+00:00"
+        },
+        {
+          "id": "d614f121491c48f6bd6383b4e24abbda",
+          "index": 5,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "right click menu framework",
+          "task": "add a basic rightclick framework in the same UI style as the main app which will be used for other systems",
+          "tags": [
+            "ui"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:01:31.8569817+00:00",
+          "updatedAt": "2026-09-09T00:00:00+00:00"
+        },
+        {
+          "id": "dc29725d940a4f0184097dd1041a5447",
+          "index": 11,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "right click scene tree",
+          "task": "add options when you right click an actor in the scene tree, actions detailed below actually hook them up dont just have them be placeholders",
+          "tags": [
+            "ui",
+            "menus",
+            "scene tree"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "460d45918f9e42649d628072841659fd",
+              "text": "cut",
+              "isDone": true
+            },
+            {
+              "id": "03e5bafbaf414419a2638a29da7ea865",
+              "text": "pase",
+              "isDone": true
+            },
+            {
+              "id": "cbbe7ada6d85404ca44660171ff50a95",
+              "text": "copy",
+              "isDone": true
+            },
+            {
+              "id": "72617e9ab42e4df3a137bb496f701aab",
+              "text": "delete",
+              "isDone": true
+            },
+            {
+              "id": "af6a0ed528854cd398ca1908cd7fc7ec",
+              "text": "add-new-child",
+              "isDone": true
+            },
+            {
+              "id": "50e9a167b8e14088aad5f6fbc0a6c16a",
+              "text": "reparent-to-new-node",
+              "isDone": true
+            },
+            {
+              "id": "089e82a3e9ee4646a3082bf7c1d2eb54",
+              "text": "duplicate",
+              "isDone": true
+            },
+            {
+              "id": "d8f61c06a39c4989b3c910e1ba492f20",
+              "text": "hide/show",
+              "isDone": true
+            },
+            {
+              "id": "320b0cd008e54f0c92c97521a2ef2da5",
+              "text": "enable/disable",
+              "isDone": true
+            },
+            {
+              "id": "4347015094774387a7817f27918bce03",
+              "text": "once done, move to the rendering branch",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T01:10:56.4220575+00:00",
+          "updatedAt": "2026-09-09T00:00:00+00:00"
         }
       ]
-    },
-    {
-      "id": "14dbcb46c5b14e9e93f502f4c7f020dc",
-      "name": "Rendering",
-      "branch": "rendering",
-      "isArchive": false,
-      "isCollapsed": false,
-      "isSystem": false,
-      "isLocked": false,
-      "tasks": []
-    },
-    {
-      "id": "9463e19afcbe4cd18681afff19b840a9",
-      "name": "Scripting",
-      "branch": "scripting",
-      "isArchive": false,
-      "isCollapsed": false,
-      "isSystem": false,
-      "isLocked": false,
-      "tasks": []
-    },
-    {
-      "id": "2b668c739ffe45aaa32fa229a7aff5ed",
-      "name": "Assets",
-      "branch": "assets",
-      "isArchive": false,
-      "isCollapsed": false,
-      "isSystem": false,
-      "isLocked": false,
-      "tasks": []
-    },
-    {
-      "id": "archive",
-      "name": "Archived",
-      "branch": null,
-      "isArchive": true,
-      "isCollapsed": false,
-      "isSystem": true,
-      "isLocked": false,
-      "tasks": []
     }
   ]
 }

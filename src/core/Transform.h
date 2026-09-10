@@ -22,6 +22,22 @@ struct Transform {
         out.scale = parentWorld.scale * scale;
         return out;
     }
+
+    // Inverse of composedWith: given a parent's world transform and a desired
+    // world transform, return the local transform that produces it. Used when
+    // reparenting so an actor keeps its place in the world.
+    static Transform localUnder(const Transform& parentWorld, const Transform& desiredWorld) {
+        auto safe = [](float v) { return v == 0.0f ? 1.0f : v; };
+        Transform out;
+        out.position = {(desiredWorld.position.x - parentWorld.position.x) / safe(parentWorld.scale.x),
+                        (desiredWorld.position.y - parentWorld.position.y) / safe(parentWorld.scale.y),
+                        (desiredWorld.position.z - parentWorld.position.z) / safe(parentWorld.scale.z)};
+        out.rotationEuler = desiredWorld.rotationEuler - parentWorld.rotationEuler;
+        out.scale = {desiredWorld.scale.x / safe(parentWorld.scale.x),
+                     desiredWorld.scale.y / safe(parentWorld.scale.y),
+                     desiredWorld.scale.z / safe(parentWorld.scale.z)};
+        return out;
+    }
 };
 
 } // namespace crate
