@@ -16,6 +16,16 @@ Value makeVector(const std::string& kind, double x, double y, double z) {
     return Value::Obj(o);
 }
 
+// True for a Vector2 / Vector3 aggregate value.
+static bool isVec(const Value& v) {
+    return v.t == Value::T::Object && v.obj &&
+           (v.obj->builtin == "Vector2" || v.obj->builtin == "Vector3");
+}
+static double vfield(const Value& v, const char* f) {
+    auto it = v.obj->fields.find(f);
+    return it == v.obj->fields.end() ? 0.0 : it->second.num();
+}
+
 Interpreter::Interpreter(ScriptContext* ctx, std::shared_ptr<ScriptObject> self)
     : ctx_(ctx), self_(std::move(self)) {
     dispatchClass_ = self_ ? self_->cls : nullptr;
@@ -302,6 +312,8 @@ Value Interpreter::eval(const Expr& e) {
         case ExprKind::Binary: return evalBinary(e);
         case ExprKind::Assign: {
             Value v = eval(*e.b);
+            if (e.op != Tok::Unknown) // compound: a op= b  ->  a = a op b
+                v = arith(e.op, eval(*e.a), v, e.line);
             assign(*e.a, v);
             return v;
         }
@@ -347,27 +359,56 @@ Value Interpreter::evalBinary(const Expr& e) {
         default: break;
     }
 
-    if (e.op == Tok::Plus && (a.t == Value::T::String || b.t == Value::T::String ||
-                              a.t == Value::T::Char || b.t == Value::T::Char))
+    return arith(e.op, a, b, e.line);
+}
+
+Value Interpreter::arith(Tok op, const Value& a, const Value& b, int line) {
+    if (op == Tok::Plus && (a.t == Value::T::String || b.t == Value::T::String ||
+                            a.t == Value::T::Char || b.t == Value::T::Char))
         return Value::Str(a.str() + b.str());
+
+    // Vector math: vector op vector is component-wise; vector op scalar (and
+    // scalar op vector) broadcasts the scalar to every component.
+    if (isVec(a) || isVec(b)) {
+        const std::string kind = ((isVec(a) && a.obj->builtin == "Vector3") ||
+                                  (isVec(b) && b.obj->builtin == "Vector3"))
+                                     ? "Vector3"
+                                     : "Vector2";
+        double ax, ay, az, bx, by, bz;
+        if (isVec(a)) { ax = vfield(a, "x"); ay = vfield(a, "y"); az = vfield(a, "z"); }
+        else          { ax = ay = az = a.num(); }
+        if (isVec(b)) { bx = vfield(b, "x"); by = vfield(b, "y"); bz = vfield(b, "z"); }
+        else          { bx = by = bz = b.num(); }
+        switch (op) {
+            case Tok::Plus:  return makeVector(kind, ax + bx, ay + by, az + bz);
+            case Tok::Minus: return makeVector(kind, ax - bx, ay - by, az - bz);
+            case Tok::Star:  return makeVector(kind, ax * bx, ay * by, az * bz);
+            case Tok::Slash:
+                if (bx == 0.0 || by == 0.0 || (kind == "Vector3" && bz == 0.0))
+                    throw RuntimeError("division by zero", line);
+                return makeVector(kind, ax / bx, ay / by, az / bz);
+            default:
+                throw RuntimeError("operator not defined for vectors", line);
+        }
+    }
 
     bool bothInt = a.t == Value::T::Int && b.t == Value::T::Int;
     double x = a.num(), y = b.num();
-    switch (e.op) {
+    switch (op) {
         case Tok::Plus: return bothInt ? Value::Int(a.i + b.i) : Value::Float(x + y);
         case Tok::Minus: return bothInt ? Value::Int(a.i - b.i) : Value::Float(x - y);
         case Tok::Star: return bothInt ? Value::Int(a.i * b.i) : Value::Float(x * y);
         case Tok::Slash:
             if (y == 0.0)
-                throw RuntimeError("division by zero", e.line);
+                throw RuntimeError("division by zero", line);
             return bothInt ? Value::Int(a.i / b.i) : Value::Float(x / y);
         case Tok::Percent:
             if (y == 0.0)
-                throw RuntimeError("modulo by zero", e.line);
+                throw RuntimeError("modulo by zero", line);
             return bothInt ? Value::Int(a.i % b.i) : Value::Float(std::fmod(x, y));
         default: break;
     }
-    throw RuntimeError("bad operator", e.line);
+    throw RuntimeError("bad operator", line);
 }
 
 Value Interpreter::actorMember(crate::Actor* a, const std::string& name, int line) {
@@ -570,6 +611,26 @@ Value* Interpreter::lvalue(const Expr& e) {
 }
 
 void Interpreter::assign(const Expr& target, Value v) {
+    // Actor transform component write-back:  <actor>.position.y = 3
+    // (transform.position returns a fresh Vector3 copy, so a plain lvalue write
+    // would be lost -- route single components straight into the Transform.)
+    if (target.kind == ExprKind::Member && target.a && target.a->kind == ExprKind::Member &&
+        (target.strVal == "x" || target.strVal == "y" || target.strVal == "z")) {
+        const Expr& mid = *target.a;
+        if (mid.strVal == "position" || mid.strVal == "rotation" || mid.strVal == "scale") {
+            Value base = eval(*mid.a);
+            if (base.t == Value::T::Actor && base.actor) {
+                Transform& t = base.actor->transform();
+                Vec3& dst = mid.strVal == "position" ? t.position
+                            : mid.strVal == "rotation" ? t.rotationEuler
+                                                       : t.scale;
+                float& c = target.strVal == "x" ? dst.x : target.strVal == "y" ? dst.y : dst.z;
+                c = (float)v.num();
+                return;
+            }
+        }
+    }
+
     // Actor transform proxies: this.actor.position = Vector3(...)
     if (target.kind == ExprKind::Member) {
         Value obj = eval(*target.a);

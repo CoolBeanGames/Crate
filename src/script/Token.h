@@ -12,6 +12,7 @@ enum class Tok {
     Comma, Semicolon, Colon, Dot,
     // operators
     Plus, Minus, Star, Slash, Percent,
+    PlusEq, MinusEq, StarEq, SlashEq, PercentEq,
     Assign, EqEq, NotEq, Lt, Gt, LtEq, GtEq,
     AndAnd, OrOr, Not,
     // keywords

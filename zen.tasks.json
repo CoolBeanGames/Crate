@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "projectId": "8afe2a0217d7419db234ceda7ecb9dff",
   "name": "Crate",
-  "nextCardIndex": 43,
+  "nextCardIndex": 44,
   "latestExePath": "C:\\Users\\haptic\\Documents\\git\\Crate\\build-Release\\Crate.exe",
   "latestReleasePath": "https://github.com/CoolBeanGames/Crate/releases/tag/v0.4.0",
   "tagCatalog": [
@@ -1763,8 +1763,60 @@
           "isCollapsed": false,
           "createdAt": "2026-09-10T09:28:51.6976967+00:00",
           "updatedAt": "2026-09-10T10:45:00+00:00"
+        },
+        {
+          "id": "aed78eb788ba901f7aed94d38313557a",
+          "index": 43,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "compound assignment and vector math",
+          "task": "Add compound-assignment operators (\u002B=, -=, *=, /=, %=) to cScript: \u0060a \u002B= b\u0060 means \u0060a = a \u002B b\u0060 and must work for every assignable target, including the actor transform proxies (transform.position \u002B= v). Also make arithmetic operators work on Vector2/Vector3 values: vector \u002B/- vector is component-wise, vector */ scalar scales, and vector-component assignment (transform.position.y = x  /  \u002B= x) writes back to the actor.",
+          "tags": [
+            "scripting"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "ae3bbea7fcd656cd9e4bb900a1d5c7da",
+              "text": "lexer/parser accept \u002B= -= *= /= %=",
+              "isDone": true
+            },
+            {
+              "id": "a7a342fb30fc1aa6c92cbd00c57616b0",
+              "text": "compound assignment works on locals, fields, indices and transform proxies",
+              "isDone": true
+            },
+            {
+              "id": "088900e95b6114bda711b09e4422b59d",
+              "text": "Vector3 \u002B/- Vector3 component-wise; Vector3 */ scalar",
+              "isDone": true
+            },
+            {
+              "id": "9718b1d9a5575db04c6e61105cf86bbe",
+              "text": "transform.position.y = / \u002B= writes back to the actor transform",
+              "isDone": true
+            },
+            {
+              "id": "0bb2ac07d4555b4475b1acfd09b43f08",
+              "text": "covered by script tests",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": true
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T11:15:00+00:00",
+          "updatedAt": "2026-09-10T11:45:00+00:00"
         }
       ]
     }
   ]
-}
+}

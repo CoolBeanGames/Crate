@@ -245,10 +245,24 @@ ExprPtr Parser::parseExpr() { return parseAssignment(); }
 
 ExprPtr Parser::parseAssignment() {
     ExprPtr lhs = parseOr();
-    if (check(Tok::Assign)) {
+
+    // Plain '=' or a compound assignment (+=, -=, *=, /=, %=). For the compound
+    // forms we record the underlying arithmetic op on the Assign node; the
+    // interpreter treats `a op= b` as `a = a op b`.
+    Tok compound = Tok::Unknown;
+    switch (peek().kind) {
+        case Tok::PlusEq: compound = Tok::Plus; break;
+        case Tok::MinusEq: compound = Tok::Minus; break;
+        case Tok::StarEq: compound = Tok::Star; break;
+        case Tok::SlashEq: compound = Tok::Slash; break;
+        case Tok::PercentEq: compound = Tok::Percent; break;
+        default: break;
+    }
+    if (check(Tok::Assign) || compound != Tok::Unknown) {
         int ln = advance().line;
         ExprPtr rhs = parseAssignment();
         auto e = mk(ExprKind::Assign, ln);
+        e->op = compound; // Tok::Unknown for a plain '='
         e->a = std::move(lhs);
         e->b = std::move(rhs);
         return e;

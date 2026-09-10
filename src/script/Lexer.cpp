@@ -169,11 +169,11 @@ std::vector<Token> Lexer::tokenize() {
             case ';': push(Tok::Semicolon, ";"); break;
             case ':': push(Tok::Colon, ":"); break;
             case '.': push(Tok::Dot, "."); break;
-            case '+': push(Tok::Plus, "+"); break;
-            case '-': push(Tok::Minus, "-"); break;
-            case '*': push(Tok::Star, "*"); break;
-            case '/': push(Tok::Slash, "/"); break;
-            case '%': push(Tok::Percent, "%"); break;
+            case '+': if (match('=')) push(Tok::PlusEq, "+="); else push(Tok::Plus, "+"); break;
+            case '-': if (match('=')) push(Tok::MinusEq, "-="); else push(Tok::Minus, "-"); break;
+            case '*': if (match('=')) push(Tok::StarEq, "*="); else push(Tok::Star, "*"); break;
+            case '/': if (match('=')) push(Tok::SlashEq, "/="); else push(Tok::Slash, "/"); break;
+            case '%': if (match('=')) push(Tok::PercentEq, "%="); else push(Tok::Percent, "%"); break;
             case '=': push(match('=') ? Tok::EqEq : Tok::Assign, "="); break;
             case '!': push(match('=') ? Tok::NotEq : Tok::Not, "!"); break;
             case '<': push(match('=') ? Tok::LtEq : Tok::Lt, "<"); break;
