@@ -18,6 +18,7 @@ public:
 
     const char* typeName() const override { return cls_ ? cls_->name.c_str() : "Script"; }
     const ClassInfo* classInfo() const { return cls_; }
+    const std::string& error() const { return lastError_; }
     std::shared_ptr<ScriptObject> object();
 
     void start() override;
@@ -31,6 +32,7 @@ public:
 
 private:
     void ensureObject();
+    void runHook(const char* hook, bool passDt, float dt);
 
     ScriptContext* ctx_ = nullptr;
     const ClassInfo* cls_ = nullptr;

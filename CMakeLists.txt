@@ -117,6 +117,10 @@ add_executable(asset_db_tests tests/asset_db_tests.cpp)
 target_link_libraries(asset_db_tests PRIVATE crate_core)
 add_test(NAME asset_db_tests COMMAND asset_db_tests)
 
+add_executable(script_bug_tests tests/script_bug_tests.cpp)
+target_link_libraries(script_bug_tests PRIVATE crate_core)
+add_test(NAME script_bug_tests COMMAND script_bug_tests)
+
 add_executable(script_tests tests/script_tests.cpp)
 target_link_libraries(script_tests PRIVATE crate_core)
 add_test(NAME script_tests COMMAND script_tests)
