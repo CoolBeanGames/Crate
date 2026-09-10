@@ -113,3 +113,9 @@ add_test(NAME mesh_tests COMMAND mesh_tests)
 add_executable(script_tests tests/script_tests.cpp)
 target_link_libraries(script_tests PRIVATE crate_core)
 add_test(NAME script_tests COMMAND script_tests)
+
+add_executable(script_integration_tests tests/script_integration_tests.cpp)
+target_link_libraries(script_integration_tests PRIVATE crate_core)
+target_compile_definitions(script_integration_tests PRIVATE
+    CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
+add_test(NAME script_integration_tests COMMAND script_integration_tests)
