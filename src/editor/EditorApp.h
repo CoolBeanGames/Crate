@@ -50,6 +50,7 @@ private:
     void drawBottomPanel(); // Asset Browser / Engine Console / Game Console
     void assetBrowserMenu(); // right-click menu: create / import / new folder
     void drawAssetFolders(); // navigable folder tree of the assets directory
+    void scanAssets();       // register image/model files under assets/ as pickable
     void folderContextMenu(const std::string& relPath);
     void drawAssetPopups();  // new folder / rename / delete / colour dialogs
 

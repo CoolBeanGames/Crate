@@ -45,6 +45,7 @@ EditorApp::EditorApp() : scene_(Scene::makeSample()) {
     registerBuiltinComponents();
     AssetDatabase::get().load(assetDir_);
     script::ScriptSystem::get().loadFolder(assetDir_ + "/scripts");
+    scanAssets();
     loadFolderColors();
     renderer_.setMeshLibrary(&meshLib_);
     renderer_.setMaterialLibrary(&materialLib_);
@@ -455,9 +456,28 @@ void EditorApp::drawHierarchyNode(Actor& actor) {
         ImGui::EndDragDropSource();
     }
 
-    // Drop ON this row: reparent the dragged actor as a child (appended).
+    // Drop ON this row: reparent a dragged actor, or apply a dragged texture /
+    // material / mesh to this actor's renderer.
     if (ImGui::BeginDragDropTarget()) {
         acceptActorDrop(&actor, -1);
+        auto payloadStr = [](const ImGuiPayload* p) {
+            return std::string(static_cast<const char*>(p->Data));
+        };
+        if (const ImGuiPayload* p = ImGui::AcceptDragDropPayload(pickPayloadId(PickKind::Texture))) {
+            std::string tex = payloadStr(p);
+            if (auto* mr = actor.getComponent<MeshRenderer>()) {
+                mr->texturePath = tex;
+                renderer_.invalidateTexture(tex);
+                CR_LOG("assets", "Applied texture to '" + actor.name() + "'");
+            } else if (auto* sp = dynamic_cast<SpriteActor*>(&actor)) {
+                sp->texturePath = tex;
+                renderer_.invalidateTexture(tex);
+            }
+        } else if (const ImGuiPayload* pm =
+                       ImGui::AcceptDragDropPayload(pickPayloadId(PickKind::Material))) {
+            if (auto* mr = actor.getComponent<MeshRenderer>())
+                mr->materialRef = payloadStr(pm);
+        }
         ImGui::EndDragDropTarget();
     }
 
@@ -965,6 +985,26 @@ void EditorApp::assetBrowserMenu() {
     menu.end();
 }
 
+// Register every texture file under assets/ so it shows up in the asset picker
+// lists and can be dragged onto a component field. Cheap; run on start and
+// after an import.
+void EditorApp::scanAssets() {
+    std::error_code ec;
+    if (!fs::exists(assetDir_, ec))
+        return;
+    for (const auto& e : fs::recursive_directory_iterator(assetDir_, ec)) {
+        if (!e.is_regular_file(ec))
+            continue;
+        std::string path = e.path().generic_string();
+        if (!isSupportedImageExt(lowerExt(path)))
+            continue;
+        if (std::find(importedAssets_.begin(), importedAssets_.end(), path) == importedAssets_.end()) {
+            importedAssets_.push_back(path);
+            AssetDatabase::get().idFor(path);
+        }
+    }
+}
+
 void EditorApp::drawAssetFolders() {
     std::error_code ec;
     fs::path base = fs::path(assetDir_) / assetCwd_;
@@ -1000,8 +1040,21 @@ void EditorApp::drawAssetFolders() {
 
     for (const auto& f : files) {
         std::string name = f.path().filename().string();
+        std::string path = f.path().generic_string();
+        std::string ext = lowerExt(name);
+        bool isImg = isSupportedImageExt(ext);
         if (ImGui::Selectable(("       " + name).c_str()))
             ingestDroppedFile(f.path().string());
+        // Drag a texture straight onto a component's Texture field.
+        if (isImg && ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoHoldToOpenOthers)) {
+            ImGui::SetDragDropPayload(pickPayloadId(PickKind::Texture), path.c_str(),
+                                     path.size() + 1);
+            ImGui::Text("Texture  %s", name.c_str());
+            ImGui::EndDragDropSource();
+            if (std::find(importedAssets_.begin(), importedAssets_.end(), path) ==
+                importedAssets_.end())
+                importedAssets_.push_back(path);
+        }
     }
 }
 
