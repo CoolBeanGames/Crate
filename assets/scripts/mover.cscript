@@ -1,0 +1,23 @@
+class mover : Actor3D
+{
+	float speed = 20.0;
+	var elapsed = 0;
+
+	func start()
+	{
+		print("mover ready on " + this.actor.name);
+	}
+
+	func update(float delta)
+	{
+		elapsed = elapsed + delta;
+		var r = this.actor.rotation;
+		r.y = r.y + speed * delta;
+		this.actor.rotation = r;
+	}
+
+	func physics_update(float delta)
+	{
+		//nothing
+	}
+}

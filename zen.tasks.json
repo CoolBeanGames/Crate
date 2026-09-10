@@ -231,268 +231,6 @@
           "updatedAt": "2026-09-10T01:26:17.0976737+00:00"
         },
         {
-          "id": "6609d0f151d540b18a5c0be924409863",
-          "index": 17,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Basic scripting",
-          "task": "We need to maintain a \u0022dictionary\u0022 of types for various systems to look up. it should provide data on type names, child methods, parameters, etc for auto complete. \r\n\r\nCreating a script adds a new type and component to the system. All scripts will inherit from Actor but can be edited to inherit from Actor2D or Actor3D or anything else that already inherits from Actor (including custom scripts). Doing this comes with text completion.\r\n\r\nattached is a sample cScript of what it should look like.",
-          "tags": [
-            "Scripting"
-          ],
-          "files": [
-            {
-              "id": "26733f5a91f0463a9f5ed5a235d53dbf",
-              "name": "sample_script.cscript",
-              "relativePath": "files/sample_script.cscript",
-              "size": 378
-            }
-          ],
-          "requirements": [
-            {
-              "id": "8a4b7d74cc254914a69161ebb867d08c",
-              "text": "basic script format .cscript (crate script)",
-              "isDone": false
-            },
-            {
-              "id": "1a0ef6fa1a814b44860c5bfbf0cd0948",
-              "text": "all scripts have Start Update and Physics Update Functions",
-              "isDone": false
-            },
-            {
-              "id": "36160867ac1045b185550d8b44e25af7",
-              "text": "code blocks use curley brackets {}",
-              "isDone": false
-            },
-            {
-              "id": "4bc41f563da54a449c8db49b212b0bfa",
-              "text": "each bracket increases indentation automatically",
-              "isDone": false
-            },
-            {
-              "id": "61d23bdb4c8446d5aed3e2590ec2aefc",
-              "text": "var untyped to be interpreited at runtime",
-              "isDone": false
-            },
-            {
-              "id": "23acf86232e04ee48117c72778b51422",
-              "text": "things can also be implicity typed",
-              "isDone": false
-            }
-          ],
-          "flags": {
-            "commit": true,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-10T01:25:29.3205373+00:00",
-          "updatedAt": "2026-09-10T01:34:26.3891213+00:00"
-        },
-        {
-          "id": "6cca33174cbd4050b7cb25aeb49b59cf",
-          "index": 23,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Script editor",
-          "task": "at the top in the main window is a button to switch to script editor mode, The script editor has a list of all scripts on the left, clicking one opens that script. Below that is a list of all functions in the script.\r\n\r\nthe rest of the window is the script itself, the requirements for that are listed below.",
-          "tags": [
-            "scripting",
-            "script editor",
-            "windows",
-            "ui"
-          ],
-          "files": [],
-          "requirements": [
-            {
-              "id": "112ddf8184604f0d89925703b8a85ddc",
-              "text": "lined interface",
-              "isDone": false
-            },
-            {
-              "id": "b452ff95aac245c286b48111a3379d6c",
-              "text": "auto complete for known types,variables,functions,classes",
-              "isDone": false
-            },
-            {
-              "id": "d4bc460c95864887be5fc7c803f002f5",
-              "text": "color hilight for keywords or types (also strings and numbers)",
-              "isDone": false
-            },
-            {
-              "id": "a085e834e0854e31bf50c249a9d327c4",
-              "text": "auto save on play, save button, ctrl \u002B s support",
-              "isDone": false
-            }
-          ],
-          "flags": {
-            "commit": true,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-10T01:29:31.2023123+00:00",
-          "updatedAt": "2026-09-10T01:31:30.1481081+00:00"
-        },
-        {
-          "id": "7e2c34d418d045babea4c82560238226",
-          "index": 18,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "variables",
-          "task": "here we will setup base system types used for all or most components, as well as some of the data they will use.\r\n\r\nnote, the syntax for a base class is uppercase first letter. \u0027ie Actor\u0022 returns the global type actor, its what you should set your variable as to use a Actor reference. Lowercase is for instance \u0027ie actor\u0022 which returns the actor. for instance.\r\n\r\nActor a = this.actor; would return the actor base of the type.\r\n\r\nif the object has a component that inherits from actor you can get it with this.get_component(type_of(Actor)); which returns the actor (or whatever type you give it). Or\r\nActor a = this.actor;\r\nActor b = a.get_component(type_of(Actor));\r\n\r\nin that case get_component is a function of Actor, which a is an instance of. type_of is a global function which is used to pass a type.\r\n\r\nArrays can take any type even in the same array, and can be accessed via array_name[index] which returns it.",
-          "tags": [
-            "scripting",
-            "cScript",
-            "types",
-            "data"
-          ],
-          "files": [],
-          "requirements": [
-            {
-              "id": "bacf6fd604a4406cacdb8d685b615cf2",
-              "text": "implimented int",
-              "isDone": false
-            },
-            {
-              "id": "50c8c39ed4194ebf8d93d588fa4de019",
-              "text": "implimented float",
-              "isDone": false
-            },
-            {
-              "id": "503227ae2afb4dbf8079db5fe2eb7ebc",
-              "text": "implimented string",
-              "isDone": false
-            },
-            {
-              "id": "a85fea407bd8464ea49f70195a6ffb49",
-              "text": "implimented char",
-              "isDone": false
-            },
-            {
-              "id": "ab9fec779fff417d816ca9a87b19a084",
-              "text": "implimented array",
-              "isDone": false
-            },
-            {
-              "id": "327a77d2404845469a504f8eb85a5d1c",
-              "text": "implemented Vector3",
-              "isDone": false
-            },
-            {
-              "id": "7081a7ebd7b3425982e95cdd572e7da3",
-              "text": "implimented  Vector2 (a vector 3 with z disabled)",
-              "isDone": false
-            },
-            {
-              "id": "db868c6c9a6b4cf49c5028849bb1df4c",
-              "text": "implimented Actor",
-              "isDone": false
-            },
-            {
-              "id": "4eeb6f27867d40a0ab09e2c58fc20fce",
-              "text": "implimented Actor2D (just the type, we are actually hooking this one up yet)",
-              "isDone": false
-            },
-            {
-              "id": "2a2a8e7cc7134cb1828d4c67d324f815",
-              "text": "implimented Actor3D",
-              "isDone": false
-            },
-            {
-              "id": "132bfe2a473b4fd48867bb51862b88a3",
-              "text": "implimented bool",
-              "isDone": false
-            }
-          ],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-10T01:25:33.5372597+00:00",
-          "updatedAt": "2026-09-10T01:41:33.8791279+00:00"
-        },
-        {
-          "id": "7ffe86adde734e868accb2ed9e22255b",
-          "index": 19,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "functions",
-          "task": "functions can be created freely with the func keyword a name and any  number of parameters. This then registeres that function for autocomplete, even in other scripts that reference the type the funciton is used in.\r\n\r\nsyntax is\r\nfunc func_name(parameter_type param) : return_type\r\n{\r\n   code;\r\n}\r\n\r\nif no return type is specified you can still return whatever you want it just isnt required.\r\n\r\nfunctions can be abstract and if they are they MUST be overriden in any inherited classes and cannot be called until they are,\r\n\r\noveridden functions are called like this.\r\nthis.base.function_name();\r\n\r\nyou override a function by simply creating one with the same name but without the abstract keyword.",
-          "tags": [
-            "Scripting"
-          ],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-10T01:25:37.3311946+00:00",
-          "updatedAt": "2026-09-10T01:47:15.4925337+00:00"
-        },
-        {
-          "id": "f9f10b41387c43bd8e52cab7a4c997fd",
-          "index": 20,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "classes",
-          "task": "classes are the types that actually get implemented and added to auto complete. classes can inherit from other classes or be inherited from. they can also be set to static (meaning instances CANNOT be made of them, they can be called from anywhere, and the update,start always run even if not instanced on any actors. Also they CANNOT be instanced on an actor and only 1 instance runs ever)\r\n\r\nthey can also be abstract which means they cannot be instanced and MUST be overriden. Each class must have a unique name that doesnt start with a number but does start with an Uppercase letter.",
-          "tags": [
-            "Scripting"
-          ],
-          "files": [],
-          "requirements": [
-            {
-              "id": "3e67fa7bfe7f4a62b2416343f3bc0cf4",
-              "text": "classes implimented",
-              "isDone": false
-            },
-            {
-              "id": "8780b8062a814679835686bd449ed671",
-              "text": "statics implimented",
-              "isDone": false
-            }
-          ],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-10T01:25:43.3710568+00:00",
-          "updatedAt": "2026-09-10T01:45:43.8566601+00:00"
-        },
-        {
           "id": "dabb8759e31c43248f9875d2de933606",
           "index": 22,
           "kind": "task",
@@ -512,11 +250,11 @@
             "release": false,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:25:59.1808498+00:00",
-          "updatedAt": "2026-09-10T01:50:11.5572448+00:00"
+          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
         },
         {
           "id": "7f1c731ee84e4417a3f43069df7c2cbe",
@@ -535,27 +273,27 @@
             {
               "id": "c23de4095555478490a5cac7bcf9de83",
               "text": "do(while) {} : for as long is while is true loop through the brackets",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "d924cd44277a47c394ed2d49472cccc9",
               "text": "do_async(while) {} : similar to do except only process 1 cycle per frame",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "082804971edf43219d434f21e7b980e5",
               "text": "if(exp) {} if expression is true process the brackets otherwise skip",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "f442b8ec060446cab02c454974a61b4b",
               "text": "if(exp) {} else {} if expressions is false, skip the first bracket and do the second",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "8850fad1dba4411c8c5f5f5e8e9cfca4",
               "text": "switch(value) case 1: {} - if value is 1, process case 1 brackets, otherwise check other cases or default if none are true",
-              "isDone": false
+              "isDone": true
             }
           ],
           "flags": {
@@ -564,11 +302,11 @@
             "release": true,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:50:16.9498468+00:00",
-          "updatedAt": "2026-09-10T01:53:09.8102835+00:00"
+          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
         },
         {
           "id": "43edb2e6d1ea421cacb9983ea2eb1214",
@@ -1225,6 +963,268 @@
           "isLocked": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:17:34.877755+00:00",
+          "updatedAt": "2026-09-09T00:00:00+00:00"
+        },
+        {
+          "id": "6609d0f151d540b18a5c0be924409863",
+          "index": 17,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Basic scripting",
+          "task": "We need to maintain a \u0022dictionary\u0022 of types for various systems to look up. it should provide data on type names, child methods, parameters, etc for auto complete. \r\n\r\nCreating a script adds a new type and component to the system. All scripts will inherit from Actor but can be edited to inherit from Actor2D or Actor3D or anything else that already inherits from Actor (including custom scripts). Doing this comes with text completion.\r\n\r\nattached is a sample cScript of what it should look like.",
+          "tags": [
+            "Scripting"
+          ],
+          "files": [
+            {
+              "id": "26733f5a91f0463a9f5ed5a235d53dbf",
+              "name": "sample_script.cscript",
+              "relativePath": "files/sample_script.cscript",
+              "size": 378
+            }
+          ],
+          "requirements": [
+            {
+              "id": "8a4b7d74cc254914a69161ebb867d08c",
+              "text": "basic script format .cscript (crate script)",
+              "isDone": true
+            },
+            {
+              "id": "1a0ef6fa1a814b44860c5bfbf0cd0948",
+              "text": "all scripts have Start Update and Physics Update Functions",
+              "isDone": true
+            },
+            {
+              "id": "36160867ac1045b185550d8b44e25af7",
+              "text": "code blocks use curley brackets {}",
+              "isDone": true
+            },
+            {
+              "id": "4bc41f563da54a449c8db49b212b0bfa",
+              "text": "each bracket increases indentation automatically",
+              "isDone": true
+            },
+            {
+              "id": "61d23bdb4c8446d5aed3e2590ec2aefc",
+              "text": "var untyped to be interpreited at runtime",
+              "isDone": true
+            },
+            {
+              "id": "23acf86232e04ee48117c72778b51422",
+              "text": "things can also be implicity typed",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:25:29.3205373+00:00",
+          "updatedAt": "2026-09-09T00:00:00+00:00"
+        },
+        {
+          "id": "6cca33174cbd4050b7cb25aeb49b59cf",
+          "index": 23,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Script editor",
+          "task": "at the top in the main window is a button to switch to script editor mode, The script editor has a list of all scripts on the left, clicking one opens that script. Below that is a list of all functions in the script.\r\n\r\nthe rest of the window is the script itself, the requirements for that are listed below.",
+          "tags": [
+            "scripting",
+            "script editor",
+            "windows",
+            "ui"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "112ddf8184604f0d89925703b8a85ddc",
+              "text": "lined interface",
+              "isDone": true
+            },
+            {
+              "id": "b452ff95aac245c286b48111a3379d6c",
+              "text": "auto complete for known types,variables,functions,classes",
+              "isDone": true
+            },
+            {
+              "id": "d4bc460c95864887be5fc7c803f002f5",
+              "text": "color hilight for keywords or types (also strings and numbers)",
+              "isDone": true
+            },
+            {
+              "id": "a085e834e0854e31bf50c249a9d327c4",
+              "text": "auto save on play, save button, ctrl \u002B s support",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:29:31.2023123+00:00",
+          "updatedAt": "2026-09-09T00:00:00+00:00"
+        },
+        {
+          "id": "7e2c34d418d045babea4c82560238226",
+          "index": 18,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "variables",
+          "task": "here we will setup base system types used for all or most components, as well as some of the data they will use.\r\n\r\nnote, the syntax for a base class is uppercase first letter. \u0027ie Actor\u0022 returns the global type actor, its what you should set your variable as to use a Actor reference. Lowercase is for instance \u0027ie actor\u0022 which returns the actor. for instance.\r\n\r\nActor a = this.actor; would return the actor base of the type.\r\n\r\nif the object has a component that inherits from actor you can get it with this.get_component(type_of(Actor)); which returns the actor (or whatever type you give it). Or\r\nActor a = this.actor;\r\nActor b = a.get_component(type_of(Actor));\r\n\r\nin that case get_component is a function of Actor, which a is an instance of. type_of is a global function which is used to pass a type.\r\n\r\nArrays can take any type even in the same array, and can be accessed via array_name[index] which returns it.",
+          "tags": [
+            "scripting",
+            "cScript",
+            "types",
+            "data"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "bacf6fd604a4406cacdb8d685b615cf2",
+              "text": "implimented int",
+              "isDone": true
+            },
+            {
+              "id": "50c8c39ed4194ebf8d93d588fa4de019",
+              "text": "implimented float",
+              "isDone": true
+            },
+            {
+              "id": "503227ae2afb4dbf8079db5fe2eb7ebc",
+              "text": "implimented string",
+              "isDone": true
+            },
+            {
+              "id": "a85fea407bd8464ea49f70195a6ffb49",
+              "text": "implimented char",
+              "isDone": true
+            },
+            {
+              "id": "ab9fec779fff417d816ca9a87b19a084",
+              "text": "implimented array",
+              "isDone": true
+            },
+            {
+              "id": "327a77d2404845469a504f8eb85a5d1c",
+              "text": "implemented Vector3",
+              "isDone": true
+            },
+            {
+              "id": "7081a7ebd7b3425982e95cdd572e7da3",
+              "text": "implimented  Vector2 (a vector 3 with z disabled)",
+              "isDone": true
+            },
+            {
+              "id": "db868c6c9a6b4cf49c5028849bb1df4c",
+              "text": "implimented Actor",
+              "isDone": true
+            },
+            {
+              "id": "4eeb6f27867d40a0ab09e2c58fc20fce",
+              "text": "implimented Actor2D (just the type, we are actually hooking this one up yet)",
+              "isDone": true
+            },
+            {
+              "id": "2a2a8e7cc7134cb1828d4c67d324f815",
+              "text": "implimented Actor3D",
+              "isDone": true
+            },
+            {
+              "id": "132bfe2a473b4fd48867bb51862b88a3",
+              "text": "implimented bool",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:25:33.5372597+00:00",
+          "updatedAt": "2026-09-09T00:00:00+00:00"
+        },
+        {
+          "id": "7ffe86adde734e868accb2ed9e22255b",
+          "index": 19,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "functions",
+          "task": "functions can be created freely with the func keyword a name and any  number of parameters. This then registeres that function for autocomplete, even in other scripts that reference the type the funciton is used in.\r\n\r\nsyntax is\r\nfunc func_name(parameter_type param) : return_type\r\n{\r\n   code;\r\n}\r\n\r\nif no return type is specified you can still return whatever you want it just isnt required.\r\n\r\nfunctions can be abstract and if they are they MUST be overriden in any inherited classes and cannot be called until they are,\r\n\r\noveridden functions are called like this.\r\nthis.base.function_name();\r\n\r\nyou override a function by simply creating one with the same name but without the abstract keyword.",
+          "tags": [
+            "Scripting"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:25:37.3311946+00:00",
+          "updatedAt": "2026-09-09T00:00:00+00:00"
+        },
+        {
+          "id": "f9f10b41387c43bd8e52cab7a4c997fd",
+          "index": 20,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "classes",
+          "task": "classes are the types that actually get implemented and added to auto complete. classes can inherit from other classes or be inherited from. they can also be set to static (meaning instances CANNOT be made of them, they can be called from anywhere, and the update,start always run even if not instanced on any actors. Also they CANNOT be instanced on an actor and only 1 instance runs ever)\r\n\r\nthey can also be abstract which means they cannot be instanced and MUST be overriden. Each class must have a unique name that doesnt start with a number but does start with an Uppercase letter.",
+          "tags": [
+            "Scripting"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "3e67fa7bfe7f4a62b2416343f3bc0cf4",
+              "text": "classes implimented",
+              "isDone": true
+            },
+            {
+              "id": "8780b8062a814679835686bd449ed671",
+              "text": "statics implimented",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T01:25:43.3710568+00:00",
           "updatedAt": "2026-09-09T00:00:00+00:00"
         }
       ]

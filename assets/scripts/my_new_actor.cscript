@@ -1,0 +1,26 @@
+class my_new_actor : Actor3D
+{
+	var unknown_var = 0;
+	int known_var = 1;
+
+	func start()
+	{
+		//nothing here
+		return;
+	}
+	
+	func update(float delta)
+	{
+		print(delta) //prints delta in game console while running
+	}
+	
+	func physics_update(float delta)
+	{
+		//runs once every physics frame
+	}
+
+	func custom_func(int a, int b) : int
+	{
+		return a + b;
+	}
+}

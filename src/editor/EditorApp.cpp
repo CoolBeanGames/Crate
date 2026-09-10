@@ -10,6 +10,7 @@
 #include "scene/Actor3D.h"
 #include "scene/BuiltinComponents.h"
 #include "scene/ComponentRegistry.h"
+#include "script/ScriptSystem.h"
 
 #include <algorithm>
 #include <cctype>
@@ -37,6 +38,7 @@ static Actor* findById(Actor& node, uint64_t id) {
 
 EditorApp::EditorApp() : scene_(Scene::makeSample()) {
     registerBuiltinComponents();
+    script::ScriptSystem::get().loadFolder(assetDir_ + "/scripts");
     renderer_.setMeshLibrary(&meshLib_);
     renderer_.setMaterialLibrary(&materialLib_);
     CR_LOG("app", "Crate editor started");
@@ -130,11 +132,13 @@ void EditorApp::onFrame() {
     // Play mode: tick components (frame update + fixed-step physics).
     if (playing_) {
         scene_.tick(dt);
+        script::ScriptSystem::get().tickStatics(dt);
         physicsAccum_ += dt;
         const float step = 1.0f / 60.0f;
         int guard = 0;
         while (physicsAccum_ >= step && guard++ < 8) {
             scene_.physicsTick(step);
+            script::ScriptSystem::get().physicsStatics(step);
             physicsAccum_ -= step;
         }
     }
@@ -169,6 +173,18 @@ void EditorApp::onFrame() {
 
     drawMenuBar();
     drawToolbar();
+
+    if (scriptMode_) {
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
+        ImGui::BeginChild("##scriptmode", ImVec2(0, 0), false);
+        scriptEditor_.draw();
+        ImGui::EndChild();
+        ImGui::PopStyleVar();
+        ImGui::End(); // dock host
+        if (showDemo_)
+            ImGui::ShowDemoWindow(&showDemo_);
+        return;
+    }
 
     ImGuiID dockspace_id = ImGui::GetID("CrateDockspace");
     if (ImGui::DockBuilderGetNode(dockspace_id) == nullptr) {
@@ -279,6 +295,16 @@ void EditorApp::drawToolbar() {
     if (ImGui::Button("  Stop  "))
         setPlaying(false);
     ImGui::EndDisabled();
+
+    ImGui::SameLine(0, 20);
+    if (scriptMode_)
+        ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+    if (ImGui::Button(scriptMode_ ? "  Scene  " : "  Script Editor  ")) {
+        scriptMode_ = !scriptMode_;
+        CR_LOG("app", scriptMode_ ? "Switched to Script Editor" : "Switched to Scene");
+    }
+    if (scriptMode_)
+        ImGui::PopStyleColor();
 
     ImGui::SameLine(0, 20);
     ImGui::TextDisabled("SCENE: %s   |   ACTORS: %d   |   %s", scene_.name().c_str(),
@@ -838,9 +864,11 @@ void EditorApp::setPlaying(bool playing) {
         return;
     playing_ = playing;
     if (playing_) {
+        scriptEditor_.saveAll(); // auto-save scripts on play
         playBackup_ = scene_.clone();
         physicsAccum_ = 0.0f;
         scene_.startPlay();
+        script::ScriptSystem::get().startStatics();
         CR_GAME("play", "--- Play started ---");
         CR_LOG("play", "Entered play mode");
     } else {
@@ -849,6 +877,7 @@ void EditorApp::setPlaying(bool playing) {
         scene_ = std::move(playBackup_);
         playBackup_ = Scene("");
         scene_.select(nullptr);
+        script::ScriptSystem::get().resetStatics();
         (void)selName;
         CR_GAME("play", "--- Play stopped ---");
         CR_LOG("play", "Returned to edit mode (scene restored)");

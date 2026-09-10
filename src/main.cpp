@@ -39,8 +39,13 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
                                                              LPARAM lParam);
 
 int main(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i)
-        g_droppedFiles.push_back(argv[i]); // treat CLI args like dropped files
+    bool startInScriptMode = false;
+    for (int i = 1; i < argc; ++i) {
+        if (std::string(argv[i]) == "--script")
+            startInScriptMode = true;
+        else
+            g_droppedFiles.push_back(argv[i]); // treat other CLI args like dropped files
+    }
     WNDCLASSEXW wc = {sizeof(wc), CS_CLASSDC, WndProc, 0L, 0L,
                       GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr,
                       L"CrateEngine", nullptr};
@@ -75,6 +80,8 @@ int main(int argc, char** argv) {
 
     crate::EditorApp app;
     app.attachDevice(g_pd3dDevice, g_pd3dDeviceContext);
+    if (startInScriptMode)
+        app.setScriptMode(true);
 
     const ImVec4 clear_col = ImVec4(0.043f, 0.051f, 0.070f, 1.0f);
     bool running = true;

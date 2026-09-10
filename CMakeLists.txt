@@ -23,6 +23,14 @@ add_library(imgui STATIC
 target_include_directories(imgui PUBLIC ${IMGUI_DIR})
 target_link_libraries(imgui PUBLIC d3d11 dxgi d3dcompiler)
 
+# --- ImGuiColorTextEdit (vendored) ---------------------------------------
+add_library(imgui_texteditor STATIC third_party/imgui_texteditor/TextEditor.cpp)
+target_include_directories(imgui_texteditor PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui_texteditor)
+target_link_libraries(imgui_texteditor PUBLIC imgui)
+if(MSVC)
+    target_compile_options(imgui_texteditor PRIVATE /w)
+endif()
+
 # --- ufbx (vendored, single translation unit) -----------------------------
 add_library(ufbx STATIC third_party/ufbx/ufbx.c)
 target_include_directories(ufbx PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
@@ -37,6 +45,13 @@ add_library(crate_core STATIC
     src/scene/Scene.cpp
     src/scene/ComponentRegistry.cpp
     src/scene/BuiltinComponents.cpp
+    src/script/Lexer.cpp
+    src/script/Parser.cpp
+    src/script/Value.cpp
+    src/script/Interpreter.cpp
+    src/script/Format.cpp
+    src/script/ScriptComponent.cpp
+    src/script/ScriptSystem.cpp
     src/render/Mesh.cpp
     src/render/Renderer.cpp
     src/assets/FbxImport.cpp
@@ -44,11 +59,12 @@ add_library(crate_core STATIC
     src/platform/FileDialog.cpp
     src/editor/Console.cpp
     src/editor/ContextMenu.cpp
+    src/editor/ScriptEditor.cpp
     src/editor/Theme.cpp
     src/editor/EditorApp.cpp
 )
 target_include_directories(crate_core PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
-target_link_libraries(crate_core PUBLIC imgui ufbx comdlg32)
+target_link_libraries(crate_core PUBLIC imgui imgui_texteditor ufbx comdlg32)
 
 # --- Editor executable ---------------------------------------------------
 add_executable(Crate WIN32 src/main.cpp)
@@ -93,3 +109,7 @@ add_test(NAME image_tests COMMAND image_tests)
 add_executable(mesh_tests tests/mesh_tests.cpp)
 target_link_libraries(mesh_tests PRIVATE crate_core)
 add_test(NAME mesh_tests COMMAND mesh_tests)
+
+add_executable(script_tests tests/script_tests.cpp)
+target_link_libraries(script_tests PRIVATE crate_core)
+add_test(NAME script_tests COMMAND script_tests)

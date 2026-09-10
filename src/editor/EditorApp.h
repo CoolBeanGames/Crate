@@ -1,6 +1,7 @@
 #pragma once
 #include "assets/MaterialLibrary.h"
 #include "assets/MeshLibrary.h"
+#include "editor/ScriptEditor.h"
 #include "render/Camera.h"
 #include "render/Renderer.h"
 #include "scene/Scene.h"
@@ -27,6 +28,8 @@ public:
     // A file dropped onto the window from the OS. FBX files are imported and
     // added to the scene; images are registered for use as textures.
     void ingestDroppedFile(const std::string& path);
+
+    void setScriptMode(bool on) { scriptMode_ = on; }
 
     // Draw one editor frame. Call between ImGui::NewFrame() and ImGui::Render().
     void onFrame();
@@ -63,6 +66,8 @@ private:
     MaterialLibrary materialLib_;
     Renderer renderer_;
     OrbitCamera camera_;
+    ScriptEditor scriptEditor_;
+    bool scriptMode_ = false;
     bool spinPreview_ = true;
     std::vector<std::string> importedAssets_; // keys of imported models/textures
     std::string selectedMaterial_;            // asset selection (inspector shows it)
