@@ -472,12 +472,12 @@
             {
               "id": "3e67fa7bfe7f4a62b2416343f3bc0cf4",
               "text": "classes implimented",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "8780b8062a814679835686bd449ed671",
               "text": "statics implimented",
-              "isDone": false
+              "isDone": true
             }
           ],
           "flags": {
@@ -486,11 +486,11 @@
             "release": false,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:25:43.3710568+00:00",
-          "updatedAt": "2026-09-10T01:45:43.8566601+00:00"
+          "updatedAt": "2026-09-09T00:00:00.0000000+00:00"
         },
         {
           "id": "dabb8759e31c43248f9875d2de933606",

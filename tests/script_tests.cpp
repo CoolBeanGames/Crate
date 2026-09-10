@@ -5,6 +5,7 @@
 #include "script/Interpreter.h"
 #include "script/Lexer.h"
 #include "script/Parser.h"
+#include "script/ScriptSystem.h"
 
 #include <cstdio>
 #include <exception>
@@ -222,6 +223,48 @@ static int run() {
             threw = true;
         }
         CHECK(threw);
+    }
+
+    // --- classes: statics + name rules (task 20) ------------------
+    {
+        auto& sys = ScriptSystem::get();
+        std::string err, name;
+
+        // static class: singleton, ticks on its own, callable from anywhere
+        CHECK(sys.compile(R"(static class GameState : Actor
+{
+    int score = 0;
+    func add(int n) { score = score + n; }
+    func update(float delta) { score = score + 1; }
+})",
+                          &err, &name));
+        CHECK(name == "GameState");
+
+        CHECK(sys.compile(R"(class Scorer : Actor
+{
+    func bump() : int
+    {
+        GameState.add(10);
+        return GameState.score;
+    }
+})",
+                          &err));
+
+        auto scorer = Interpreter::instantiate(&sys.context(), sys.types().at("Scorer").get(),
+                                                       nullptr);
+        Value r = Interpreter(&sys.context(), scorer).call("bump");
+        CHECK(r.i == 10);
+
+        // static update() runs even with no actor instancing the class
+        sys.tickStatics(0.016f);
+        sys.tickStatics(0.016f);
+        auto* gs = sys.context().getStatic("GameState").get();
+        CHECK(gs != nullptr);
+        CHECK(gs->fields["score"].i == 12); // 10 from bump + 2 update ticks
+
+        // name must start uppercase / not a digit
+        CHECK(!sys.compile("class lowerName : Actor { }", &err));
+        CHECK(!sys.compile("class 9bad : Actor { }", &err));
     }
 
     // --- reindent --------------------------------------------------

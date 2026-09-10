@@ -8,6 +8,7 @@
 #include "script/Parser.h"
 #include "script/ScriptComponent.h"
 
+#include <cctype>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -36,6 +37,10 @@ ScriptSystem::ScriptSystem() {
         }
         return nullptr;
     };
+    ctx_.getStatic = [this](const std::string& name) -> std::shared_ptr<ScriptObject> {
+        auto it = statics_.find(name);
+        return it == statics_.end() ? nullptr : it->second;
+    };
     rebuildTypeDocs();
 }
 
@@ -44,6 +49,14 @@ bool ScriptSystem::compile(const std::string& source, std::string* errorOut, std
         Lexer lex(source);
         Parser parser(lex.tokenize());
         std::unique_ptr<ClassDecl> decl = parser.parseClass();
+
+        // Name rules: starts with an uppercase letter, no leading digit.
+        const std::string& n = decl->name;
+        if (n.empty() || std::isdigit((unsigned char)n[0]) || !std::isupper((unsigned char)n[0])) {
+            if (errorOut)
+                *errorOut = "class name '" + n + "' must start with an uppercase letter";
+            return false;
+        }
 
         auto ci = std::make_unique<ClassInfo>();
         ci->name = decl->name;
@@ -56,9 +69,14 @@ bool ScriptSystem::compile(const std::string& source, std::string* errorOut, std
         if (nameOut)
             *nameOut = ci->name;
         std::string cname = ci->name;
+        bool wasStatic = ci->isStatic;
         types_[cname] = std::move(ci);
         resolveBases();
-        registerComponent(cname);
+        // static / abstract classes cannot be added to actors as components
+        if (!wasStatic && !types_[cname]->isAbstract)
+            registerComponent(cname);
+        if (wasStatic)
+            rebuildStatic(cname);
         rebuildTypeDocs();
         if (errorOut)
             errorOut->clear();
@@ -88,6 +106,49 @@ void ScriptSystem::registerComponent(const std::string& className) {
     ComponentRegistry::get().add(className, "Scripts", [ctx, cls] {
         return std::make_unique<ScriptComponent>(ctx, cls);
     });
+}
+
+void ScriptSystem::rebuildStatic(const std::string& className) {
+    auto it = types_.find(className);
+    if (it == types_.end() || !it->second->isStatic)
+        return;
+    statics_[className] = Interpreter::instantiate(&ctx_, it->second.get(), nullptr);
+}
+
+void ScriptSystem::resetStatics() {
+    for (const auto& [name, ci] : types_)
+        if (ci->isStatic)
+            rebuildStatic(name);
+}
+
+void ScriptSystem::startStatics() {
+    resetStatics();
+    for (auto& [name, obj] : statics_) {
+        try {
+            Interpreter(&ctx_, obj).call("start");
+        } catch (const std::exception& ex) {
+            CR_ERROR("script", name + ".start (static): " + ex.what());
+        }
+    }
+}
+
+void ScriptSystem::tickStatics(float dt) {
+    for (auto& [name, obj] : statics_) {
+        try {
+            Interpreter(&ctx_, obj).call("update", {Value::Float(dt)});
+        } catch (const std::exception& ex) {
+            CR_ERROR("script", name + ".update (static): " + ex.what());
+        }
+    }
+}
+
+void ScriptSystem::physicsStatics(float dt) {
+    for (auto& [name, obj] : statics_) {
+        try {
+            Interpreter(&ctx_, obj).call("physics_update", {Value::Float(dt)});
+        } catch (const std::exception&) {
+        }
+    }
 }
 
 void ScriptSystem::loadFolder(const std::string& dir) {

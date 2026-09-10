@@ -56,14 +56,23 @@ public:
         return types_;
     }
 
+    // `static class` singletons: one instance each, ticked every frame while
+    // playing regardless of any actor.
+    void startStatics();
+    void tickStatics(float dt);
+    void physicsStatics(float dt);
+    void resetStatics(); // re-instantiate (called on Stop)
+
 private:
     ScriptSystem();
     void resolveBases();
     void rebuildTypeDocs();
     void registerComponent(const std::string& className);
+    void rebuildStatic(const std::string& className);
 
     ScriptContext ctx_;
     std::unordered_map<std::string, std::unique_ptr<ClassInfo>> types_;
+    std::unordered_map<std::string, std::shared_ptr<ScriptObject>> statics_;
     std::vector<ScriptFile> files_;
     std::vector<TypeDoc> typeDocs_;
 };

@@ -334,6 +334,13 @@ Value Interpreter::evalMember(const Expr& e) {
         return actorMember(obj.actor, name, e.line);
     if (obj.t == Value::T::Array && name == "length")
         return Value::Int(obj.arr ? (long long)obj.arr->size() : 0);
+    if (obj.t == Value::T::TypeRef && ctx_->getStatic) {
+        if (auto so = ctx_->getStatic(obj.s)) {
+            auto it = so->fields.find(name);
+            if (it != so->fields.end())
+                return it->second;
+        }
+    }
 
     throw RuntimeError("cannot read '." + name + "' on " + obj.typeName(), e.line);
 }
@@ -378,6 +385,13 @@ Value Interpreter::evalCall(const Expr& e) {
         }
 
         Value obj = eval(objExpr);
+
+        // StaticClass.method(...)  -> call on the static singleton
+        if (obj.t == Value::T::TypeRef && ctx_->getStatic) {
+            if (auto so = ctx_->getStatic(obj.s))
+                return callMethodOn(so, method, std::move(args), e.line, false);
+        }
+
         if (obj.t == Value::T::Object && obj.obj && obj.obj->cls) {
             // `this.get_component(...)` / `this.actor` shortcuts forward to the
             // owning actor when the script class has no such method.
@@ -503,6 +517,12 @@ void Interpreter::assign(const Expr& target, Value v) {
             if (target.strVal == "rotation") { setVec(a->transform().rotationEuler); return; }
             if (target.strVal == "scale") { setVec(a->transform().scale); return; }
             throw RuntimeError("cannot assign Actor." + target.strVal, target.line);
+        }
+        if (obj.t == Value::T::TypeRef && ctx_->getStatic) {
+            if (auto so = ctx_->getStatic(obj.s)) {
+                so->fields[target.strVal] = std::move(v);
+                return;
+            }
         }
     }
     if (Value* slot = lvalue(target)) {

@@ -30,6 +30,9 @@ struct ScriptContext {
     // this.actor.get_component(type_of(SomeScript))). Set by ScriptSystem.
     std::function<std::shared_ptr<ScriptObject>(crate::Actor*, const std::string&)> getComponent;
 
+    // Resolve the singleton instance of a `static class` by name (or null).
+    std::function<std::shared_ptr<ScriptObject>(const std::string&)> getStatic;
+
     const ClassInfo* findType(const std::string& n) const {
         if (!types)
             return nullptr;

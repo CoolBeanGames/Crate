@@ -132,11 +132,13 @@ void EditorApp::onFrame() {
     // Play mode: tick components (frame update + fixed-step physics).
     if (playing_) {
         scene_.tick(dt);
+        script::ScriptSystem::get().tickStatics(dt);
         physicsAccum_ += dt;
         const float step = 1.0f / 60.0f;
         int guard = 0;
         while (physicsAccum_ >= step && guard++ < 8) {
             scene_.physicsTick(step);
+            script::ScriptSystem::get().physicsStatics(step);
             physicsAccum_ -= step;
         }
     }
@@ -866,6 +868,7 @@ void EditorApp::setPlaying(bool playing) {
         playBackup_ = scene_.clone();
         physicsAccum_ = 0.0f;
         scene_.startPlay();
+        script::ScriptSystem::get().startStatics();
         CR_GAME("play", "--- Play started ---");
         CR_LOG("play", "Entered play mode");
     } else {
@@ -874,6 +877,7 @@ void EditorApp::setPlaying(bool playing) {
         scene_ = std::move(playBackup_);
         playBackup_ = Scene("");
         scene_.select(nullptr);
+        script::ScriptSystem::get().resetStatics();
         (void)selName;
         CR_GAME("play", "--- Play stopped ---");
         CR_LOG("play", "Returned to edit mode (scene restored)");
