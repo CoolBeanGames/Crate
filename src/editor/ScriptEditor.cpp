@@ -184,6 +184,7 @@ void ScriptEditor::drawCode() {
 
     editor_.SetHandleKeyboardInputs(!acOpen_);
     editor_.Render("##code", ImVec2(0, 0), true);
+    applyElectricIndent();
 
     if (editor_.IsTextChanged()) {
         if (syncGrace_ > 0)
@@ -193,6 +194,71 @@ void ScriptEditor::drawCode() {
     }
 
     updateAutocomplete();
+}
+
+// --- auto indent -------------------------------------------------------
+static int leadingTabs(const std::string& s) {
+    int n = 0;
+    for (char c : s) {
+        if (c == '\t')
+            ++n;
+        else
+            break;
+    }
+    return n;
+}
+
+static char lastCodeChar(const std::string& line) {
+    std::string code = line;
+    if (auto c = code.find("//"); c != std::string::npos)
+        code = code.substr(0, c);
+    while (!code.empty() && (code.back() == ' ' || code.back() == '\t' || code.back() == '\r'))
+        code.pop_back();
+    return code.empty() ? '\0' : code.back();
+}
+
+void ScriptEditor::applyElectricIndent() {
+    if (!ImGui::IsItemFocused() || acOpen_)
+        return;
+
+    auto cur = editor_.GetCursorPosition();
+    std::vector<std::string> lines = editor_.GetTextLines();
+    if (cur.mLine < 0 || cur.mLine >= (int)lines.size())
+        return;
+
+    // Enter: TextEditor already copied the previous line's indent; if that line
+    // opened a brace, go one level deeper.
+    if (ImGui::IsKeyPressed(ImGuiKey_Enter, false) && cur.mLine > 0) {
+        if (lastCodeChar(lines[cur.mLine - 1]) == '{')
+            editor_.InsertText("\t");
+        return;
+    }
+
+    // A line that is only a closing brace: snap it to (brace depth - 1) tabs.
+    const std::string& line = lines[cur.mLine];
+    size_t first = line.find_first_not_of("\t ");
+    if (first == std::string::npos || line[first] != '}')
+        return;
+    if (line.find_first_not_of("\t ", first + 1) != std::string::npos)
+        return; // something after the '}'
+
+    int depth = 0;
+    for (int i = 0; i < cur.mLine; ++i)
+        for (char c : lines[i]) {
+            if (c == '{')
+                ++depth;
+            else if (c == '}')
+                --depth;
+        }
+    int desired = depth > 0 ? depth - 1 : 0;
+    int have = leadingTabs(line);
+    if (have > desired) {
+        int remove = have - desired;
+        editor_.SetCursorPosition(TextEditor::Coordinates(cur.mLine, 0));
+        for (int k = 0; k < remove; ++k)
+            editor_.Delete();
+        editor_.SetCursorPosition(TextEditor::Coordinates(cur.mLine, std::max(0, cur.mColumn - remove)));
+    }
 }
 
 // --- autocomplete -------------------------------------------------------

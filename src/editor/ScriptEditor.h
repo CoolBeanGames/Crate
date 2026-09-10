@@ -31,6 +31,7 @@ private:
     void pushToSystem();     // editor text -> ScriptSystem (recompile)
     void refreshFunctions();
     void updateAutocomplete();
+    void applyElectricIndent(); // +1 indent after '{' on Enter, snap '}' back
 
     TextEditor editor_;
     std::string current_;
