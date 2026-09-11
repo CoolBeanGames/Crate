@@ -1316,6 +1316,52 @@ void EditorApp::scanAssets() {
     }
 }
 
+// One icon-grid cell: a coloured glyph tile (the "icon") plus a wrapped label
+// underneath, sized/selectable like a real asset-browser tile. Everything
+// that used to be a text row (folders, files, materials, imported assets) is
+// drawn as one of these now; the click/drag/context-menu logic per item is
+// unchanged (task 61 - keep functionality, change presentation).
+bool EditorApp::assetIconTile(const char* strId, const char* glyph, unsigned int argb,
+                              const std::string& label, bool selected, bool* dbl) {
+    constexpr float kTileW = 84.0f, kTileH = 96.0f, kIconH = 64.0f;
+    ImGui::PushID(strId);
+    ImVec2 topLeft = ImGui::GetCursorScreenPos();
+    bool clicked =
+        ImGui::Selectable("##tile", selected, ImGuiSelectableFlags_AllowDoubleClick,
+                          ImVec2(kTileW, kTileH));
+    if (dbl)
+        *dbl = clicked && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
+
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    ImVec2 iconMin(topLeft.x + 6.0f, topLeft.y + 4.0f);
+    ImVec2 iconMax(topLeft.x + kTileW - 6.0f, topLeft.y + 4.0f + kIconH);
+    dl->AddRectFilled(iconMin, iconMax, argb, 6.0f);
+    ImVec2 gsz = ImGui::CalcTextSize(glyph);
+    dl->AddText(ImVec2(iconMin.x + (iconMax.x - iconMin.x - gsz.x) * 0.5f,
+                       iconMin.y + (iconMax.y - iconMin.y - gsz.y) * 0.5f),
+               IM_COL32(18, 18, 22, 255), glyph);
+
+    ImGui::PushClipRect(topLeft, ImVec2(topLeft.x + kTileW, topLeft.y + kTileH), true);
+    ImGui::PushTextWrapPos(topLeft.x + kTileW - 2.0f);
+    ImVec2 lsz = ImGui::CalcTextSize(label.c_str(), nullptr, false, kTileW - 4.0f);
+    dl->AddText(ImGui::GetFont(), ImGui::GetFontSize(),
+               ImVec2(topLeft.x + (kTileW - (std::min)(lsz.x, kTileW - 4.0f)) * 0.5f,
+                      iconMax.y + 4.0f),
+               IM_COL32(214, 218, 226, 255), label.c_str(), nullptr, kTileW - 4.0f);
+    ImGui::PopTextWrapPos();
+    ImGui::PopClipRect();
+    ImGui::PopID();
+    return clicked;
+}
+
+void EditorApp::assetGridWrap(bool moreFollow) {
+    if (!moreFollow)
+        return;
+    float nextX = ImGui::GetItemRectMax().x + ImGui::GetStyle().ItemSpacing.x + 84.0f;
+    if (nextX < ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x)
+        ImGui::SameLine();
+}
+
 void EditorApp::drawAssetFolders() {
     std::error_code ec;
     fs::path base = fs::path(assetDir_) / assetCwd_;
@@ -1332,32 +1378,38 @@ void EditorApp::drawAssetFolders() {
         (e.is_directory(ec) ? dirs : files).push_back(e);
     }
 
-    for (const auto& d : dirs) {
+    for (size_t i = 0; i < dirs.size(); ++i) {
+        const auto& d = dirs[i];
         std::string name = d.path().filename().string();
         std::string rel = assetCwd_.empty() ? name : assetCwd_ + "/" + name;
         unsigned int col = folderColor(rel);
-        ImGui::PushID(rel.c_str());
-        if (col)
-            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(col));
-        bool clicked = ImGui::Selectable(("[dir]  " + name).c_str(), false,
-                                         ImGuiSelectableFlags_AllowDoubleClick);
-        if (col)
-            ImGui::PopStyleColor();
-        if (clicked && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+        bool dbl = false;
+        assetIconTile(rel.c_str(), "DIR", col ? col : IM_COL32(120, 110, 200, 255), name, false,
+                     &dbl);
+        if (dbl)
             assetCwd_ = rel;
         folderContextMenu(rel);
-        ImGui::PopID();
+        assetGridWrap(i + 1 < dirs.size() || !files.empty());
     }
 
-    for (const auto& f : files) {
+    for (size_t i = 0; i < files.size(); ++i) {
+        const auto& f = files[i];
         std::string name = f.path().filename().string();
         std::string path = f.path().generic_string();
         std::string ext = lowerExt(name);
         bool isImg = isSupportedImageExt(ext);
-        if (ImGui::Selectable(("       " + name).c_str(), false,
-                              ImGuiSelectableFlags_AllowDoubleClick)) {
-            if (ext == "inputmap") {
-                if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+        bool isFbx = ext == "fbx";
+        bool isMap = ext == "inputmap";
+        const char* glyph = isImg ? "IMG" : isFbx ? "MDL" : isMap ? "IN" : "FILE";
+        unsigned int col = isImg   ? IM_COL32(70, 150, 170, 255)
+                          : isFbx  ? IM_COL32(150, 110, 190, 255)
+                          : isMap  ? IM_COL32(90, 130, 200, 255)
+                                   : IM_COL32(90, 94, 104, 255);
+        bool dbl = false;
+        bool clicked = assetIconTile(path.c_str(), glyph, col, name, false, &dbl);
+        if (clicked) {
+            if (isMap) {
+                if (dbl) {
                     inputMapPath_ = path;
                     inputMap_.load(path);
                     Input::get().setMap(&inputMap_);
@@ -1378,13 +1430,13 @@ void EditorApp::drawAssetFolders() {
                 importedAssets_.push_back(path);
         }
         // Drag an FBX into the viewport to spawn a mesh actor.
-        if (ext == "fbx" &&
-            ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoHoldToOpenOthers)) {
+        if (isFbx && ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoHoldToOpenOthers)) {
             std::string osPath = f.path().string();
             ImGui::SetDragDropPayload("CRATE_FBX_PATH", osPath.c_str(), osPath.size() + 1);
             ImGui::Text("Model  %s", name.c_str());
             ImGui::EndDragDropSource();
         }
+        assetGridWrap(i + 1 < files.size());
     }
 }
 
@@ -1525,8 +1577,11 @@ void EditorApp::drawBottomPanel() {
         assetBrowserMenu(); // right-click empty space
         drawAssetFolders();
 
-        for (const std::string& mn : materialLib_.names()) {
-            if (ImGui::Selectable(("[mat] " + mn).c_str(), selectedMaterial_ == mn)) {
+        auto matNames = materialLib_.names();
+        for (size_t i = 0; i < matNames.size(); ++i) {
+            const std::string& mn = matNames[i];
+            if (assetIconTile(("mat:" + mn).c_str(), "MAT", IM_COL32(180, 130, 220, 255), mn,
+                              selectedMaterial_ == mn)) {
                 selectedMaterial_ = mn;
                 selectedAsset_.clear();
                 scene_.select(nullptr);
@@ -1537,15 +1592,18 @@ void EditorApp::drawBottomPanel() {
                 ImGui::Text("Material  %s", mn.c_str());
                 ImGui::EndDragDropSource();
             }
+            assetGridWrap(i + 1 < matNames.size() || !importedAssets_.empty());
         }
-        for (const std::string& a : importedAssets_) {
+        for (size_t i = 0; i < importedAssets_.size(); ++i) {
+            const std::string& a = importedAssets_[i];
             std::string name = a;
             if (auto s = name.find_last_of("/\\"); s != std::string::npos)
                 name = name.substr(s + 1);
             const std::string ext = lowerExt(a);
             bool isImg = isSupportedImageExt(ext);
-            if (ImGui::Selectable(((isImg ? "[img] " : "[mesh] ") + name).c_str(),
-                                  selectedAsset_ == a)) {
+            if (assetIconTile(("ia:" + a).c_str(), isImg ? "IMG" : "MDL",
+                              isImg ? IM_COL32(70, 150, 170, 255) : IM_COL32(150, 110, 190, 255),
+                              name, selectedAsset_ == a)) {
                 selectedAsset_ = a;
                 selectedMaterial_.clear();
                 if (isImg) {
@@ -1565,6 +1623,7 @@ void EditorApp::drawBottomPanel() {
                 ImGui::Text("%s  %s", isImg ? "Texture" : "Mesh", name.c_str());
                 ImGui::EndDragDropSource();
             }
+            assetGridWrap(i + 1 < importedAssets_.size());
         }
         ImGui::EndChild();
         if (ImGui::BeginDragDropTarget()) {
