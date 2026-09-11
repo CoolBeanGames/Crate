@@ -4,7 +4,7 @@
   "name": "Crate",
   "nextCardIndex": 62,
   "latestExePath": "C:\\Users\\haptic\\Documents\\git\\Crate\\build-Release\\Crate.exe",
-  "latestReleasePath": "https://github.com/CoolBeanGames/Crate/releases/tag/v0.7.0",
+  "latestReleasePath": "https://github.com/CoolBeanGames/Crate/releases/tag/v0.8.0",
   "tagCatalog": [
     {
       "name": "bug",
@@ -225,115 +225,6 @@
       "isLocked": false,
       "tasks": [
         {
-          "id": "d4a33cfd1f1b44d8adb5d5e25cb6a8e5",
-          "index": 55,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Normal Arrow Gizmo",
-          "task": "add a gizmo of an arrow that points in the direction of the selected Actors normal (\u002Bz)",
-          "tags": [
-            "gizmos",
-            "rendering"
-          ],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": false,
-            "merge": false
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-10T23:25:50.684687+00:00",
-          "updatedAt": "2026-09-10T16:00:00.0000000+00:00"
-        },
-        {
-          "id": "0750bc487c85454780f212771f69a14e",
-          "index": 56,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "omni light range gizmo",
-          "task": "add a gizmo for the selected omni light that shows its range as a wireframe sphere",
-          "tags": [
-            "rendering",
-            "lighting"
-          ],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": true,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-10T23:27:43.2275822+00:00",
-          "updatedAt": "2026-09-10T16:00:00.0000000+00:00"
-        },
-        {
-          "id": "9fa314ed1114423c8ebd1f92e401a243",
-          "index": 57,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "spotlight frustrum",
-          "task": "add a light frustrum for the spotlight showing where it will hit",
-          "tags": [
-            "rendering",
-            "lighting"
-          ],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": true,
-            "merge": false
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-10T23:28:13.5157392+00:00",
-          "updatedAt": "2026-09-10T16:00:00.0000000+00:00"
-        },
-        {
-          "id": "492653eda4a945db950b84bb7f67511b",
-          "index": 58,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "shadows",
-          "task": "add shadows. add two toggles to mesh renderer. cast shadows and recieve shadows",
-          "tags": [
-            "rendering",
-            "lighting",
-            "shadows"
-          ],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": false,
-            "merge": false
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-10T23:28:50.3611686+00:00",
-          "updatedAt": "2026-09-10T16:00:00.0000000+00:00"
-        },
-        {
           "id": "2eaff1cefdcf4140b1fa74091c8bea5d",
           "index": 59,
           "kind": "task",
@@ -379,34 +270,7 @@
           "isLocked": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T23:29:43.7833772+00:00",
-          "updatedAt": "2026-09-10T16:30:00.0000000+00:00"
-        },
-        {
-          "id": "8347cb9cdf254b5ba693342b82e8eb28",
-          "index": 60,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "dithering",
-          "task": "add per material dithering, if set to true (and configured) the lights affect the material with dithering rather than smoothly",
-          "tags": [
-            "rendering",
-            "lighting"
-          ],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": true,
-            "merge": true
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-10T23:30:33.5271578+00:00",
-          "updatedAt": "2026-09-10T16:30:00.0000000+00:00"
+          "updatedAt": "2026-09-10T16:30:00+00:00"
         }
       ]
     },
@@ -2422,6 +2286,142 @@
           "isCollapsed": false,
           "createdAt": "2026-09-10T18:49:29.7370408+00:00",
           "updatedAt": "2026-09-10T15:00:00+00:00"
+        },
+        {
+          "id": "d4a33cfd1f1b44d8adb5d5e25cb6a8e5",
+          "index": 55,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Normal Arrow Gizmo",
+          "task": "add a gizmo of an arrow that points in the direction of the selected Actors normal (\u002Bz)",
+          "tags": [
+            "gizmos",
+            "rendering"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T23:25:50.684687+00:00",
+          "updatedAt": "2026-09-10T16:00:00+00:00"
+        },
+        {
+          "id": "0750bc487c85454780f212771f69a14e",
+          "index": 56,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "omni light range gizmo",
+          "task": "add a gizmo for the selected omni light that shows its range as a wireframe sphere",
+          "tags": [
+            "rendering",
+            "lighting"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T23:27:43.2275822+00:00",
+          "updatedAt": "2026-09-10T16:00:00+00:00"
+        },
+        {
+          "id": "9fa314ed1114423c8ebd1f92e401a243",
+          "index": 57,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "spotlight frustrum",
+          "task": "add a light frustrum for the spotlight showing where it will hit",
+          "tags": [
+            "rendering",
+            "lighting"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T23:28:13.5157392+00:00",
+          "updatedAt": "2026-09-10T16:00:00+00:00"
+        },
+        {
+          "id": "492653eda4a945db950b84bb7f67511b",
+          "index": 58,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "shadows",
+          "task": "add shadows. add two toggles to mesh renderer. cast shadows and recieve shadows",
+          "tags": [
+            "rendering",
+            "lighting",
+            "shadows"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T23:28:50.3611686+00:00",
+          "updatedAt": "2026-09-10T16:00:00+00:00"
+        },
+        {
+          "id": "8347cb9cdf254b5ba693342b82e8eb28",
+          "index": 60,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "dithering",
+          "task": "add per material dithering, if set to true (and configured) the lights affect the material with dithering rather than smoothly",
+          "tags": [
+            "rendering",
+            "lighting"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": true
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T23:30:33.5271578+00:00",
+          "updatedAt": "2026-09-10T16:30:00+00:00"
         }
       ]
     }
