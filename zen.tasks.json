@@ -351,7 +351,7 @@
             {
               "id": "b8dec3296a064fcf8142c253bd49090c",
               "text": "static lights",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "5bb533383d824a27b3e8df1c7ee5bef1",
@@ -366,7 +366,7 @@
             {
               "id": "61dbba170e834cd3aed8650e6ee47822",
               "text": "light probes",
-              "isDone": false
+              "isDone": true
             }
           ],
           "flags": {
@@ -379,7 +379,7 @@
           "isLocked": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T23:29:43.7833772+00:00",
-          "updatedAt": "2026-09-10T23:30:29.4351259+00:00"
+          "updatedAt": "2026-09-10T16:30:00.0000000+00:00"
         },
         {
           "id": "8347cb9cdf254b5ba693342b82e8eb28",
@@ -402,11 +402,11 @@
             "release": true,
             "merge": true
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T23:30:33.5271578+00:00",
-          "updatedAt": "2026-09-10T23:31:12.6983708+00:00"
+          "updatedAt": "2026-09-10T16:30:00.0000000+00:00"
         }
       ]
     },
