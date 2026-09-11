@@ -407,10 +407,13 @@ void ScriptSystem::rebuildTypeDocs() {
     add("array", "", false, {"length", "add", "str"});
     add("Vector2", "", false, {"x", "y", "str"});
     add("Vector3", "", false, {"x", "y", "z", "str"});
-    add("Transform", "", false, {"position", "rotation", "scale"});
-    add("Actor", "", false, {"name", "position", "rotation", "scale", "get_component"});
-    add("Actor2D", "Actor", false, {"name", "position", "rotation", "scale", "get_component"});
-    add("Actor3D", "Actor", false, {"name", "position", "rotation", "scale", "get_component"});
+    add("Transform", "", false, {"position", "rotation", "scale", "forward", "right", "up"});
+    add("Actor", "", false,
+        {"name", "position", "rotation", "scale", "forward", "right", "up", "get_component"});
+    add("Actor2D", "Actor", false,
+        {"name", "position", "rotation", "scale", "forward", "right", "up", "get_component"});
+    add("Actor3D", "Actor", false,
+        {"name", "position", "rotation", "scale", "forward", "right", "up", "get_component"});
 
     for (const auto& [name, ci] : types_) {
         std::vector<std::string> members;

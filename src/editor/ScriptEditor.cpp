@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <climits>
 
 namespace crate {
 
@@ -200,8 +201,19 @@ void ScriptEditor::drawCode() {
         ImGui::TextDisabled("Ctrl+S to save   |   Ctrl+Space for completions");
     }
 
+    // Snapshot input *before* Render(): TextEditor's own keyboard handling
+    // (which runs inside Render() when acOpen_ is false) drains
+    // io.InputQueueCharacters and consumes the Enter keypress, so anything
+    // downstream that wants to know what was just typed has to look now.
+    ImGuiIO& io = ImGui::GetIO();
+    typedChars_.assign(io.InputQueueCharacters.begin(), io.InputQueueCharacters.end());
+    preCursor_ = editor_.GetCursorPosition();
+    preLine_ = editor_.GetCurrentLineText();
+    enterPressed_ = ImGui::IsKeyPressed(ImGuiKey_Enter, false);
+
     editor_.SetHandleKeyboardInputs(!acOpen_);
     editor_.Render("##code", ImVec2(0, 0), true);
+    applyAutoBrackets();
     applyElectricIndent();
 
     if (editor_.IsTextChanged()) {
@@ -235,6 +247,66 @@ static char lastCodeChar(const std::string& line) {
     return code.empty() ? '\0' : code.back();
 }
 
+// --- auto brackets ------------------------------------------------------
+// Typing '{' or '(' inserts the matching closer and leaves the caret between
+// them; typing a closer that's already sitting right at the caret (i.e. the
+// one we just auto-inserted) steps over it instead of adding a duplicate.
+void ScriptEditor::applyAutoBrackets() {
+    if (acOpen_ || !ImGui::IsItemFocused())
+        return;
+    // Only handle the common case of a single typed character: bulk input
+    // (e.g. a paste that went through the character queue) is left alone.
+    if (typedChars_.size() != 1)
+        return;
+    char c = (char)typedChars_[0];
+
+    if (c == '{' || c == '(') {
+        // Render() already inserted `c` and moved the caret past it; add the
+        // matching closer right after and step back in between.
+        editor_.InsertText(c == '{' ? "}" : ")");
+        auto cur = editor_.GetCursorPosition();
+        editor_.SetCursorPosition(TextEditor::Coordinates(cur.mLine, cur.mColumn - 1));
+        return;
+    }
+    if (c == '}' || c == ')') {
+        // Render() already inserted a second `c` right before whatever was
+        // at the caret. If that was the *same* closer, it's a type-over:
+        // undo the duplicate and just step past the existing one.
+        if (preCursor_.mColumn >= 0 && preCursor_.mColumn < (int)preLine_.size() &&
+            preLine_[preCursor_.mColumn] == c) {
+            // Backspace() is private; step back onto the just-typed
+            // duplicate and forward-delete it instead.
+            auto cur = editor_.GetCursorPosition();
+            editor_.SetCursorPosition(TextEditor::Coordinates(cur.mLine, cur.mColumn - 1));
+            editor_.Delete();
+            cur = editor_.GetCursorPosition();
+            editor_.SetCursorPosition(TextEditor::Coordinates(cur.mLine, cur.mColumn + 1));
+        }
+    }
+}
+
+// Used by updateAutocomplete() while the popup is open: at that point
+// TextEditor isn't handling keyboard input, so characters must be forwarded
+// (or paired/skipped) manually, before anything is inserted. Returns true if
+// `c` was fully handled.
+bool ScriptEditor::handleBracketCharForAc(char c) {
+    if (c == '{' || c == '(') {
+        editor_.InsertText(std::string(1, c) + (c == '{' ? "}" : ")"));
+        auto cur = editor_.GetCursorPosition();
+        editor_.SetCursorPosition(TextEditor::Coordinates(cur.mLine, cur.mColumn - 1));
+        return true;
+    }
+    if (c == '}' || c == ')') {
+        std::string line = editor_.GetCurrentLineText();
+        auto cur = editor_.GetCursorPosition();
+        if (cur.mColumn >= 0 && cur.mColumn < (int)line.size() && line[cur.mColumn] == c) {
+            editor_.SetCursorPosition(TextEditor::Coordinates(cur.mLine, cur.mColumn + 1));
+            return true;
+        }
+    }
+    return false;
+}
+
 void ScriptEditor::applyElectricIndent() {
     if (!ImGui::IsItemFocused() || acOpen_)
         return;
@@ -245,9 +317,30 @@ void ScriptEditor::applyElectricIndent() {
         return;
 
     // Enter: TextEditor already copied the previous line's indent; if that line
-    // opened a brace, go one level deeper.
-    if (ImGui::IsKeyPressed(ImGuiKey_Enter, false) && cur.mLine > 0) {
-        if (lastCodeChar(lines[cur.mLine - 1]) == '{')
+    // opened a brace, go one level deeper. If Enter was pressed right between
+    // an auto-inserted matching pair on the same original line (e.g. "{}" or
+    // "()"), split it into three lines instead: the closer drops to its own
+    // line back at the opening indent, and the caret lands on a fresh,
+    // one-level-deeper body line in between.
+    if (enterPressed_ && cur.mLine > 0) {
+        const std::string& prevLine = lines[cur.mLine - 1];
+        const std::string& newLine = lines[cur.mLine];
+        char prevLast = lastCodeChar(prevLine);
+
+        size_t nf = newLine.find_first_not_of("\t ");
+        char newFirst = nf == std::string::npos ? '\0' : newLine[nf];
+        bool onlyCloser = nf != std::string::npos &&
+                          newLine.find_first_not_of("\t ", nf + 1) == std::string::npos &&
+                          (newFirst == '}' || newFirst == ')');
+        bool matchingPair = onlyCloser && ((prevLast == '{' && newFirst == '}') ||
+                                           (prevLast == '(' && newFirst == ')'));
+        if (matchingPair) {
+            int openIndent = leadingTabs(prevLine);
+            editor_.InsertText("\t\n" + std::string(openIndent, '\t'));
+            editor_.SetCursorPosition(TextEditor::Coordinates(cur.mLine, openIndent + 1));
+            return;
+        }
+        if (prevLast == '{')
             editor_.InsertText("\t");
         return;
     }
@@ -280,6 +373,125 @@ void ScriptEditor::applyElectricIndent() {
 }
 
 // --- autocomplete -------------------------------------------------------
+
+// Best-effort static type for a builtin member (Actor/Transform/Vector3/...).
+// Returns "" when the member's type isn't a builtin we know about (either
+// because it doesn't exist, or because it belongs to a script class -- those
+// are resolved separately via ClassInfo).
+static std::string builtinMemberType(const std::string& type, const std::string& member) {
+    if (type == "Actor" || type == "Actor2D" || type == "Actor3D" || type == "Transform") {
+        if (member == "position" || member == "rotation" || member == "scale" ||
+            member == "forward" || member == "right" || member == "up")
+            return "Vector3";
+        if (member == "name")
+            return "string";
+    }
+    if (type == "Vector3" || type == "Vector2") {
+        if (member == "x" || member == "y" || member == "z")
+            return "float";
+        if (member == "str")
+            return "string";
+    }
+    if ((type == "array" || type == "string") && member == "length")
+        return "int";
+    return "";
+}
+
+std::string ScriptEditor::resolveChainType(const std::string& chain) const {
+    if (chain.empty())
+        return "";
+    std::vector<std::string> segs;
+    size_t start = 0;
+    while (start <= chain.size()) {
+        size_t dot = chain.find('.', start);
+        segs.push_back(chain.substr(start, dot == std::string::npos ? std::string::npos : dot - start));
+        if (dot == std::string::npos)
+            break;
+        start = dot + 1;
+    }
+    if (segs.empty() || segs[0].empty())
+        return "";
+
+    auto& sys = ScriptSystem::get();
+    std::string type;
+    if (segs[0] == "transform" || segs[0] == "actor") {
+        type = "Actor";
+    } else {
+        auto it = sys.types().find(current_);
+        if (it != sys.types().end() && it->second->decl) {
+            for (const auto& fd : it->second->decl->fields)
+                if (fd.name == segs[0] && !fd.type.empty())
+                    type = fd.type;
+            if (type.empty())
+                for (const auto& fn : it->second->decl->functions)
+                    for (const auto& p : fn.params)
+                        if (p.name == segs[0] && !p.type.empty())
+                            type = p.type;
+        }
+    }
+    if (type.empty())
+        return "";
+
+    for (size_t i = 1; i < segs.size(); ++i) {
+        const std::string& member = segs[i];
+        std::string next = builtinMemberType(type, member);
+        if (next.empty()) {
+            // Maybe `type` is a script class: look up the field/function.
+            auto it = sys.types().find(type);
+            if (it != sys.types().end() && it->second->decl) {
+                for (const auto& fd : it->second->decl->fields)
+                    if (fd.name == member)
+                        next = fd.type;
+                if (next.empty())
+                    for (const auto& fn : it->second->decl->functions)
+                        if (fn.name == member)
+                            next = fn.returnType;
+            }
+        }
+        if (next.empty())
+            return ""; // unknown from here on; caller falls back
+        type = next;
+    }
+    return type;
+}
+
+static void collectLocalsInStmts(const std::vector<script::StmtPtr>& stmts, std::vector<std::string>& out);
+
+static void collectLocalsInStmt(const script::Stmt& s, std::vector<std::string>& out) {
+    using script::StmtKind;
+    if (s.kind == StmtKind::VarDecl && !s.name.empty())
+        out.push_back(s.name);
+    collectLocalsInStmts(s.thenBody, out);
+    collectLocalsInStmts(s.elseBody, out);
+    collectLocalsInStmts(s.body, out);
+    for (const auto& c : s.cases)
+        collectLocalsInStmts(c.body, out);
+}
+
+static void collectLocalsInStmts(const std::vector<script::StmtPtr>& stmts, std::vector<std::string>& out) {
+    for (const auto& s : stmts)
+        if (s)
+            collectLocalsInStmt(*s, out);
+}
+
+void ScriptEditor::collectLocalsInScope(int line, std::vector<std::string>& out) const {
+    auto& sys = ScriptSystem::get();
+    auto it = sys.types().find(current_);
+    if (it == sys.types().end() || !it->second->decl)
+        return;
+    const auto& fns = it->second->decl->functions;
+    for (size_t i = 0; i < fns.size(); ++i) {
+        int start = fns[i].line;
+        int end = i + 1 < fns.size() ? fns[i + 1].line : INT_MAX;
+        if (line + 1 < start || line + 1 >= end)
+            continue; // not the enclosing function (functions' `line` is 1-based)
+        for (const auto& p : fns[i].params)
+            out.push_back(p.name);
+        collectLocalsInStmts(fns[i].body, out);
+        break;
+    }
+}
+
 void ScriptEditor::updateAutocomplete() {
     ImGuiIO& io = ImGui::GetIO();
     const bool editorFocused = ImGui::IsItemFocused() || acOpen_;
@@ -297,12 +509,39 @@ void ScriptEditor::updateAutocomplete() {
     std::string word = upToCaret.substr(w);
     bool afterDot = w > 0 && upToCaret[w - 1] == '.';
 
-    // Open on Ctrl+Space or automatically right after typing '.'
+    // The dotted receiver chain right before the word, e.g. for
+    // "transform.rotation.y" -> "transform.rotation" (word == "y").
+    std::string chain;
+    if (afterDot) {
+        int p = w - 1; // sits on the '.'
+        while (true) {
+            int idEnd = p;
+            int idStart = idEnd;
+            while (idStart > 0 &&
+                   (std::isalnum((unsigned char)upToCaret[idStart - 1]) || upToCaret[idStart - 1] == '_'))
+                --idStart;
+            if (idStart == idEnd)
+                break;
+            p = idStart;
+            if (p > 0 && upToCaret[p - 1] == '.') {
+                p -= 1;
+                continue;
+            }
+            break;
+        }
+        chain = upToCaret.substr(p, (w - 1) - p);
+    }
+
+    // Open on Ctrl+Space, right after typing '.', or as soon as an
+    // identifier character is typed -- autocomplete should be live, not
+    // something you have to remember to summon.
     if (editorFocused && !acOpen_) {
         bool ctrlSpace = io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Space);
-        bool justDot = !io.InputQueueCharacters.empty() &&
-                       io.InputQueueCharacters.back() == '.';
-        if (ctrlSpace || justDot) {
+        bool justTypedWordChar = false;
+        for (ImWchar tc : typedChars_)
+            if (tc == '.' || std::isalnum((int)tc) || tc == '_')
+                justTypedWordChar = true;
+        if (ctrlSpace || (justTypedWordChar && (afterDot || !word.empty()))) {
             acOpen_ = true;
             acIndex_ = 0;
         }
@@ -325,14 +564,27 @@ void ScriptEditor::updateAutocomplete() {
 
     auto& sys = ScriptSystem::get();
     if (acAfterDot_) {
-        // members of every type + Actor built-ins (no full type inference yet)
-        for (const auto& d : sys.typeDocs())
-            for (const auto& m : d.members)
-                consider(m);
+        std::string type = resolveChainType(chain);
+        const ScriptSystem::TypeDoc* doc = type.empty() ? nullptr : sys.typeDoc(type);
+        if (doc) {
+            // Known receiver type: only its own members (+ inherited, walking
+            // script base classes) -- no more dumping every type's members.
+            for (const ScriptSystem::TypeDoc* d = doc; d;
+                 d = d->base.empty() ? nullptr : sys.typeDoc(d->base))
+                for (const auto& m : d->members)
+                    consider(m);
+        } else {
+            // Unknown receiver: fall back to every known member (better a
+            // noisy list than none at all).
+            for (const auto& d : sys.typeDocs())
+                for (const auto& m : d.members)
+                    consider(m);
+        }
     } else {
         for (const auto& c : sys.completions(acPrefix_))
             consider(c);
-        // current class's own fields + functions + params
+        // current class's own fields + functions + params, plus locals
+        // declared anywhere in the function the caret is currently inside.
         auto it = sys.types().find(current_);
         if (it != sys.types().end() && it->second->decl) {
             for (const auto& fd : it->second->decl->fields)
@@ -343,6 +595,10 @@ void ScriptEditor::updateAutocomplete() {
                     consider(p.name);
             }
         }
+        std::vector<std::string> locals;
+        collectLocalsInScope(cur.mLine, locals);
+        for (const auto& n : locals)
+            consider(n);
     }
     std::sort(acItems_.begin(), acItems_.end());
     if (acItems_.empty()) {
@@ -361,12 +617,25 @@ void ScriptEditor::updateAutocomplete() {
         return;
     }
     bool accept = ImGui::IsKeyPressed(ImGuiKey_Tab) || ImGui::IsKeyPressed(ImGuiKey_Enter);
-    // forward typed characters so the word keeps growing
+    // forward typed characters so the word keeps growing (TextEditor isn't
+    // handling keyboard input while the popup is open, so nothing else will
+    // insert these) -- brackets get paired/skipped just like normal typing,
+    // and anything else still reaches the buffer instead of being dropped.
     for (int i = 0; i < io.InputQueueCharacters.Size; ++i) {
         ImWchar c = io.InputQueueCharacters[i];
         if (std::isalnum((int)c) || c == '_') {
             editor_.InsertText(std::string(1, (char)c));
+        } else if (c == '.') {
+            // Chained access (e.g. "transform." then "rotation."): insert the
+            // dot and keep the popup open, now completing the new receiver's
+            // members, instead of closing and losing the live trigger.
+            editor_.InsertText(".");
+            acIndex_ = 0;
+        } else if (handleBracketCharForAc((char)c)) {
+            acOpen_ = false;
         } else {
+            if (c != 0)
+                editor_.InsertText(std::string(1, (char)c));
             acOpen_ = false; // any other char closes the popup
         }
     }

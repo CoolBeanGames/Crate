@@ -134,4 +134,15 @@ struct Mat4 {
     }
 };
 
+// Rotates/scales a direction by the upper-left 3x3 of `m` (row-vector
+// convention: v' = v * M), ignoring translation. Used for derived
+// transform.forward / right / up vectors.
+inline Vec3 transformDirection(const Vec3& v, const Mat4& m) {
+    return {
+        v.x * m.at(0, 0) + v.y * m.at(1, 0) + v.z * m.at(2, 0),
+        v.x * m.at(0, 1) + v.y * m.at(1, 1) + v.z * m.at(2, 1),
+        v.x * m.at(0, 2) + v.y * m.at(1, 2) + v.z * m.at(2, 2),
+    };
+}
+
 } // namespace crate
