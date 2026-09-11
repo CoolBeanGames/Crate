@@ -282,7 +282,8 @@
           "title": "Documentation",
           "task": "Crreate a \u0022Wiki\u0022 to go along with the scripting language so i can look up how to do things. Keep it updated as we add more stuff",
           "tags": [
-            "documentation"
+            "documentation",
+            "in progress"
           ],
           "files": [],
           "requirements": [],
@@ -296,7 +297,7 @@
           "isLocked": false,
           "isCollapsed": false,
           "createdAt": "2026-09-11T03:23:48.6295219+00:00",
-          "updatedAt": "2026-09-11T03:24:21.3912423+00:00"
+          "updatedAt": "2026-09-11T00:15:00+00:00"
         },
         {
           "id": "048b62f5db3943cbb887b9cf15f2461b",
