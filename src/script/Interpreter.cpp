@@ -433,6 +433,15 @@ Value Interpreter::actorMember(crate::Actor* a, const std::string& name, int lin
         return makeVector("Vector3", t.rotationEuler.x, t.rotationEuler.y, t.rotationEuler.z);
     if (name == "scale")
         return makeVector("Vector3", t.scale.x, t.scale.y, t.scale.z);
+    // Derived direction vectors, read-only: +Z/+X/+Y rotated by the transform's
+    // Euler rotation (matches the +Z-forward convention used elsewhere, e.g.
+    // LightComponent's directional "forward" arrow).
+    if (name == "forward" || name == "right" || name == "up") {
+        Mat4 rot = Mat4::rotationEuler(t.rotationEuler);
+        Vec3 base = name == "forward" ? Vec3{0, 0, 1} : name == "right" ? Vec3{1, 0, 0} : Vec3{0, 1, 0};
+        Vec3 dir = normalize(transformDirection(base, rot));
+        return makeVector("Vector3", dir.x, dir.y, dir.z);
+    }
     throw RuntimeError("Actor has no member '" + name + "'", line);
 }
 

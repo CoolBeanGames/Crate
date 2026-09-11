@@ -292,11 +292,11 @@
             "release": true,
             "merge": true
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": false,
           "createdAt": "2026-09-11T03:23:48.6295219+00:00",
-          "updatedAt": "2026-09-11T03:24:21.3912423+00:00"
+          "updatedAt": "2026-09-11T00:15:00+00:00"
         },
         {
           "id": "048b62f5db3943cbb887b9cf15f2461b",

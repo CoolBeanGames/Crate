@@ -36,6 +36,19 @@ private:
     void refreshFunctions();
     void updateAutocomplete();
     void applyElectricIndent(); // +1 indent after '{' on Enter, snap '}' back
+    void applyAutoBrackets();   // auto-insert/skip-over matching } and )
+    // Pre-insert bracket pairing/skip-over used while the autocomplete popup
+    // is open (TextEditor isn't handling keyboard input in that case, so
+    // characters are forwarded manually -- see updateAutocomplete()).
+    // Returns true if `c` was fully handled (nothing else should insert it).
+    bool handleBracketCharForAc(char c);
+    // Best-effort static type of a dotted member-access chain (e.g.
+    // "transform.rotation" -> "Vector3"), used to narrow '.' completions to
+    // the members that actually exist on the receiver. Empty => unknown.
+    std::string resolveChainType(const std::string& chain) const;
+    // Local variable names declared (at any depth) in the function whose
+    // body contains `line` (0-based), for live autocomplete of locals.
+    void collectLocalsInScope(int line, std::vector<std::string>& out) const;
 
     TextEditor editor_;
     std::string current_;
@@ -53,6 +66,15 @@ private:
     std::string acPrefix_;
     std::vector<std::string> acItems_;
     int acIndex_ = 0;
+
+    // Per-frame input snapshot, captured *before* editor_.Render() (which
+    // drains ImGui's character queue and consumes the keypress), so the
+    // bracket/indent/autocomplete logic that runs after Render() can still
+    // see what was actually typed this frame.
+    std::vector<ImWchar> typedChars_;
+    TextEditor::Coordinates preCursor_{0, 0};
+    std::string preLine_;
+    bool enterPressed_ = false;
 };
 
 } // namespace crate
