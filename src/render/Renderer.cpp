@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <functional>
 #include <vector>
 
 namespace crate {
@@ -497,25 +498,48 @@ void Renderer::drawActor(Actor& actor, const Mat4& viewProj, const Options& opt,
     cb.baseColor[2] = sel ? baseColor[2] * 0.85f + 0.25f : baseColor[2];
     cb.baseColor[3] = baseColor[3];
 
-    int lightCount = static_cast<int>(std::min<size_t>(lights_.size(), kMaxLights));
-    cb.params[0] = texPath.empty() ? 0.0f : 1.0f;
-    cb.params[1] = emissive;
-    cb.params[2] = unlit ? 1.0f : 0.0f;
-    cb.params[3] = static_cast<float>(lightCount);
-    cb.ambient[0] = opt.ambient.x; cb.ambient[1] = opt.ambient.y; cb.ambient[2] = opt.ambient.z;
-    cb.fogColor[0] = opt.fogColor.x; cb.fogColor[1] = opt.fogColor.y; cb.fogColor[2] = opt.fogColor.z;
-    cb.fogParams[0] = opt.fogStart;
-    cb.fogParams[1] = opt.fogEnd;
-    cb.fogParams[2] = opt.fogEnabled ? 1.0f : 0.0f;
-    for (int k = 0; k < lightCount; ++k) {
-        const LightSample& s = lights_[k];
-        GpuLight& g = cb.lights[k];
+    // Static lights don't reach the real-time list; their effect only shows up
+    // via a bake (below). Everything else is uploaded, capped at kMaxLights.
+    int lightCount = 0;
+    for (const auto& s : lights_) {
+        if (s.isStatic)
+            continue;
+        if (lightCount >= kMaxLights)
+            break;
+        GpuLight& g = cb.lights[lightCount];
         g.pos[0] = s.pos.x; g.pos[1] = s.pos.y; g.pos[2] = s.pos.z;
         g.dir[0] = s.dir.x; g.dir[1] = s.dir.y; g.dir[2] = s.dir.z;
         g.color[0] = s.color.x; g.color[1] = s.color.y; g.color[2] = s.color.z;
         g.color[3] = static_cast<float>(s.type);
         g.params[0] = s.range; g.params[1] = s.cosInner; g.params[2] = s.cosOuter;
+        ++lightCount;
     }
+    cb.params[0] = texPath.empty() ? 0.0f : 1.0f;
+    cb.params[1] = emissive;
+    cb.params[2] = unlit ? 1.0f : 0.0f;
+    cb.params[3] = static_cast<float>(lightCount);
+
+    // Baked static-light contribution: the mesh's own bake if it has one,
+    // otherwise the nearest baked LightProbe (for actors that move at runtime).
+    Vec3 baked{0, 0, 0};
+    if (mr->bakedValid) {
+        baked = {mr->bakedLight[0], mr->bakedLight[1], mr->bakedLight[2]};
+    } else if (!probes_.empty()) {
+        const ProbeSample* nearest = &probes_[0];
+        float best = length(probes_[0].pos - w.position);
+        for (const auto& p : probes_) {
+            float d = length(p.pos - w.position);
+            if (d < best) { best = d; nearest = &p; }
+        }
+        baked = nearest->baked;
+    }
+    cb.ambient[0] = opt.ambient.x + baked.x;
+    cb.ambient[1] = opt.ambient.y + baked.y;
+    cb.ambient[2] = opt.ambient.z + baked.z;
+    cb.fogColor[0] = opt.fogColor.x; cb.fogColor[1] = opt.fogColor.y; cb.fogColor[2] = opt.fogColor.z;
+    cb.fogParams[0] = opt.fogStart;
+    cb.fogParams[1] = opt.fogEnd;
+    cb.fogParams[2] = opt.fogEnabled ? 1.0f : 0.0f;
 
     D3D11_MAPPED_SUBRESOURCE ms;
     if (SUCCEEDED(ctx_->Map(cb_, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms))) {
@@ -586,6 +610,59 @@ bool Renderer::computeShadowVP(Mat4& out) const {
     return false;
 }
 
+void Renderer::bakeLighting(Scene& scene) {
+    lights_.clear();
+    probes_.clear();
+    for (const auto& child : scene.root().children())
+        collectLights(*child);
+
+    const Vec3 N{0, 1, 0}; // coarse per-object bake: assumes an up-facing normal
+    auto eval = [&](const Vec3& p) -> Vec3 {
+        Vec3 acc{0, 0, 0};
+        for (const auto& s : lights_) {
+            if (!s.isStatic)
+                continue;
+            Vec3 Ldir;
+            float atten = 1.0f;
+            if (s.type == 0) {
+                Ldir = s.dir * -1.0f;
+            } else {
+                Vec3 toL = s.pos - p;
+                float d = length(toL);
+                Ldir = d > 1e-4f ? toL * (1.0f / d) : Vec3{0, 1, 0};
+                float f = (std::max)(0.0f, 1.0f - d / (std::max)(s.range, 1e-4f));
+                atten = f * f;
+                if (s.type == 2) {
+                    float cs = dot(Ldir * -1.0f, s.dir);
+                    float denom = (std::max)(s.cosInner - s.cosOuter, 1e-4f);
+                    atten *= (std::max)(0.0f, (std::min)(1.0f, (cs - s.cosOuter) / denom));
+                }
+            }
+            float ndl = (std::max)(0.0f, dot(N, Ldir));
+            acc = acc + s.color * (ndl * atten);
+        }
+        return acc;
+    };
+
+    std::function<void(Actor&)> walk = [&](Actor& a) {
+        if (auto* mr = a.getComponent<MeshRenderer>()) {
+            Vec3 c = eval(a.worldTransform().position);
+            mr->bakedLight[0] = c.x; mr->bakedLight[1] = c.y; mr->bakedLight[2] = c.z;
+            mr->bakedValid = true;
+        }
+        if (auto* lp = a.getComponent<LightProbeComponent>()) {
+            Vec3 c = eval(a.worldTransform().position);
+            lp->bakedLight[0] = c.x; lp->bakedLight[1] = c.y; lp->bakedLight[2] = c.z;
+            lp->bakedValid = true;
+        }
+        for (const auto& ch : a.children())
+            walk(*ch);
+    };
+    for (const auto& ch : scene.root().children())
+        walk(*ch);
+    CR_LOG("render", "Baked static lighting");
+}
+
 void Renderer::collectLights(Actor& actor) {
     if (auto* lc = actor.getComponent<LightComponent>()) {
         if (lc->enabled && actor.visible() && lights_.size() < kMaxLights) {
@@ -601,9 +678,14 @@ void Renderer::collectLights(Actor& actor) {
             s.range = lc->range;
             s.cosInner = std::cos(radians(lc->spotInnerDeg));
             s.cosOuter = std::cos(radians(lc->spotOuterDeg));
+            s.isStatic = lc->isStatic;
             lights_.push_back(s);
         }
     }
+    if (auto* lp = actor.getComponent<LightProbeComponent>())
+        if (lp->bakedValid)
+            probes_.push_back({actor.worldTransform().position,
+                               Vec3{lp->bakedLight[0], lp->bakedLight[1], lp->bakedLight[2]}});
     for (const auto& child : actor.children())
         collectLights(*child);
 }
@@ -614,6 +696,7 @@ void* Renderer::render(Scene& scene, const OrbitCamera& cam, int width, int heig
         return nullptr;
 
     lights_.clear();
+    probes_.clear();
     for (const auto& child : scene.root().children())
         collectLights(*child);
     shadowActive_ =

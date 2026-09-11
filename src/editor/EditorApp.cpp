@@ -303,6 +303,11 @@ void EditorApp::drawMenuBar() {
         if (ImGui::MenuItem("Create Mesh"))        scene_.select(spawn("mesh", p));
         if (ImGui::MenuItem("Create Sprite"))      scene_.select(spawn("sprite", p));
         if (ImGui::MenuItem("Create UI Control"))  scene_.select(spawn("ui", p));
+        ImGui::Separator();
+        if (ImGui::MenuItem("Bake Lighting")) {
+            renderer_.bakeLighting(scene_);
+            CR_LOG("render", "Baked static lights into meshes and light probes");
+        }
         ImGui::EndMenu();
     }
     if (ImGui::BeginMenu("Window")) {

@@ -50,6 +50,12 @@ public:
     // Drop a cached GPU mesh so a re-import is picked up.
     void invalidateMesh(const std::string& key);
 
+    // Evaluate every static light at each MeshRenderer's position (normal
+    // assumed up) and at each LightProbeComponent, storing the result as a
+    // per-object baked colour (task 59: "static lights ... only applied when
+    // lightmaps are baked"). Coarse per-object bake, not a per-texel lightmap.
+    void bakeLighting(Scene& scene);
+
     struct Options {
         Vec3 clear{0.043f, 0.051f, 0.070f};
         Actor* highlight = nullptr; // selected actor, drawn with a tinted base colour
@@ -85,8 +91,14 @@ private:
         float range = 8.0f;
         float cosInner = 1.0f;
         float cosOuter = 0.9f;
+        bool isStatic = false; // excluded from the real-time GPU light list
     };
     std::vector<LightSample> lights_;
+    struct ProbeSample {
+        Vec3 pos;
+        Vec3 baked;
+    };
+    std::vector<ProbeSample> probes_;
 
     bool ensureTargets(int w, int h);
     bool ensureShadowMap();
