@@ -329,13 +329,14 @@ void EditorApp::drawToolbar() {
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(14, 6));
     ImGui::Dummy(ImVec2(1, 2));
 
-    const char* playLabel = playing_ ? "  Pause  " : "  Play  ";
-    if (playing_)
+    const bool wasPlaying = playing_;
+    const char* playLabel = wasPlaying ? "  Pause  " : "  Play  ";
+    if (wasPlaying)
         ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
     ImGui::SameLine(0, 12);
     if (ImGui::Button(playLabel))
         setPlaying(!playing_);
-    if (playing_)
+    if (wasPlaying)
         ImGui::PopStyleColor();
 
     ImGui::SameLine();

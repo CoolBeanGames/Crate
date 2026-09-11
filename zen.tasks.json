@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "projectId": "8afe2a0217d7419db234ceda7ecb9dff",
   "name": "Crate",
-  "nextCardIndex": 67,
+  "nextCardIndex": 68,
   "latestExePath": "build-Release/Crate.exe",
   "latestReleasePath": "https://github.com/CoolBeanGames/Crate/releases/tag/v0.10.0",
   "tagCatalog": [
@@ -148,50 +148,40 @@
       "isCollapsed": false,
       "isSystem": true,
       "isLocked": false,
-      "tasks": []
-    },
-    {
-      "id": "14dbcb46c5b14e9e93f502f4c7f020dc",
-      "name": "Rendering",
-      "branch": "rendering",
-      "isArchive": false,
-      "isCollapsed": false,
-      "isSystem": false,
-      "isLocked": false,
       "tasks": [
         {
-          "id": "2eaff1cefdcf4140b1fa74091c8bea5d",
-          "index": 59,
+          "id": "b7f3a1c6e9d3411a8b6e2f0a7c5d9e41",
+          "index": 67,
           "kind": "task",
           "dueDate": null,
           "startedDate": null,
-          "priority": null,
-          "title": "static lights \u002B lightmap baking",
-          "task": "add a setting to lights that mark them as static, static lights are only applied when lightmaps are baked.",
+          "priority": "critical",
+          "title": "Play button crashes on click (ImGui style-color stack imbalance)",
+          "task": "Reported: attaching this script to an actor and pressing Play appeared to do nothing (\\u0022script isn't working\\u0022):\r\n\r\nclass Player : Actor\n{\n float move_speed = 1;\n float turn_speed = 1;\n int turn_axis = 0;\n func start()\n {\n }\n\n func update(float delta)\n {\n  transform.rotation.y += move_speed * delta;\n  transform.position += transform.forward * move_speed * delta;\n }\n\n func physics_update(float delta)\n {\n }\n \n func update_turn_axis()\n {\n  \n }\n}\n\r\nActual root cause had nothing to do with the script (verified the script's language semantics work correctly in isolation): EditorApp::drawToolbar() pushed a style color only `if (playing_)`, then called the Play button, whose click handler flips `playing_` synchronously via setPlaying(), and then popped the style color `if (playing_)` again — now true post-click — producing an unbalanced ImGui::PopStyleColor() on every single Play click (Debug builds hit the ImGui assertion and abort(); Release builds silently corrupt the style-color stack). Reproduced live via the actual editor (attach script, click Play), confirmed the exact assertion (\\u0022Calling PopStyleColor() too many times!\\u0022, imgui.cpp:3356) by bisecting the script content down to an empty update() body — the crash was 100% present with zero script content, proving it was unrelated to the reported script.\r\n\r\nFix: capture `wasPlaying = playing_` before the button, and gate both the push and the pop on that captured snapshot instead of the live (mutable-mid-frame) `playing_` flag.",
           "tags": [
-            "lighting",
-            "rendering"
+            "bug",
+            "UI"
           ],
           "files": [],
           "requirements": [
             {
-              "id": "b8dec3296a064fcf8142c253bd49090c",
-              "text": "static lights",
+              "id": "d4e1a2b3c4d5e6f7a8b9c0d1e2f3a4b5",
+              "text": "root cause identified (ImGui PushStyleColor/PopStyleColor gated on a flag that mutates mid-frame)",
               "isDone": true
             },
             {
-              "id": "5bb533383d824a27b3e8df1c7ee5bef1",
-              "text": "lightmap baking",
+              "id": "e5f2b3c4d5e6f7a8b9c0d1e2f3a4b5c6",
+              "text": "fixed by snapshotting playing_ before the Play button and using that snapshot for both push and pop",
               "isDone": true
             },
             {
-              "id": "f68ab9250f8c4db7bdf6a106cf6f5ea7",
-              "text": "lightmaps",
+              "id": "f6a3c4d5e6f7a8b9c0d1e2f3a4b5c6d7",
+              "text": "verified live: attach the reported script, press Play, engine runs without crashing (14+ seconds observed, hundreds of frames)",
               "isDone": true
             },
             {
-              "id": "61dbba170e834cd3aed8650e6ee47822",
-              "text": "light probes",
+              "id": "a7b4d5e6f7a8b9c0d1e2f3a4b5c6d7e8",
+              "text": "full test suite still passes after the fix",
               "isDone": true
             }
           ],
@@ -204,10 +194,20 @@
           "isDone": true,
           "isLocked": false,
           "isCollapsed": false,
-          "createdAt": "2026-09-10T23:29:43.7833772+00:00",
-          "updatedAt": "2026-09-10T23:45:00+00:00"
+          "createdAt": "2026-09-11T01:55:00+00:00",
+          "updatedAt": "2026-09-11T02:00:00+00:00"
         }
       ]
+    },
+    {
+      "id": "14dbcb46c5b14e9e93f502f4c7f020dc",
+      "name": "Rendering",
+      "branch": "rendering",
+      "isArchive": false,
+      "isCollapsed": false,
+      "isSystem": false,
+      "isLocked": false,
+      "tasks": []
     },
     {
       "id": "9463e19afcbe4cd18681afff19b840a9",
@@ -218,86 +218,6 @@
       "isSystem": false,
       "isLocked": false,
       "tasks": [
-        {
-          "id": "fd4414c9b4c54d73adf8ceed74d7668a",
-          "index": 62,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": "high",
-          "title": "Not Quite Right",
-          "task": "I made this script\r\nclass Player : Actor\n{\n float move_speed = 1;\n float turn_speed = 1;\n int turn_axis = 0;\n func start()\n {\n }\n\n func update(float delta)\n {\n  transform.rotation.y \u002B= move_speed * delta;\n  transform.position \u002B= transform.forward * move_speed * delta;\n }\n\n func physics_update(float delta)\n {\n }\n \n func update_turn_axis()\n {\n  \n }\n}\nactors have no forward vector as a child of transform, see that that gets added in, autocorrect doesnt work (see next task), brackets dont auto get added (nor do parenthesis) and auto indent doesnt work. Fix it",
-          "tags": [
-            "task"
-          ],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": true,
-            "merge": false
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-11T03:23:35.9865492+00:00",
-          "updatedAt": "2026-09-11T00:00:00+00:00"
-        },
-        {
-          "id": "769acfc712fb49248d994d64d0620f18",
-          "index": 63,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": "high",
-          "title": "Autocomplete",
-          "task": "I made this script:\r\nclass Player : Actor\n{\n float move_speed = 1;\n float turn_speed = 1;\n int turn_axis = 0;\n func start()\n {\n }\n\n func update(float delta)\n {\n  transform.rotation.y \u002B= move_speed * delta;\n  transform.position \u002B= transform.forward * move_speed * delta;\n }\n\n func physics_update(float delta)\n {\n }\n \n func update_turn_axis()\n {\n  \n }\n}\n\r\nAutocomplete should have tried to complete:\r\ntransform\r\ntransform.position\r\ntransform.rotation\r\nmove_speed\r\ndelta\r\n\r\nhowever none of it even started to auto complete, fix the autocomplete. As Soon as a variable function or class exists the scripting engine should be aware of it and ready for autocomplete",
-          "tags": [
-            "Scripting",
-            "script editor",
-            "autocomplete"
-          ],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": true,
-            "merge": false
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-11T03:23:41.6781365+00:00",
-          "updatedAt": "2026-09-11T00:00:00+00:00"
-        },
-        {
-          "id": "5012b56ad8fc4ef29e334010340436f7",
-          "index": 64,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Documentation",
-          "task": "Crreate a \u0022Wiki\u0022 to go along with the scripting language so i can look up how to do things. Keep it updated as we add more stuff",
-          "tags": [
-            "documentation"
-          ],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": true,
-            "merge": true
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-11T03:23:48.6295219+00:00",
-          "updatedAt": "2026-09-11T00:15:00+00:00"
-        },
         {
           "id": "048b62f5db3943cbb887b9cf15f2461b",
           "index": 66,
@@ -2460,6 +2380,134 @@
           "isCollapsed": false,
           "createdAt": "2026-09-10T23:31:27.0917012+00:00",
           "updatedAt": "2026-09-10T17:00:00+00:00"
+        },
+        {
+          "id": "2eaff1cefdcf4140b1fa74091c8bea5d",
+          "index": 59,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "static lights \u002B lightmap baking",
+          "task": "add a setting to lights that mark them as static, static lights are only applied when lightmaps are baked.",
+          "tags": [
+            "lighting",
+            "rendering"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "b8dec3296a064fcf8142c253bd49090c",
+              "text": "static lights",
+              "isDone": true
+            },
+            {
+              "id": "5bb533383d824a27b3e8df1c7ee5bef1",
+              "text": "lightmap baking",
+              "isDone": true
+            },
+            {
+              "id": "f68ab9250f8c4db7bdf6a106cf6f5ea7",
+              "text": "lightmaps",
+              "isDone": true
+            },
+            {
+              "id": "61dbba170e834cd3aed8650e6ee47822",
+              "text": "light probes",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T23:29:43.7833772+00:00",
+          "updatedAt": "2026-09-10T23:45:00+00:00"
+        },
+        {
+          "id": "fd4414c9b4c54d73adf8ceed74d7668a",
+          "index": 62,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": "high",
+          "title": "Not Quite Right",
+          "task": "I made this script\r\nclass Player : Actor\n{\n float move_speed = 1;\n float turn_speed = 1;\n int turn_axis = 0;\n func start()\n {\n }\n\n func update(float delta)\n {\n  transform.rotation.y \u002B= move_speed * delta;\n  transform.position \u002B= transform.forward * move_speed * delta;\n }\n\n func physics_update(float delta)\n {\n }\n \n func update_turn_axis()\n {\n  \n }\n}\nactors have no forward vector as a child of transform, see that that gets added in, autocorrect doesnt work (see next task), brackets dont auto get added (nor do parenthesis) and auto indent doesnt work. Fix it",
+          "tags": [
+            "task"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-11T03:23:35.9865492+00:00",
+          "updatedAt": "2026-09-11T00:00:00+00:00"
+        },
+        {
+          "id": "769acfc712fb49248d994d64d0620f18",
+          "index": 63,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": "high",
+          "title": "Autocomplete",
+          "task": "I made this script:\r\nclass Player : Actor\n{\n float move_speed = 1;\n float turn_speed = 1;\n int turn_axis = 0;\n func start()\n {\n }\n\n func update(float delta)\n {\n  transform.rotation.y \u002B= move_speed * delta;\n  transform.position \u002B= transform.forward * move_speed * delta;\n }\n\n func physics_update(float delta)\n {\n }\n \n func update_turn_axis()\n {\n  \n }\n}\n\r\nAutocomplete should have tried to complete:\r\ntransform\r\ntransform.position\r\ntransform.rotation\r\nmove_speed\r\ndelta\r\n\r\nhowever none of it even started to auto complete, fix the autocomplete. As Soon as a variable function or class exists the scripting engine should be aware of it and ready for autocomplete",
+          "tags": [
+            "Scripting",
+            "script editor",
+            "autocomplete"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-11T03:23:41.6781365+00:00",
+          "updatedAt": "2026-09-11T00:00:00+00:00"
+        },
+        {
+          "id": "5012b56ad8fc4ef29e334010340436f7",
+          "index": 64,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Documentation",
+          "task": "Crreate a \u0022Wiki\u0022 to go along with the scripting language so i can look up how to do things. Keep it updated as we add more stuff",
+          "tags": [
+            "documentation"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": true
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-11T03:23:48.6295219+00:00",
+          "updatedAt": "2026-09-11T00:15:00+00:00"
         }
       ]
     }

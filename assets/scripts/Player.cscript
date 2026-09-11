@@ -1,0 +1,24 @@
+class Player : Actor
+{
+    float move_speed = 1;
+    float turn_speed = 1;
+    int turn_axis = 0;
+    func start()
+    {
+    }
+
+    func update(float delta)
+    {
+        transform.rotation.y += move_speed * delta;
+        transform.position += transform.forward * move_speed * delta;
+    }
+
+    func physics_update(float delta)
+    {
+    }
+
+    func update_turn_axis()
+    {
+
+    }
+}
