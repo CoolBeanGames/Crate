@@ -8,6 +8,7 @@
 
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
 
 using namespace crate;
 
@@ -71,7 +72,45 @@ int main() {
     r.bakeLighting(scene);
     CHECK(std::fabs(mr->bakedLight[0] - first) < 1e-4f);
 
+    // --- Lightmap persistence (task 59: "lightmap baking" / "lightmaps") ---
+    // bakeLighting() writes the bake to disk; loadLightmap() on a freshly
+    // constructed scene (same name/hierarchy, nothing baked in memory yet)
+    // must reproduce the same baked values by reading it back.
+    const std::string tmpDir = "lightmap_test_tmp";
+    std::error_code ec;
+    std::filesystem::remove_all(tmpDir, ec);
+    r.bakeLighting(scene, tmpDir);
+    CHECK(std::filesystem::exists(tmpDir + "/lightmaps/bake.lightmap"));
+
+    Scene fresh("bake");
+    Actor* lightActor2 = fresh.add(std::make_unique<Actor3D>("StaticLight"));
+    (void)lightActor2;
+    Actor* mesh2 = fresh.add(std::make_unique<Actor3D>("Lit"));
+    mesh2->addComponent(std::make_unique<MeshRenderer>());
+    auto* mr2 = mesh2->getComponent<MeshRenderer>();
+    Actor* probeActor2 = fresh.add(std::make_unique<Actor3D>("Probe"));
+    probeActor2->addComponent(std::make_unique<LightProbeComponent>());
+    auto* probe2 = probeActor2->getComponent<LightProbeComponent>();
+    fresh.add(std::make_unique<Actor3D>("DynLight"));
+
+    CHECK(!mr2->bakedValid);
+    Renderer r2;
+    bool loaded = r2.loadLightmap(fresh, tmpDir);
+    CHECK(loaded);
+    CHECK(mr2->bakedValid);
+    CHECK(probe2->bakedValid);
+    CHECK(std::fabs(mr2->bakedLight[0] - mr->bakedLight[0]) < 1e-4f);
+    CHECK(std::fabs(probe2->bakedLight[0] - probe->bakedLight[0]) < 1e-4f);
+
+    // A scene with a different name has no lightmap file yet.
+    Scene other("no-such-scene");
+    Renderer r3;
+    CHECK(!r3.loadLightmap(other, tmpDir));
+
+    std::filesystem::remove_all(tmpDir, ec);
+
     if (fails == 0)
-        std::printf("ok  static-light baking: meshes + probes, dynamic lights excluded\n");
+        std::printf("ok  static-light baking: meshes + probes, dynamic lights excluded, "
+                    "lightmap persists to disk\n");
     return fails ? 1 : 0;
 }

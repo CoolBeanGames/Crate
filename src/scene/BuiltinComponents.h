@@ -26,7 +26,7 @@ public:
     bool castShadows = true;
     bool receiveShadows = true;
 
-    // Baked contribution of static lights (task 59), filled by "Bake Lighting".
+    // Baked contribution of static lights (task 59), filled by "Bake Lightmaps".
     // Sampled with an up-facing normal at the object's position - a coarse
     // per-object bake rather than a real per-texel lightmap.
     float bakedLight[3] = {0.0f, 0.0f, 0.0f};

@@ -9,8 +9,12 @@
 #include <d3dcompiler.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <functional>
 #include <vector>
 
@@ -642,7 +646,22 @@ bool Renderer::computeShadowVP(Mat4& out) const {
     return false;
 }
 
-void Renderer::bakeLighting(Scene& scene) {
+namespace {
+// Turn a scene name into a filesystem-safe basename ("My Scene" -> "My_Scene").
+std::string sanitizeFileName(const std::string& s) {
+    std::string out;
+    out.reserve(s.size());
+    for (char c : s)
+        out += (std::isalnum(static_cast<unsigned char>(c)) || c == '-' || c == '_') ? c : '_';
+    return out.empty() ? std::string("scene") : out;
+}
+} // namespace
+
+std::string Renderer::lightmapPath(const Scene& scene, const std::string& assetDir) {
+    return assetDir + "/lightmaps/" + sanitizeFileName(scene.name()) + ".lightmap";
+}
+
+void Renderer::bakeLighting(Scene& scene, const std::string& assetDir) {
     lights_.clear();
     probes_.clear();
     for (const auto& child : scene.root().children())
@@ -692,7 +711,87 @@ void Renderer::bakeLighting(Scene& scene) {
     };
     for (const auto& ch : scene.root().children())
         walk(*ch);
-    CR_LOG("render", "Baked static lighting");
+
+    // Persist the bake to disk (task 59: "lightmap baking" / "lightmaps") so it
+    // is picked up again next time this scene is opened, without re-baking.
+    std::string path = lightmapPath(scene, assetDir);
+    std::error_code ec;
+    std::filesystem::create_directories(std::filesystem::path(path).parent_path(), ec);
+    std::ofstream out(path, std::ios::binary | std::ios::trunc);
+    if (out) {
+        std::function<void(Actor&)> write = [&](Actor& a) {
+            std::string p = scene.pathOf(&a);
+            if (auto* mr = a.getComponent<MeshRenderer>(); mr && mr->bakedValid) {
+                out << "MESH\t" << p << '\t' << mr->bakedLight[0] << '\t' << mr->bakedLight[1]
+                    << '\t' << mr->bakedLight[2] << '\n';
+            }
+            if (auto* lp = a.getComponent<LightProbeComponent>(); lp && lp->bakedValid) {
+                out << "PROBE\t" << p << '\t' << lp->bakedLight[0] << '\t' << lp->bakedLight[1]
+                    << '\t' << lp->bakedLight[2] << '\n';
+            }
+            for (const auto& ch2 : a.children())
+                write(*ch2);
+        };
+        for (const auto& ch : scene.root().children())
+            write(*ch);
+        CR_LOG("render", "Baked static lighting -> " + path);
+    } else {
+        CR_ERROR("render", "Baked static lighting but could not write " + path);
+    }
+}
+
+bool Renderer::loadLightmap(Scene& scene, const std::string& assetDir) {
+    std::string path = lightmapPath(scene, assetDir);
+    std::ifstream in(path, std::ios::binary);
+    if (!in)
+        return false;
+
+    bool any = false;
+    std::string line;
+    while (std::getline(in, line)) {
+        if (!line.empty() && line.back() == '\r')
+            line.pop_back();
+        if (line.empty())
+            continue;
+        // Fields are tab-separated: KIND \t ACTOR_PATH \t R \t G \t B.
+        std::vector<std::string> fields;
+        size_t start = 0;
+        while (true) {
+            size_t tab = line.find('\t', start);
+            fields.push_back(line.substr(start, tab == std::string::npos ? std::string::npos
+                                                                           : tab - start));
+            if (tab == std::string::npos)
+                break;
+            start = tab + 1;
+        }
+        if (fields.size() != 5)
+            continue;
+        const std::string& kind = fields[0];
+        const std::string& actorPath = fields[1];
+        float r = std::strtof(fields[2].c_str(), nullptr);
+        float g = std::strtof(fields[3].c_str(), nullptr);
+        float b = std::strtof(fields[4].c_str(), nullptr);
+
+        Actor* actor = scene.atPath(actorPath);
+        if (!actor)
+            continue;
+        if (kind == "MESH") {
+            if (auto* mr = actor->getComponent<MeshRenderer>()) {
+                mr->bakedLight[0] = r; mr->bakedLight[1] = g; mr->bakedLight[2] = b;
+                mr->bakedValid = true;
+                any = true;
+            }
+        } else if (kind == "PROBE") {
+            if (auto* lp = actor->getComponent<LightProbeComponent>()) {
+                lp->bakedLight[0] = r; lp->bakedLight[1] = g; lp->bakedLight[2] = b;
+                lp->bakedValid = true;
+                any = true;
+            }
+        }
+    }
+    if (any)
+        CR_LOG("render", "Loaded baked lightmap <- " + path);
+    return any;
 }
 
 void Renderer::collectLights(Actor& actor) {

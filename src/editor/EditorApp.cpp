@@ -63,6 +63,7 @@ EditorApp::EditorApp() : scene_(Scene::makeSample()) {
     }
     renderer_.setMeshLibrary(&meshLib_);
     renderer_.setMaterialLibrary(&materialLib_);
+    renderer_.loadLightmap(scene_, assetDir_); // apply any lightmap baked for this scene
     CR_LOG("app", "Crate editor started");
     CR_LOG("scene", "Loaded sample scene with " + std::to_string(scene_.actorCount()) + " actors");
 }
@@ -270,10 +271,12 @@ void EditorApp::drawMenuBar() {
     if (ImGui::BeginMenu("File")) {
         if (ImGui::MenuItem("New Scene")) {
             scene_ = Scene("Untitled");
+            renderer_.loadLightmap(scene_, assetDir_);
             CR_LOG("scene", "New scene created");
         }
         if (ImGui::MenuItem("Load Sample Scene")) {
             scene_ = Scene::makeSample();
+            renderer_.loadLightmap(scene_, assetDir_);
             CR_LOG("scene", "Reloaded sample scene");
         }
         ImGui::Separator();
@@ -304,8 +307,8 @@ void EditorApp::drawMenuBar() {
         if (ImGui::MenuItem("Create Sprite"))      scene_.select(spawn("sprite", p));
         if (ImGui::MenuItem("Create UI Control"))  scene_.select(spawn("ui", p));
         ImGui::Separator();
-        if (ImGui::MenuItem("Bake Lighting")) {
-            renderer_.bakeLighting(scene_);
+        if (ImGui::MenuItem("Bake Lightmaps")) {
+            renderer_.bakeLighting(scene_, assetDir_);
             CR_LOG("render", "Baked static lights into meshes and light probes");
         }
         ImGui::EndMenu();

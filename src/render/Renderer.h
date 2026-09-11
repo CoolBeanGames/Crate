@@ -54,7 +54,16 @@ public:
     // assumed up) and at each LightProbeComponent, storing the result as a
     // per-object baked colour (task 59: "static lights ... only applied when
     // lightmaps are baked"). Coarse per-object bake, not a per-texel lightmap.
-    void bakeLighting(Scene& scene);
+    // The result is also written to disk under <assetDir>/lightmaps/ (task 59:
+    // "lightmap baking" / "lightmaps") so it survives to the next launch.
+    void bakeLighting(Scene& scene, const std::string& assetDir = "assets");
+
+    // Load a previously baked lightmap file for `scene` (matched by scene
+    // name) and apply it to the matching actors' MeshRenderer/LightProbe
+    // components, keyed by hierarchy path. Called whenever a scene is
+    // (re)opened so baked static lighting shows up without re-baking. Returns
+    // true if a lightmap file was found and applied.
+    bool loadLightmap(Scene& scene, const std::string& assetDir = "assets");
 
     struct Options {
         Vec3 clear{0.043f, 0.051f, 0.070f};
@@ -109,6 +118,7 @@ private:
     void collectLights(Actor& actor); // fills lights_ (world space), capped
     bool computeShadowVP(Mat4& out) const; // false if no shadow-casting light
     void releaseTargets();
+    static std::string lightmapPath(const Scene& scene, const std::string& assetDir);
 
     ID3D11Device* device_ = nullptr;
     ID3D11DeviceContext* ctx_ = nullptr;
