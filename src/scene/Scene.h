@@ -53,6 +53,10 @@ public:
     // The actor at a path produced by pathOf(), or nullptr.
     Actor* atPath(const std::string& path) const;
 
+    // The actor whose AUUID matches, or nullptr. Used to re-find an actor
+    // across a clone (which preserves AUUIDs) once pointers have changed.
+    Actor* findByAuid(const std::string& auid) const;
+
     // Current hierarchy path -> actor AUUID, for every actor in the scene.
     // Recomputed from the live tree, so it always reflects the latest moves.
     std::vector<std::pair<std::string, std::string>> actorTable() const;

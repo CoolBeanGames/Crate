@@ -79,7 +79,35 @@ int main() {
         }
     }
 
+    // Task 68: an inspector-edited exposed field must survive a scene clone
+    // (used for the play-mode backup/restore), not revert to its script default.
+    {
+        Scene s("t68");
+        Actor* a = attach(s, sys, R"(class Bug68 : Actor
+{
+    float turn_speed = 90;
+})", "Bug68");
+        CHECK(a != nullptr);
+        if (a) {
+            auto* sc = dynamic_cast<script::ScriptComponent*>(a->components()[0].get());
+            auto obj = sc->object(); // instantiate the field defaults
+            CHECK(obj != nullptr);
+            if (obj)
+                obj->fields["turn_speed"] = script::Value::Float(275.0);
+
+            auto cloneComp = sc->clone();
+            auto* clonedSc = dynamic_cast<script::ScriptComponent*>(cloneComp.get());
+            CHECK(clonedSc != nullptr);
+            if (clonedSc) {
+                auto clonedObj = clonedSc->object();
+                CHECK(clonedObj != nullptr);
+                if (clonedObj)
+                    CHECK(clonedObj->fields["turn_speed"].f == 275.0);
+            }
+        }
+    }
+
     if (fails == 0)
-        std::printf("ok  script bug regressions (tasks 45, 46)\n");
+        std::printf("ok  script bug regressions (tasks 45, 46, 68)\n");
     return fails ? 1 : 0;
 }

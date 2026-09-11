@@ -1694,13 +1694,12 @@ void EditorApp::setPlaying(bool playing) {
         CR_LOG("play", "Entered play mode");
     } else {
         Actor* wasSelected = scene_.selected();
-        std::string selName = wasSelected ? wasSelected->name() : std::string();
+        std::string selAuid = wasSelected ? wasSelected->auid() : std::string();
         scene_ = std::move(playBackup_);
         playBackup_ = Scene("");
-        scene_.select(nullptr);
+        scene_.select(scene_.findByAuid(selAuid));
         script::ScriptSystem::get().resetStatics();
         script::ScriptSystem::get().resetInput();
-        (void)selName;
         CR_GAME("play", "--- Play stopped ---");
         CR_LOG("play", "Returned to edit mode (scene restored)");
     }

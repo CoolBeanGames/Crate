@@ -27,7 +27,16 @@ public:
     void drawInspector() override;
 
     std::unique_ptr<Component> clone() const override {
-        return std::make_unique<ScriptComponent>(ctx_, cls_);
+        auto c = std::make_unique<ScriptComponent>(ctx_, cls_);
+        // Preserve current field values (e.g. inspector edits) instead of
+        // rebuilding a fresh object with class defaults -- a clone is used
+        // both for actor duplication and for the play-mode backup/restore,
+        // neither of which should discard values the user already set.
+        if (obj_) {
+            c->obj_ = std::make_shared<ScriptObject>(*obj_);
+            c->objGen_ = objGen_;
+        }
+        return c;
     }
 
 private:

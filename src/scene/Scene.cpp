@@ -159,6 +159,24 @@ std::vector<std::pair<std::string, std::string>> Scene::actorTable() const {
     return out;
 }
 
+namespace {
+Actor* findByAuidRec(Actor& node, const std::string& auid) {
+    for (const auto& ch : node.children()) {
+        if (ch->auid() == auid)
+            return ch.get();
+        if (Actor* found = findByAuidRec(*ch, auid))
+            return found;
+    }
+    return nullptr;
+}
+} // namespace
+
+Actor* Scene::findByAuid(const std::string& auid) const {
+    if (auid.empty())
+        return nullptr;
+    return findByAuidRec(*root_, auid);
+}
+
 Scene Scene::clone() const {
     Scene s(name_);
     for (const auto& c : root_->children())
