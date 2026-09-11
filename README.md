@@ -50,3 +50,8 @@ Actor
 ├── Actor2D ── SpriteActor, UIControlActor
 └── Actor3D ── MeshActor
 ```
+
+## Scripting
+
+Crate has its own scripting language, cScript (`.cscript` files). See the
+[scripting wiki](docs/scripting/README.md) for the language reference.
