@@ -783,6 +783,8 @@ void EditorApp::drawViewport() {
                 ImGui::SameLine();
                 ImGui::Checkbox("Fog", &fog_);
                 ImGui::SameLine();
+                ImGui::Checkbox("Shadows", &shadows_);
+                ImGui::SameLine();
                 ImGui::TextDisabled("W/E/R  |  drag = orbit  |  wheel = zoom");
 
                 ImVec2 size = ImGui::GetContentRegionAvail();
@@ -790,6 +792,7 @@ void EditorApp::drawViewport() {
                 Renderer::Options opt;
                 opt.highlight = scene_.selected();
                 opt.fogEnabled = fog_;
+                opt.shadows = shadows_;
                 void* srv = renderer_.ready() ? renderer_.render(scene_, camera_, w, h, opt) : nullptr;
 
                 if (srv) {
@@ -943,7 +946,7 @@ void EditorApp::drawViewportOverlays(float x, float y, float w, float h) {
             circle(o, right, fwd, lc->range, lcol);
             circle(o, up, fwd, lc->range, lcol);
         } else if (lc->type == LightComponent::Type::Spot) {
-            Vec3 dir = fwd * -1.0f; // spot forward is local -Z (matches Input)
+            Vec3 dir = fwd; // light shines along local +Z
             float dist = lc->range;
             float outerR = dist * std::tan(radians(lc->spotOuterDeg));
             float innerR = dist * std::tan(radians(lc->spotInnerDeg));
@@ -955,11 +958,11 @@ void EditorApp::drawViewportOverlays(float x, float y, float w, float h) {
                 Vec3 e = end + right * (std::cos(a) * outerR) + up * (std::sin(a) * outerR);
                 line(o, e, lcol);
             }
-        } else { // directional: a short ray bundle
+        } else { // directional: a short parallel-ray bundle along +Z
             for (int i = -1; i <= 1; ++i)
                 for (int j = -1; j <= 1; ++j) {
                     Vec3 s = o + right * (i * 0.4f) + up * (j * 0.4f);
-                    line(s, s + fwd * -1.6f, lcol);
+                    line(s, s + fwd * 1.6f, lcol);
                 }
         }
     }

@@ -102,6 +102,7 @@ private:
     bool gizmoLocal_ = true; // local vs world axes
     bool gizmoInit_ = false;
     bool fog_ = false;       // viewport distance fog
+    bool shadows_ = true;    // viewport real-time shadows
 
     // Input Map editing.
     InputMap inputMap_;         // the project's active input map

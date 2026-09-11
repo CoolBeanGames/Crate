@@ -24,6 +24,7 @@ public:
     std::string texturePath;        // albedo override when no material is set
     float tint[4] = {1.0f, 1.0f, 1.0f, 1.0f};
     bool castShadows = true;
+    bool receiveShadows = true;
 
     // MeshLibrary key for the geometry: empty -> use the primitive fallback.
     std::string meshKey() const { return usePrimitive ? std::string() : meshPath; }

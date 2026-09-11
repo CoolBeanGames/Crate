@@ -206,12 +206,12 @@ Scene Scene::makeSample() {
     s.add(std::move(lamp), set);
 
     auto sun = std::make_unique<Actor3D>("Sun");
-    sun->transform().rotationEuler = {55.0f, -30.0f, 0.0f};
+    sun->transform().rotationEuler = {58.0f, -30.0f, 0.0f}; // +Z points down-forward
     {
         auto lc = std::make_unique<LightComponent>();
         lc->type = LightComponent::Type::Directional;
-        lc->color[0] = 0.55f; lc->color[1] = 0.6f; lc->color[2] = 0.8f;
-        lc->intensity = 0.5f;
+        lc->color[0] = 0.7f; lc->color[1] = 0.72f; lc->color[2] = 0.85f;
+        lc->intensity = 0.85f;
         sun->addComponent(std::move(lc));
     }
     s.add(std::move(sun), set);

@@ -26,6 +26,7 @@ void MeshRenderer::drawInspector() {
     // fields (the component can't reach the asset libraries).
     ImGui::ColorEdit4("Tint", tint);
     ImGui::Checkbox("Cast Shadows", &castShadows);
+    ImGui::Checkbox("Receive Shadows", &receiveShadows);
 }
 
 void LightComponent::drawInspector() {
@@ -43,7 +44,7 @@ void LightComponent::drawInspector() {
         if (spotOuterDeg < spotInnerDeg)
             spotOuterDeg = spotInnerDeg;
     }
-    ImGui::TextDisabled("-Z is the light's forward direction");
+    ImGui::TextDisabled("+Z (the normal arrow) is the light's forward direction");
 }
 
 void SpinnerComponent::start() {
