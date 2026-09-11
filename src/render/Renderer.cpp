@@ -45,6 +45,7 @@ struct CBData {
     float fogColor[4];
     float fogParams[4]; // x=start y=end z=enabled
     float shadow[4];    // x=enabled y=receive z=1/mapSize w=bias
+    float dither[4];    // x=enabled y=levels
     GpuLight lights[kMaxLights];
 };
 
@@ -62,6 +63,7 @@ cbuffer CB : register(b0)
     float4   uFogColor;
     float4   uFogParams;
     float4   uShadow;
+    float4   uDither;
     Light    uLights[MAX_LIGHTS];
 };
 Texture2D             uTex : register(t0);
@@ -143,11 +145,35 @@ float shadowFactor(float4 lpos)
     return s / 9.0;
 }
 
+static const float kBayer4x4[16] = {
+     0,  8,  2, 10,
+    12,  4, 14,  6,
+     3, 11,  1,  9,
+    15,  7, 13,  5
+};
+
+// Ordered (Bayer) dither: quantizes each channel to uDither.y bands using a
+// per-pixel threshold, so lighting bands/dithers instead of shading smoothly.
+float3 ditherQuantize(float3 c, float2 screenPos)
+{
+    int bx = ((int)screenPos.x) & 3;
+    int by = ((int)screenPos.y) & 3;
+    float threshold = (kBayer4x4[by * 4 + bx] + 0.5) / 16.0;
+    float levels = max(uDither.y - 1.0, 1.0);
+    float3 scaled = c * levels;
+    float3 base = floor(scaled);
+    float3 frac = scaled - base;
+    float3 stepped = base + step(threshold, frac);
+    return stepped / levels;
+}
+
 float4 PSMain(VSOut i) : SV_TARGET
 {
     float3 tex = lerp(float3(1,1,1), uTex.Sample(uSamp, i.uv).rgb, uParams.x);
     float3 lit = (uParams.z > 0.5) ? float3(1,1,1)
                                    : uAmbient.rgb + i.light * shadowFactor(i.lpos);
+    if (uDither.x > 0.5)
+        lit = ditherQuantize(saturate(lit), i.pos.xy);
     float3 col = uBaseColor.rgb * tex * lit + uParams.y;
     col = lerp(uFogColor.rgb, col, saturate(i.fog));
     return float4(col, uBaseColor.a);
@@ -472,6 +498,8 @@ void Renderer::drawActor(Actor& actor, const Mat4& viewProj, const Options& opt,
     std::string texPath = mr->texturePath;
     float emissive = 0.0f;
     bool unlit = false;
+    bool dither = false;
+    float ditherLevels = 4.0f;
     if (materials_ && !mr->materialRef.empty()) {
         if (const Material* mat = materials_->find(mr->materialRef)) {
             for (int i = 0; i < 4; ++i)
@@ -479,6 +507,8 @@ void Renderer::drawActor(Actor& actor, const Mat4& viewProj, const Options& opt,
             texPath = mat->texturePath.empty() ? mr->texturePath : mat->texturePath;
             emissive = mat->emissive;
             unlit = mat->unlit;
+            dither = mat->dither;
+            ditherLevels = mat->ditherLevels;
         }
     }
 
@@ -492,6 +522,8 @@ void Renderer::drawActor(Actor& actor, const Mat4& viewProj, const Options& opt,
     cb.shadow[1] = mr->receiveShadows ? 1.0f : 0.0f;
     cb.shadow[2] = 1.0f / static_cast<float>(kShadowSize);
     cb.shadow[3] = 0.004f;
+    cb.dither[0] = dither ? 1.0f : 0.0f;
+    cb.dither[1] = ditherLevels;
     bool sel = opt.highlight == &actor;
     cb.baseColor[0] = sel ? baseColor[0] * 0.85f + 0.10f : baseColor[0];
     cb.baseColor[1] = sel ? baseColor[1] * 0.85f + 0.05f : baseColor[1];

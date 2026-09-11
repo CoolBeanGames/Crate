@@ -15,6 +15,11 @@ struct Material {
     std::string texturePath; // resolved to a loadable path when possible
     float emissive = 0.0f;   // adds to the lit result (0..1+)
     bool unlit = false;      // ignore scene lighting (flat/PSX look)
+
+    // Task 60: quantize the light term with an ordered (Bayer) dither instead
+    // of shading it smoothly - a retro, banded PSX look.
+    bool dither = false;
+    float ditherLevels = 4.0f; // number of light bands (2 = high-contrast, 8+ = subtle)
 };
 
 // Runtime store of imported geometry and materials, keyed by source path.

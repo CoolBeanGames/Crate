@@ -602,6 +602,9 @@ void EditorApp::drawInspector() {
                     renderer_.invalidateTexture(mat->texturePath);
                 ImGui::DragFloat("Emissive", &mat->emissive, 0.01f, 0.0f, 4.0f);
                 ImGui::Checkbox("Unlit", &mat->unlit);
+                ImGui::Checkbox("Dithered Lighting", &mat->dither);
+                if (mat->dither)
+                    ImGui::DragFloat("Dither Levels", &mat->ditherLevels, 0.1f, 2.0f, 16.0f);
                 ImGui::Spacing();
 
                 static std::string renameBuf;
