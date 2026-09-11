@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "projectId": "8afe2a0217d7419db234ceda7ecb9dff",
   "name": "Crate",
-  "nextCardIndex": 62,
-  "latestExePath": "C:\\Users\\haptic\\Documents\\git\\Crate\\build-Release\\Crate.exe",
-  "latestReleasePath": "https://github.com/CoolBeanGames/Crate/releases/tag/v0.9.0",
+  "nextCardIndex": 67,
+  "latestExePath": "build-Release/Crate.exe",
+  "latestReleasePath": "https://github.com/CoolBeanGames/Crate/releases/tag/v0.10.0-rc2",
   "tagCatalog": [
     {
       "name": "bug",
@@ -129,6 +129,14 @@
     {
       "name": "asset browser swapped",
       "color": "#8C553E"
+    },
+    {
+      "name": "documentation",
+      "color": "#704F9B"
+    },
+    {
+      "name": "autocomplete",
+      "color": "#6557B8"
     }
   ],
   "branches": [
@@ -140,80 +148,7 @@
       "isCollapsed": false,
       "isSystem": true,
       "isLocked": false,
-      "tasks": [
-        {
-          "id": "064051784cdc43b7aeba0c5540b95482",
-          "index": 1,
-          "kind": "note",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "about the project",
-          "task": "This is going to be a simple 3D game engine, a merge of Unreal Unity and Godot with some design principals belonging to one or the other and a melding of the Three. My style is simple PSX style horror games so this engine will be geared towords that. For now we will work in \u0027main\u0027 and focus on the very very basics, before moving into more strucutres sub systems via branches\r\n\r\nLanguage Used should be C\u002B\u002B",
-          "tags": [],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": false,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-10T00:36:52.7890665+00:00",
-          "updatedAt": "2026-09-10T01:10:44.1560669+00:00"
-        },
-        {
-          "id": "d063b2a4610c4432a04c05845bbd146a",
-          "index": 6,
-          "kind": "note",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Ensure we are adding system log",
-          "task": "As we built the engine make sure we are building out the basics of the system log, and logging what the engine is doing",
-          "tags": [],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": false,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-10T01:03:31.0947377+00:00",
-          "updatedAt": "2026-09-10T01:10:43.3135053+00:00"
-        },
-        {
-          "id": "e130e7ca7bc34fe5a7f296b11247e8d0",
-          "index": 7,
-          "kind": "note",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Component system",
-          "task": "Actors will consist of components which will be built out in other branches and merged to main. Components are the building blocks of everything. \r\n\r\nMesh renderers are a component\r\nSprites are a component\r\ntextboxes are a component\r\nRigidbodies and colliders are components\r\n\r\nEach of these can be added to obejcts and add the actual functionality.",
-          "tags": [],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": false,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-10T01:04:06.9034488+00:00",
-          "updatedAt": "2026-09-10T01:10:42.5622894+00:00"
-        }
-      ]
+      "tasks": []
     },
     {
       "id": "14dbcb46c5b14e9e93f502f4c7f020dc",
@@ -247,12 +182,12 @@
             {
               "id": "5bb533383d824a27b3e8df1c7ee5bef1",
               "text": "lightmap baking",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "f68ab9250f8c4db7bdf6a106cf6f5ea7",
               "text": "lightmaps",
-              "isDone": false
+              "isDone": true
             },
             {
               "id": "61dbba170e834cd3aed8650e6ee47822",
@@ -266,11 +201,11 @@
             "release": true,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T23:29:43.7833772+00:00",
-          "updatedAt": "2026-09-10T16:30:00+00:00"
+          "updatedAt": "2026-09-10T23:45:00+00:00"
         }
       ]
     },
@@ -284,51 +219,16 @@
       "isLocked": false,
       "tasks": [
         {
-          "id": "f86523a60f7e49db803c8d21d1381845",
-          "index": 16,
-          "kind": "note",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "We are going to create a custom scripting engine",
-          "task": "the code at compile time will compile down to native c\u002B\u002B, although in the editor just interprit the script literally to speed processing up. We will have an in engine script editor. Scripting will be a blend of C# and GDscript",
-          "tags": [],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": false,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-10T01:24:42.3980421+00:00",
-          "updatedAt": "2026-09-10T01:26:17.0976737+00:00"
-        }
-      ]
-    },
-    {
-      "id": "2b668c739ffe45aaa32fa229a7aff5ed",
-      "name": "Assets",
-      "branch": "assets",
-      "isArchive": false,
-      "isCollapsed": false,
-      "isSystem": false,
-      "isLocked": false,
-      "tasks": [
-        {
-          "id": "cc713c6222cf4b21810c20af7a80aa54",
-          "index": 61,
+          "id": "fd4414c9b4c54d73adf8ceed74d7668a",
+          "index": 62,
           "kind": "task",
           "dueDate": null,
           "startedDate": null,
-          "priority": null,
-          "title": "convert asset browser",
-          "task": "make the asset browser an icon window rather than a text based list. keep all functionality just change how its presented",
+          "priority": "high",
+          "title": "Not Quite Right",
+          "task": "I made this script\r\nclass Player : Actor\n{\n float move_speed = 1;\n float turn_speed = 1;\n int turn_axis = 0;\n func start()\n {\n }\n\n func update(float delta)\n {\n  transform.rotation.y \u002B= move_speed * delta;\n  transform.position \u002B= transform.forward * move_speed * delta;\n }\n\n func physics_update(float delta)\n {\n }\n \n func update_turn_axis()\n {\n  \n }\n}\nactors have no forward vector as a child of transform, see that that gets added in, autocorrect doesnt work (see next task), brackets dont auto get added (nor do parenthesis) and auto indent doesnt work. Fix it",
           "tags": [
-            "asset browser swapped"
+            "task"
           ],
           "files": [],
           "requirements": [],
@@ -341,10 +241,122 @@
           "isDone": true,
           "isLocked": false,
           "isCollapsed": false,
-          "createdAt": "2026-09-10T23:31:27.0917012+00:00",
-          "updatedAt": "2026-09-10T17:00:00.0000000+00:00"
+          "createdAt": "2026-09-11T03:23:35.9865492+00:00",
+          "updatedAt": "2026-09-11T00:00:00+00:00"
+        },
+        {
+          "id": "769acfc712fb49248d994d64d0620f18",
+          "index": 63,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": "high",
+          "title": "Autocomplete",
+          "task": "I made this script:\r\nclass Player : Actor\n{\n float move_speed = 1;\n float turn_speed = 1;\n int turn_axis = 0;\n func start()\n {\n }\n\n func update(float delta)\n {\n  transform.rotation.y \u002B= move_speed * delta;\n  transform.position \u002B= transform.forward * move_speed * delta;\n }\n\n func physics_update(float delta)\n {\n }\n \n func update_turn_axis()\n {\n  \n }\n}\n\r\nAutocomplete should have tried to complete:\r\ntransform\r\ntransform.position\r\ntransform.rotation\r\nmove_speed\r\ndelta\r\n\r\nhowever none of it even started to auto complete, fix the autocomplete. As Soon as a variable function or class exists the scripting engine should be aware of it and ready for autocomplete",
+          "tags": [
+            "Scripting",
+            "script editor",
+            "autocomplete"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-11T03:23:41.6781365+00:00",
+          "updatedAt": "2026-09-11T00:00:00+00:00"
+        },
+        {
+          "id": "5012b56ad8fc4ef29e334010340436f7",
+          "index": 64,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Documentation",
+          "task": "Crreate a \u0022Wiki\u0022 to go along with the scripting language so i can look up how to do things. Keep it updated as we add more stuff",
+          "tags": [
+            "documentation"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": true
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-11T03:23:48.6295219+00:00",
+          "updatedAt": "2026-09-11T03:24:21.3912423+00:00"
+        },
+        {
+          "id": "048b62f5db3943cbb887b9cf15f2461b",
+          "index": 66,
+          "kind": "cleanup",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "",
+          "task": "",
+          "tags": [],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-11T03:27:38.0423229+00:00",
+          "updatedAt": "2026-09-11T03:27:38.042323+00:00"
+        },
+        {
+          "id": "115447b334554c04aa1e059e0daa0821",
+          "index": 65,
+          "kind": "break",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "",
+          "task": "",
+          "tags": [],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-11T03:27:31.1614384+00:00",
+          "updatedAt": "2026-09-11T03:27:31.1614386+00:00"
         }
       ]
+    },
+    {
+      "id": "2b668c739ffe45aaa32fa229a7aff5ed",
+      "name": "Assets",
+      "branch": "assets",
+      "isArchive": false,
+      "isCollapsed": false,
+      "isSystem": false,
+      "isLocked": false,
+      "tasks": []
     },
     {
       "id": "archive",
@@ -2422,6 +2434,32 @@
           "isCollapsed": false,
           "createdAt": "2026-09-10T23:30:33.5271578+00:00",
           "updatedAt": "2026-09-10T16:30:00+00:00"
+        },
+        {
+          "id": "cc713c6222cf4b21810c20af7a80aa54",
+          "index": 61,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "convert asset browser",
+          "task": "make the asset browser an icon window rather than a text based list. keep all functionality just change how its presented",
+          "tags": [
+            "asset browser swapped"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T23:31:27.0917012+00:00",
+          "updatedAt": "2026-09-10T17:00:00+00:00"
         }
       ]
     }
