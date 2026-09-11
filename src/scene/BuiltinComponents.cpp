@@ -26,6 +26,7 @@ void MeshRenderer::drawInspector() {
     // fields (the component can't reach the asset libraries).
     ImGui::ColorEdit4("Tint", tint);
     ImGui::Checkbox("Cast Shadows", &castShadows);
+    ImGui::Checkbox("Receive Shadows", &receiveShadows);
 }
 
 void LightComponent::drawInspector() {
@@ -43,7 +44,15 @@ void LightComponent::drawInspector() {
         if (spotOuterDeg < spotInnerDeg)
             spotOuterDeg = spotInnerDeg;
     }
-    ImGui::TextDisabled("-Z is the light's forward direction");
+    ImGui::TextDisabled("+Z (the normal arrow) is the light's forward direction");
+    ImGui::Checkbox("Static", &isStatic);
+    if (isStatic)
+        ImGui::TextDisabled("Static: only affects meshes/probes via Bake Lighting");
+}
+
+void LightProbeComponent::drawInspector() {
+    ImGui::TextDisabled(bakedValid ? "baked" : "not baked yet - Object > Bake Lighting");
+    ImGui::ColorButton("##baked", ImVec4(bakedLight[0], bakedLight[1], bakedLight[2], 1.0f));
 }
 
 void SpinnerComponent::start() {

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "projectId": "8afe2a0217d7419db234ceda7ecb9dff",
   "name": "Crate",
-  "nextCardIndex": 55,
+  "nextCardIndex": 62,
   "latestExePath": "C:\\Users\\haptic\\Documents\\git\\Crate\\build-Release\\Crate.exe",
   "latestReleasePath": "https://github.com/CoolBeanGames/Crate/releases/tag/v0.7.0",
   "tagCatalog": [
@@ -117,6 +117,18 @@
     {
       "name": "lighting",
       "color": "#3F6F77"
+    },
+    {
+      "name": "gizmos",
+      "color": "#57742F"
+    },
+    {
+      "name": "shadows",
+      "color": "#3F6F77"
+    },
+    {
+      "name": "asset browser swapped",
+      "color": "#8C553E"
     }
   ],
   "branches": [
@@ -200,34 +212,6 @@
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:04:06.9034488+00:00",
           "updatedAt": "2026-09-10T01:10:42.5622894+00:00"
-        },
-        {
-          "id": "c56440b816e04b25828b3ba362c3fa1e",
-          "index": 54,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "transform handles",
-          "task": "add draggable translate, rotate, and scale modes and handles to the viewport for the selected object",
-          "tags": [
-            "ui",
-            "3d",
-            "viewport"
-          ],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": true,
-            "merge": false
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-10T18:56:02.4556693+00:00",
-          "updatedAt": "2026-09-10T13:30:00.0000000+00:00"
         }
       ]
     },
@@ -241,62 +225,188 @@
       "isLocked": false,
       "tasks": [
         {
-          "id": "be28e9f9d30f4dd59726bd6c43658ee5",
-          "index": 52,
+          "id": "d4a33cfd1f1b44d8adb5d5e25cb6a8e5",
+          "index": 55,
           "kind": "task",
           "dueDate": null,
           "startedDate": null,
           "priority": null,
-          "title": "Basic Lighting",
-          "task": "add in basic (vertex) lighting support",
+          "title": "Normal Arrow Gizmo",
+          "task": "add a gizmo of an arrow that points in the direction of the selected Actors normal (\u002Bz)",
+          "tags": [
+            "gizmos",
+            "rendering"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T23:25:50.684687+00:00",
+          "updatedAt": "2026-09-10T16:00:00.0000000+00:00"
+        },
+        {
+          "id": "0750bc487c85454780f212771f69a14e",
+          "index": 56,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "omni light range gizmo",
+          "task": "add a gizmo for the selected omni light that shows its range as a wireframe sphere",
           "tags": [
             "rendering",
             "lighting"
           ],
           "files": [],
-          "requirements": [
-            {
-              "id": "dbc829087e664b90915e718ac57c4800",
-              "text": "vertex lighting",
-              "isDone": true
-            },
-            {
-              "id": "eeaa7f724d1748d0af7e832546db1dfd",
-              "text": "point",
-              "isDone": true
-            },
-            {
-              "id": "ce79e82e59e34987bf6dae440610a697",
-              "text": "spot",
-              "isDone": true
-            },
-            {
-              "id": "1fc24c789faf4cfb9c347a4513113b8a",
-              "text": "directional",
-              "isDone": true
-            },
-            {
-              "id": "c8c495b950f245439fe8b9e85b9b878c",
-              "text": "future support for fog",
-              "isDone": true
-            },
-            {
-              "id": "949c6f24ec314b96b4688a025dc65307",
-              "text": "colors",
-              "isDone": true
-            }
-          ],
+          "requirements": [],
           "flags": {
-            "commit": false,
+            "commit": true,
             "build": false,
             "release": false,
             "merge": false
           },
           "isDone": true,
           "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T23:27:43.2275822+00:00",
+          "updatedAt": "2026-09-10T16:00:00.0000000+00:00"
+        },
+        {
+          "id": "9fa314ed1114423c8ebd1f92e401a243",
+          "index": 57,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "spotlight frustrum",
+          "task": "add a light frustrum for the spotlight showing where it will hit",
+          "tags": [
+            "rendering",
+            "lighting"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T23:28:13.5157392+00:00",
+          "updatedAt": "2026-09-10T16:00:00.0000000+00:00"
+        },
+        {
+          "id": "492653eda4a945db950b84bb7f67511b",
+          "index": 58,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "shadows",
+          "task": "add shadows. add two toggles to mesh renderer. cast shadows and recieve shadows",
+          "tags": [
+            "rendering",
+            "lighting",
+            "shadows"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-10T23:28:50.3611686+00:00",
+          "updatedAt": "2026-09-10T16:00:00.0000000+00:00"
+        },
+        {
+          "id": "2eaff1cefdcf4140b1fa74091c8bea5d",
+          "index": 59,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "static lights \u002B lightmap baking",
+          "task": "add a setting to lights that mark them as static, static lights are only applied when lightmaps are baked.",
+          "tags": [
+            "lighting",
+            "rendering"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "b8dec3296a064fcf8142c253bd49090c",
+              "text": "static lights",
+              "isDone": true
+            },
+            {
+              "id": "5bb533383d824a27b3e8df1c7ee5bef1",
+              "text": "lightmap baking",
+              "isDone": false
+            },
+            {
+              "id": "f68ab9250f8c4db7bdf6a106cf6f5ea7",
+              "text": "lightmaps",
+              "isDone": false
+            },
+            {
+              "id": "61dbba170e834cd3aed8650e6ee47822",
+              "text": "light probes",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
           "isCollapsed": false,
-          "createdAt": "2026-09-10T18:54:52.3916047+00:00",
-          "updatedAt": "2026-09-10T13:45:00.0000000+00:00"
+          "createdAt": "2026-09-10T23:29:43.7833772+00:00",
+          "updatedAt": "2026-09-10T16:30:00.0000000+00:00"
+        },
+        {
+          "id": "8347cb9cdf254b5ba693342b82e8eb28",
+          "index": 60,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "dithering",
+          "task": "add per material dithering, if set to true (and configured) the lights affect the material with dithering rather than smoothly",
+          "tags": [
+            "rendering",
+            "lighting"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": true
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T23:30:33.5271578+00:00",
+          "updatedAt": "2026-09-10T16:30:00.0000000+00:00"
         }
       ]
     },
@@ -332,114 +442,6 @@
           "isCollapsed": false,
           "createdAt": "2026-09-10T01:24:42.3980421+00:00",
           "updatedAt": "2026-09-10T01:26:17.0976737+00:00"
-        },
-        {
-          "id": "2c341fec325d457cbe6be1e8967a1840",
-          "index": 47,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Math functions",
-          "task": "add in (global) math functions as a child of class Math",
-          "tags": [
-            "Scripting"
-          ],
-          "files": [],
-          "requirements": [
-            {
-              "id": "6449437cc447421aad7c120e112b05dd",
-              "text": "clamp",
-              "isDone": true
-            },
-            {
-              "id": "0ad05c2f38ba48858ad588aa2f69989d",
-              "text": "lerp",
-              "isDone": true
-            },
-            {
-              "id": "3843119c025c4a068ee3dfda9bcc05e8",
-              "text": "sine",
-              "isDone": true
-            },
-            {
-              "id": "bebd2c87865c4ccea0f4d76f08acc612",
-              "text": "cos",
-              "isDone": true
-            },
-            {
-              "id": "4374fc4e4846454e98314d8c4aa281d9",
-              "text": "tan",
-              "isDone": true
-            },
-            {
-              "id": "ae8cefd32d824cd3adaa2ca58e4bfce7",
-              "text": "rand_i",
-              "isDone": true
-            },
-            {
-              "id": "a93d9b7ca9a74d94a6703cf5d34f114e",
-              "text": "rand_f",
-              "isDone": true
-            },
-            {
-              "id": "caa8af890a1b40669e6d2fc9eb779f5c",
-              "text": "rand_i_range",
-              "isDone": true
-            },
-            {
-              "id": "b3b18a3cc74b4cb28add8a301c86e83c",
-              "text": "rand_f_range",
-              "isDone": true
-            },
-            {
-              "id": "08c88778c35249fea2cd5d2b148f5d4b",
-              "text": "exp",
-              "isDone": true
-            },
-            {
-              "id": "c799ef99e4844bec91233f2355b1dd8e",
-              "text": "sqrt",
-              "isDone": true
-            }
-          ],
-          "flags": {
-            "commit": false,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-10T18:43:39.1779404+00:00",
-          "updatedAt": "2026-09-10T14:00:00.0000000+00:00"
-        },
-        {
-          "id": "afc20949260a4de69df54369fd96bdf4",
-          "index": 48,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "signals",
-          "task": "add in signals they should work EXACTLY like godot",
-          "tags": [
-            "Scripting"
-          ],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": true,
-            "merge": true
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-10T18:45:33.3098217+00:00",
-          "updatedAt": "2026-09-10T14:20:00.0000000+00:00"
         }
       ]
     },
@@ -453,17 +455,16 @@
       "isLocked": false,
       "tasks": [
         {
-          "id": "5cd5172b25484594960326dad35ba534",
-          "index": 50,
+          "id": "cc713c6222cf4b21810c20af7a80aa54",
+          "index": 61,
           "kind": "task",
           "dueDate": null,
           "startedDate": null,
           "priority": null,
-          "title": "reference dragging",
-          "task": "I have a mesh rendeerer actor, i tried to drag a texture to it but it doesnt accept it. the bmp doesnt show in the asset picker either",
+          "title": "convert asset browser",
+          "task": "make the asset browser an icon window rather than a text based list. keep all functionality just change how its presented",
           "tags": [
-            "bug",
-            "assets"
+            "asset browser swapped"
           ],
           "files": [],
           "requirements": [],
@@ -473,105 +474,11 @@
             "release": true,
             "merge": false
           },
-          "isDone": true,
+          "isDone": false,
           "isLocked": false,
           "isCollapsed": false,
-          "createdAt": "2026-09-10T18:48:08.7959899+00:00",
-          "updatedAt": "2026-09-10T15:00:00.0000000+00:00"
-        },
-        {
-          "id": "0837094031af4d629d9af0dc33e2578c",
-          "index": 49,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "asset dragging",
-          "task": "add support for dragging fbx into the scene to spawn an asset with mesh renderer and that mesh",
-          "tags": [
-            "assets"
-          ],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": false,
-            "merge": false
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-10T18:46:27.6148496+00:00",
-          "updatedAt": "2026-09-10T15:00:00.0000000+00:00"
-        },
-        {
-          "id": "e1922dbdfac743f7b6255d340776f070",
-          "index": 51,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Input Map Asset",
-          "task": "create an input map asset, when you double click it a window pops up, you can map inputs (buttons, 2 or 4 button axis, analog axis) to strings and look up the values, \r\n\r\nbuttons : has signals for just_pressed, just_released, and pressed. maps 1 button to 1 string\r\n\r\n2 button axis : maps a positive and negative key/button to a string and returns a float, where 0 is nothing being pressed\r\n\r\n4 button axis: like a 2 button but it maps to 4 buttons and returns x/y as a vector 2.\r\n\r\nanalog axis: returns a vector 2 from a gamepad joystick.\r\n\r\nall of these are referenced with Input.get_button(name) Input.get_axis(name) so to connect a signal you would do it like this\r\n\r\nfor all button mapps add a \u0022listen\u0022 button to select whatever you hit next as well as a drop down.\r\nInput,get_button(\u0022my_button\u0022).is_just_pressed.connect(my_func);",
-          "tags": [
-            "Input",
-            "Input_Map"
-          ],
-          "files": [],
-          "requirements": [
-            {
-              "id": "58c0348720144cdcbe25391f6ab27f97",
-              "text": "input map asset",
-              "isDone": true
-            },
-            {
-              "id": "87c4d7f157d248c586f258793523c186",
-              "text": "double click to open",
-              "isDone": true
-            },
-            {
-              "id": "e9bb3d7d52a1404f99b7c89fae453434",
-              "text": "buttons",
-              "isDone": true
-            },
-            {
-              "id": "066e7a2528ae43978fdb0bdb66aab7ac",
-              "text": "4 button axis",
-              "isDone": true
-            },
-            {
-              "id": "294fca622c1740b6a542a72cec9be9f6",
-              "text": "2 button axis",
-              "isDone": true
-            },
-            {
-              "id": "af2acfc39ab24f59becf6e2da4124ac8",
-              "text": "scripting side",
-              "isDone": true
-            },
-            {
-              "id": "7fed62bdad144e638209edeb27b2b5f8",
-              "text": "window",
-              "isDone": true
-            },
-            {
-              "id": "28b452e548f7401da9da663729fbb9c6",
-              "text": "listen for input",
-              "isDone": true
-            }
-          ],
-          "flags": {
-            "commit": false,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": true,
-          "isLocked": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-10T18:49:29.7370408+00:00",
-          "updatedAt": "2026-09-10T15:00:00.0000000+00:00"
+          "createdAt": "2026-09-10T23:31:27.0917012+00:00",
+          "updatedAt": "2026-09-10T23:32:00.1906554+00:00"
         }
       ]
     },
@@ -691,6 +598,33 @@
           "isCollapsed": false,
           "createdAt": "2026-09-10T13:07:07.1683815+00:00",
           "updatedAt": "2026-09-10T12:30:00+00:00"
+        },
+        {
+          "id": "5cd5172b25484594960326dad35ba534",
+          "index": 50,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "reference dragging",
+          "task": "I have a mesh rendeerer actor, i tried to drag a texture to it but it doesnt accept it. the bmp doesnt show in the asset picker either",
+          "tags": [
+            "bug",
+            "assets"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T18:48:08.7959899+00:00",
+          "updatedAt": "2026-09-10T15:00:00+00:00"
         },
         {
           "id": "c9d4482b33c94eeda497726091ff6dbf",
@@ -2200,6 +2134,294 @@
           "isCollapsed": false,
           "createdAt": "2026-09-10T11:15:00+00:00",
           "updatedAt": "2026-09-10T11:45:00+00:00"
+        },
+        {
+          "id": "c56440b816e04b25828b3ba362c3fa1e",
+          "index": 54,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "transform handles",
+          "task": "add draggable translate, rotate, and scale modes and handles to the viewport for the selected object",
+          "tags": [
+            "ui",
+            "3d",
+            "viewport"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T18:56:02.4556693+00:00",
+          "updatedAt": "2026-09-10T13:30:00+00:00"
+        },
+        {
+          "id": "be28e9f9d30f4dd59726bd6c43658ee5",
+          "index": 52,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Basic Lighting",
+          "task": "add in basic (vertex) lighting support",
+          "tags": [
+            "rendering",
+            "lighting"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "dbc829087e664b90915e718ac57c4800",
+              "text": "vertex lighting",
+              "isDone": true
+            },
+            {
+              "id": "eeaa7f724d1748d0af7e832546db1dfd",
+              "text": "point",
+              "isDone": true
+            },
+            {
+              "id": "ce79e82e59e34987bf6dae440610a697",
+              "text": "spot",
+              "isDone": true
+            },
+            {
+              "id": "1fc24c789faf4cfb9c347a4513113b8a",
+              "text": "directional",
+              "isDone": true
+            },
+            {
+              "id": "c8c495b950f245439fe8b9e85b9b878c",
+              "text": "future support for fog",
+              "isDone": true
+            },
+            {
+              "id": "949c6f24ec314b96b4688a025dc65307",
+              "text": "colors",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T18:54:52.3916047+00:00",
+          "updatedAt": "2026-09-10T13:45:00+00:00"
+        },
+        {
+          "id": "2c341fec325d457cbe6be1e8967a1840",
+          "index": 47,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Math functions",
+          "task": "add in (global) math functions as a child of class Math",
+          "tags": [
+            "Scripting"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "6449437cc447421aad7c120e112b05dd",
+              "text": "clamp",
+              "isDone": true
+            },
+            {
+              "id": "0ad05c2f38ba48858ad588aa2f69989d",
+              "text": "lerp",
+              "isDone": true
+            },
+            {
+              "id": "3843119c025c4a068ee3dfda9bcc05e8",
+              "text": "sine",
+              "isDone": true
+            },
+            {
+              "id": "bebd2c87865c4ccea0f4d76f08acc612",
+              "text": "cos",
+              "isDone": true
+            },
+            {
+              "id": "4374fc4e4846454e98314d8c4aa281d9",
+              "text": "tan",
+              "isDone": true
+            },
+            {
+              "id": "ae8cefd32d824cd3adaa2ca58e4bfce7",
+              "text": "rand_i",
+              "isDone": true
+            },
+            {
+              "id": "a93d9b7ca9a74d94a6703cf5d34f114e",
+              "text": "rand_f",
+              "isDone": true
+            },
+            {
+              "id": "caa8af890a1b40669e6d2fc9eb779f5c",
+              "text": "rand_i_range",
+              "isDone": true
+            },
+            {
+              "id": "b3b18a3cc74b4cb28add8a301c86e83c",
+              "text": "rand_f_range",
+              "isDone": true
+            },
+            {
+              "id": "08c88778c35249fea2cd5d2b148f5d4b",
+              "text": "exp",
+              "isDone": true
+            },
+            {
+              "id": "c799ef99e4844bec91233f2355b1dd8e",
+              "text": "sqrt",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T18:43:39.1779404+00:00",
+          "updatedAt": "2026-09-10T14:00:00+00:00"
+        },
+        {
+          "id": "afc20949260a4de69df54369fd96bdf4",
+          "index": 48,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "signals",
+          "task": "add in signals they should work EXACTLY like godot",
+          "tags": [
+            "Scripting"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": true
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T18:45:33.3098217+00:00",
+          "updatedAt": "2026-09-10T14:20:00+00:00"
+        },
+        {
+          "id": "0837094031af4d629d9af0dc33e2578c",
+          "index": 49,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "asset dragging",
+          "task": "add support for dragging fbx into the scene to spawn an asset with mesh renderer and that mesh",
+          "tags": [
+            "assets"
+          ],
+          "files": [],
+          "requirements": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T18:46:27.6148496+00:00",
+          "updatedAt": "2026-09-10T15:00:00+00:00"
+        },
+        {
+          "id": "e1922dbdfac743f7b6255d340776f070",
+          "index": 51,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Input Map Asset",
+          "task": "create an input map asset, when you double click it a window pops up, you can map inputs (buttons, 2 or 4 button axis, analog axis) to strings and look up the values, \r\n\r\nbuttons : has signals for just_pressed, just_released, and pressed. maps 1 button to 1 string\r\n\r\n2 button axis : maps a positive and negative key/button to a string and returns a float, where 0 is nothing being pressed\r\n\r\n4 button axis: like a 2 button but it maps to 4 buttons and returns x/y as a vector 2.\r\n\r\nanalog axis: returns a vector 2 from a gamepad joystick.\r\n\r\nall of these are referenced with Input.get_button(name) Input.get_axis(name) so to connect a signal you would do it like this\r\n\r\nfor all button mapps add a \u0022listen\u0022 button to select whatever you hit next as well as a drop down.\r\nInput,get_button(\u0022my_button\u0022).is_just_pressed.connect(my_func);",
+          "tags": [
+            "Input",
+            "Input_Map"
+          ],
+          "files": [],
+          "requirements": [
+            {
+              "id": "58c0348720144cdcbe25391f6ab27f97",
+              "text": "input map asset",
+              "isDone": true
+            },
+            {
+              "id": "87c4d7f157d248c586f258793523c186",
+              "text": "double click to open",
+              "isDone": true
+            },
+            {
+              "id": "e9bb3d7d52a1404f99b7c89fae453434",
+              "text": "buttons",
+              "isDone": true
+            },
+            {
+              "id": "066e7a2528ae43978fdb0bdb66aab7ac",
+              "text": "4 button axis",
+              "isDone": true
+            },
+            {
+              "id": "294fca622c1740b6a542a72cec9be9f6",
+              "text": "2 button axis",
+              "isDone": true
+            },
+            {
+              "id": "af2acfc39ab24f59becf6e2da4124ac8",
+              "text": "scripting side",
+              "isDone": true
+            },
+            {
+              "id": "7fed62bdad144e638209edeb27b2b5f8",
+              "text": "window",
+              "isDone": true
+            },
+            {
+              "id": "28b452e548f7401da9da663729fbb9c6",
+              "text": "listen for input",
+              "isDone": true
+            }
+          ],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T18:49:29.7370408+00:00",
+          "updatedAt": "2026-09-10T15:00:00+00:00"
         }
       ]
     }

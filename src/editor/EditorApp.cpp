@@ -303,6 +303,11 @@ void EditorApp::drawMenuBar() {
         if (ImGui::MenuItem("Create Mesh"))        scene_.select(spawn("mesh", p));
         if (ImGui::MenuItem("Create Sprite"))      scene_.select(spawn("sprite", p));
         if (ImGui::MenuItem("Create UI Control"))  scene_.select(spawn("ui", p));
+        ImGui::Separator();
+        if (ImGui::MenuItem("Bake Lighting")) {
+            renderer_.bakeLighting(scene_);
+            CR_LOG("render", "Baked static lights into meshes and light probes");
+        }
         ImGui::EndMenu();
     }
     if (ImGui::BeginMenu("Window")) {
@@ -597,6 +602,9 @@ void EditorApp::drawInspector() {
                     renderer_.invalidateTexture(mat->texturePath);
                 ImGui::DragFloat("Emissive", &mat->emissive, 0.01f, 0.0f, 4.0f);
                 ImGui::Checkbox("Unlit", &mat->unlit);
+                ImGui::Checkbox("Dithered Lighting", &mat->dither);
+                if (mat->dither)
+                    ImGui::DragFloat("Dither Levels", &mat->ditherLevels, 0.1f, 2.0f, 16.0f);
                 ImGui::Spacing();
 
                 static std::string renameBuf;
@@ -783,6 +791,8 @@ void EditorApp::drawViewport() {
                 ImGui::SameLine();
                 ImGui::Checkbox("Fog", &fog_);
                 ImGui::SameLine();
+                ImGui::Checkbox("Shadows", &shadows_);
+                ImGui::SameLine();
                 ImGui::TextDisabled("W/E/R  |  drag = orbit  |  wheel = zoom");
 
                 ImVec2 size = ImGui::GetContentRegionAvail();
@@ -790,6 +800,7 @@ void EditorApp::drawViewport() {
                 Renderer::Options opt;
                 opt.highlight = scene_.selected();
                 opt.fogEnabled = fog_;
+                opt.shadows = shadows_;
                 void* srv = renderer_.ready() ? renderer_.render(scene_, camera_, w, h, opt) : nullptr;
 
                 if (srv) {
@@ -811,6 +822,7 @@ void EditorApp::drawViewport() {
                         }
                         ImGui::EndDragDropTarget();
                     }
+                    drawViewportOverlays(imgPos.x, imgPos.y, size.x, size.y);
                     drawViewportGizmo(imgPos.x, imgPos.y, size.x, size.y);
                     if (ImGui::IsItemHovered() && !gizmoActive()) {
                         ImGuiIO& io = ImGui::GetIO();
@@ -856,6 +868,112 @@ void EditorApp::drawViewport() {
 
 bool EditorApp::gizmoActive() const {
     return scene_.selected() && (ImGuizmo::IsOver() || ImGuizmo::IsUsing());
+}
+
+namespace {
+// Row-vector transform of a point by a row-major matrix (v * M), returning the
+// homogeneous result.
+struct V4 {
+    float x, y, z, w;
+};
+V4 mulPoint(const Mat4& m, const Vec3& p) {
+    V4 o{};
+    const float v[4] = {p.x, p.y, p.z, 1.0f};
+    o.x = v[0] * m.at(0, 0) + v[1] * m.at(1, 0) + v[2] * m.at(2, 0) + v[3] * m.at(3, 0);
+    o.y = v[0] * m.at(0, 1) + v[1] * m.at(1, 1) + v[2] * m.at(2, 1) + v[3] * m.at(3, 1);
+    o.z = v[0] * m.at(0, 2) + v[1] * m.at(1, 2) + v[2] * m.at(2, 2) + v[3] * m.at(3, 2);
+    o.w = v[0] * m.at(0, 3) + v[1] * m.at(1, 3) + v[2] * m.at(2, 3) + v[3] * m.at(3, 3);
+    return o;
+}
+} // namespace
+
+void EditorApp::drawViewportOverlays(float x, float y, float w, float h) {
+    Actor* sel = scene_.selected();
+    if (!sel || w < 1.0f || h < 1.0f)
+        return;
+
+    const Mat4 viewProj = camera_.view() * camera_.proj(w / h);
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+
+    // world -> screen; returns false when the point is behind the camera.
+    auto project = [&](const Vec3& wp, ImVec2& out) -> bool {
+        V4 c = mulPoint(viewProj, wp);
+        if (c.w <= 1e-4f)
+            return false;
+        out = ImVec2(x + (c.x / c.w * 0.5f + 0.5f) * w, y + (1.0f - (c.y / c.w * 0.5f + 0.5f)) * h);
+        return true;
+    };
+    auto line = [&](const Vec3& a, const Vec3& b, ImU32 col, float thick = 1.5f) {
+        ImVec2 pa, pb;
+        if (project(a, pa) && project(b, pb))
+            dl->AddLine(pa, pb, col, thick);
+    };
+    auto circle = [&](const Vec3& center, const Vec3& axisU, const Vec3& axisV, float r, ImU32 col) {
+        const int N = 40;
+        ImVec2 prev;
+        bool havePrev = false;
+        for (int i = 0; i <= N; ++i) {
+            float t = (float)i / N * 2.0f * kPi;
+            Vec3 p = center + axisU * (std::cos(t) * r) + axisV * (std::sin(t) * r);
+            ImVec2 s;
+            bool ok = project(p, s);
+            if (ok && havePrev)
+                dl->AddLine(prev, s, col, 1.5f);
+            prev = s;
+            havePrev = ok;
+        }
+    };
+
+    Transform world = sel->worldTransform();
+    Mat4 rot = Mat4::rotationEuler(world.rotationEuler);
+    // local axes in world space (row vectors: axis * R = matching row of R).
+    Vec3 fwd = normalize(Vec3{rot.at(2, 0), rot.at(2, 1), rot.at(2, 2)});     // +Z
+    Vec3 right = normalize(Vec3{rot.at(0, 0), rot.at(0, 1), rot.at(0, 2)});   // +X
+    Vec3 up = normalize(Vec3{rot.at(1, 0), rot.at(1, 1), rot.at(1, 2)});      // +Y
+    const Vec3 o = world.position;
+
+    // --- Normal arrow: points along the actor's local +Z (task 55) ----------
+    {
+        const ImU32 col = IM_COL32(90, 200, 255, 220);
+        float len = 1.5f;
+        Vec3 tip = o + fwd * len;
+        line(o, tip, col, 2.0f);
+        // arrowhead
+        Vec3 back = tip - fwd * (len * 0.22f);
+        line(tip, back + right * (len * 0.10f), col, 2.0f);
+        line(tip, back - right * (len * 0.10f), col, 2.0f);
+        line(tip, back + up * (len * 0.10f), col, 2.0f);
+        line(tip, back - up * (len * 0.10f), col, 2.0f);
+    }
+
+    // --- Light gizmos (tasks 56, 57) ---------------------------------------
+    if (auto* lc = sel->getComponent<LightComponent>()) {
+        const ImU32 lcol = IM_COL32(255, 214, 120, 200);
+        if (lc->type == LightComponent::Type::Point) {
+            circle(o, right, up, lc->range, lcol);
+            circle(o, right, fwd, lc->range, lcol);
+            circle(o, up, fwd, lc->range, lcol);
+        } else if (lc->type == LightComponent::Type::Spot) {
+            Vec3 dir = fwd; // light shines along local +Z
+            float dist = lc->range;
+            float outerR = dist * std::tan(radians(lc->spotOuterDeg));
+            float innerR = dist * std::tan(radians(lc->spotInnerDeg));
+            Vec3 end = o + dir * dist;
+            circle(end, right, up, outerR, lcol);
+            circle(end, right, up, innerR, IM_COL32(255, 214, 120, 90));
+            for (int i = 0; i < 4; ++i) {
+                float a = i * (kPi * 0.5f);
+                Vec3 e = end + right * (std::cos(a) * outerR) + up * (std::sin(a) * outerR);
+                line(o, e, lcol);
+            }
+        } else { // directional: a short parallel-ray bundle along +Z
+            for (int i = -1; i <= 1; ++i)
+                for (int j = -1; j <= 1; ++j) {
+                    Vec3 s = o + right * (i * 0.4f) + up * (j * 0.4f);
+                    line(s, s + fwd * 1.6f, lcol);
+                }
+        }
+    }
 }
 
 // Draw the translate/rotate/scale gizmo over the viewport image for the

@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <functional>
 #include <vector>
 
 namespace crate {
@@ -37,11 +38,14 @@ struct GpuLight {
 struct CBData {
     float mvp[16];
     float model[16];
+    float lightVP[16]; // world -> shadow-casting light clip space
     float baseColor[4];
     float params[4];    // x=useTexture y=emissive z=unlit w=lightCount
     float ambient[4];   // rgb = ambient light
     float fogColor[4];
     float fogParams[4]; // x=start y=end z=enabled
+    float shadow[4];    // x=enabled y=receive z=1/mapSize w=bias
+    float dither[4];    // x=enabled y=levels
     GpuLight lights[kMaxLights];
 };
 
@@ -52,23 +56,35 @@ cbuffer CB : register(b0)
 {
     float4x4 uMVP;
     float4x4 uModel;
+    float4x4 uLightVP;
     float4   uBaseColor;
     float4   uParams;
     float4   uAmbient;
     float4   uFogColor;
     float4   uFogParams;
+    float4   uShadow;
+    float4   uDither;
     Light    uLights[MAX_LIGHTS];
 };
-Texture2D    uTex : register(t0);
-SamplerState uSamp : register(s0);
+Texture2D             uTex : register(t0);
+SamplerState          uSamp : register(s0);
+Texture2D             uShadowMap : register(t1);
+SamplerComparisonState uShadowSamp : register(s1);
 
 struct VSIn  { float3 pos : POSITION; float3 nrm : NORMAL; float2 uv : TEXCOORD0; };
 struct VSOut { float4 pos : SV_POSITION; float2 uv : TEXCOORD0;
-               float3 light : COLOR0; float fog : TEXCOORD1; };
+               float3 light : COLOR0; float fog : TEXCOORD1; float4 lpos : TEXCOORD2; };
+
+// Depth-only pass from the shadow light's point of view.
+float4 VSShadow(VSIn i) : SV_POSITION
+{
+    float3 wpos = mul(uModel, float4(i.pos, 1.0)).xyz;
+    return mul(uLightVP, float4(wpos, 1.0));
+}
 
 float3 shadeVertex(float3 wpos, float3 N)
 {
-    float3 acc = uAmbient.rgb;
+    float3 acc = float3(0, 0, 0);
     int count = (int)uParams.w;
     [loop] for (int k = 0; k < count; ++k)
     {
@@ -109,13 +125,56 @@ VSOut VSMain(VSIn i)
     o.fog = (uFogParams.z > 0.5)
               ? saturate((uFogParams.y - o.pos.w) / max(uFogParams.y - uFogParams.x, 1e-4))
               : 1.0;
+    o.lpos = mul(uLightVP, float4(wpos, 1.0));
     return o;
+}
+
+float shadowFactor(float4 lpos)
+{
+    if (uShadow.x < 0.5 || uShadow.y < 0.5)
+        return 1.0;
+    float3 p = lpos.xyz / lpos.w;
+    float2 uv = p.xy * float2(0.5, -0.5) + 0.5;
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0 || p.z > 1.0)
+        return 1.0;
+    float ref = p.z - uShadow.w;
+    float s = 0.0;
+    [unroll] for (int y = -1; y <= 1; ++y)
+        [unroll] for (int x = -1; x <= 1; ++x)
+            s += uShadowMap.SampleCmpLevelZero(uShadowSamp, uv + float2(x, y) * uShadow.z, ref);
+    return s / 9.0;
+}
+
+static const float kBayer4x4[16] = {
+     0,  8,  2, 10,
+    12,  4, 14,  6,
+     3, 11,  1,  9,
+    15,  7, 13,  5
+};
+
+// Ordered (Bayer) dither: quantizes each channel to uDither.y bands using a
+// per-pixel threshold, so lighting bands/dithers instead of shading smoothly.
+float3 ditherQuantize(float3 c, float2 screenPos)
+{
+    int bx = ((int)screenPos.x) & 3;
+    int by = ((int)screenPos.y) & 3;
+    float threshold = (kBayer4x4[by * 4 + bx] + 0.5) / 16.0;
+    float levels = max(uDither.y - 1.0, 1.0);
+    float3 scaled = c * levels;
+    float3 base = floor(scaled);
+    float3 frac = scaled - base;
+    float3 stepped = base + step(threshold, frac);
+    return stepped / levels;
 }
 
 float4 PSMain(VSOut i) : SV_TARGET
 {
     float3 tex = lerp(float3(1,1,1), uTex.Sample(uSamp, i.uv).rgb, uParams.x);
-    float3 col = uBaseColor.rgb * tex * i.light + uParams.y;
+    float3 lit = (uParams.z > 0.5) ? float3(1,1,1)
+                                   : uAmbient.rgb + i.light * shadowFactor(i.lpos);
+    if (uDither.x > 0.5)
+        lit = ditherQuantize(saturate(lit), i.pos.xy);
+    float3 col = uBaseColor.rgb * tex * lit + uParams.y;
     col = lerp(uFogColor.rgb, col, saturate(i.fog));
     return float4(col, uBaseColor.a);
 }
@@ -158,6 +217,24 @@ bool Renderer::init(ID3D11Device* device, ID3D11DeviceContext* context) {
     dsd.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
     dsd.DepthFunc = D3D11_COMPARISON_LESS;
     device_->CreateDepthStencilState(&dsd, &depthState_);
+
+    // Shadow map: comparison sampler (clamp, white outside), depth-bias raster.
+    D3D11_SAMPLER_DESC ssd = {};
+    ssd.Filter = D3D11_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT;
+    ssd.AddressU = ssd.AddressV = ssd.AddressW = D3D11_TEXTURE_ADDRESS_BORDER;
+    ssd.BorderColor[0] = ssd.BorderColor[1] = ssd.BorderColor[2] = ssd.BorderColor[3] = 1.0f;
+    ssd.ComparisonFunc = D3D11_COMPARISON_LESS_EQUAL;
+    ssd.MaxLOD = D3D11_FLOAT32_MAX;
+    device_->CreateSamplerState(&ssd, &shadowSamp_);
+
+    D3D11_RASTERIZER_DESC srd = {};
+    srd.FillMode = D3D11_FILL_SOLID;
+    srd.CullMode = D3D11_CULL_NONE;
+    srd.DepthClipEnable = TRUE;
+    srd.DepthBias = 120;
+    srd.SlopeScaledDepthBias = 3.5f;
+    device_->CreateRasterizerState(&srd, &shadowRaster_);
+    ensureShadowMap();
 
     // 1x1 white + an 8x8 checker for "no texture" and "textured" states.
     auto makeTex = [&](const uint32_t* pixels, int w, int h) -> ID3D11ShaderResourceView* {
@@ -207,11 +284,17 @@ void Renderer::shutdown() {
     safeRelease(checkerSrv_);
     safeRelease(vs_);
     safeRelease(ps_);
+    safeRelease(vsShadow_);
     safeRelease(layout_);
     safeRelease(cb_);
     safeRelease(sampler_);
     safeRelease(raster_);
     safeRelease(depthState_);
+    safeRelease(shadowTex_);
+    safeRelease(shadowDsv_);
+    safeRelease(shadowSrv_);
+    safeRelease(shadowSamp_);
+    safeRelease(shadowRaster_);
     device_ = nullptr;
     ctx_ = nullptr;
 }
@@ -242,6 +325,19 @@ bool Renderer::compileShaders() {
 
     device_->CreateVertexShader(vsb->GetBufferPointer(), vsb->GetBufferSize(), nullptr, &vs_);
     device_->CreatePixelShader(psb->GetBufferPointer(), psb->GetBufferSize(), nullptr, &ps_);
+
+    ID3DBlob* svsb = nullptr;
+    if (SUCCEEDED(D3DCompile(kShaderSrc, std::strlen(kShaderSrc), "crate.hlsl", nullptr, nullptr,
+                             "VSShadow", "vs_4_0", flags, 0, &svsb, &err))) {
+        device_->CreateVertexShader(svsb->GetBufferPointer(), svsb->GetBufferSize(), nullptr,
+                                    &vsShadow_);
+        safeRelease(svsb);
+    } else {
+        if (err)
+            CR_ERROR("render",
+                     std::string("VSShadow: ") + static_cast<const char*>(err->GetBufferPointer()));
+        safeRelease(err);
+    }
 
     const D3D11_INPUT_ELEMENT_DESC elems[] = {
         {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
@@ -380,12 +476,14 @@ void Renderer::invalidateTexture(const std::string& path) {
     }
 }
 
-void Renderer::drawActor(Actor& actor, const Mat4& viewProj, const Options& opt) {
+void Renderer::drawActor(Actor& actor, const Mat4& viewProj, const Options& opt, bool shadowPass) {
     for (const auto& child : actor.children())
-        drawActor(*child, viewProj, opt);
+        drawActor(*child, viewProj, opt, shadowPass);
 
     auto* mr = actor.getComponent<MeshRenderer>();
     if (!mr || !mr->enabled || !actor.visible())
+        return;
+    if (shadowPass && !mr->castShadows)
         return;
 
     Transform w = actor.worldTransform();
@@ -400,6 +498,8 @@ void Renderer::drawActor(Actor& actor, const Mat4& viewProj, const Options& opt)
     std::string texPath = mr->texturePath;
     float emissive = 0.0f;
     bool unlit = false;
+    bool dither = false;
+    float ditherLevels = 4.0f;
     if (materials_ && !mr->materialRef.empty()) {
         if (const Material* mat = materials_->find(mr->materialRef)) {
             for (int i = 0; i < 4; ++i)
@@ -407,6 +507,8 @@ void Renderer::drawActor(Actor& actor, const Mat4& viewProj, const Options& opt)
             texPath = mat->texturePath.empty() ? mr->texturePath : mat->texturePath;
             emissive = mat->emissive;
             unlit = mat->unlit;
+            dither = mat->dither;
+            ditherLevels = mat->ditherLevels;
         }
     }
 
@@ -415,31 +517,61 @@ void Renderer::drawActor(Actor& actor, const Mat4& viewProj, const Options& opt)
     // mul(M, v) then yields the row-vector product v * M that this math uses.
     std::memcpy(cb.mvp, mvp.m, sizeof(cb.mvp));
     std::memcpy(cb.model, model.m, sizeof(cb.model));
+    std::memcpy(cb.lightVP, shadowVP_.m, sizeof(cb.lightVP));
+    cb.shadow[0] = shadowActive_ ? 1.0f : 0.0f;
+    cb.shadow[1] = mr->receiveShadows ? 1.0f : 0.0f;
+    cb.shadow[2] = 1.0f / static_cast<float>(kShadowSize);
+    cb.shadow[3] = 0.004f;
+    cb.dither[0] = dither ? 1.0f : 0.0f;
+    cb.dither[1] = ditherLevels;
     bool sel = opt.highlight == &actor;
     cb.baseColor[0] = sel ? baseColor[0] * 0.85f + 0.10f : baseColor[0];
     cb.baseColor[1] = sel ? baseColor[1] * 0.85f + 0.05f : baseColor[1];
     cb.baseColor[2] = sel ? baseColor[2] * 0.85f + 0.25f : baseColor[2];
     cb.baseColor[3] = baseColor[3];
 
-    int lightCount = static_cast<int>(std::min<size_t>(lights_.size(), kMaxLights));
-    cb.params[0] = texPath.empty() ? 0.0f : 1.0f;
-    cb.params[1] = emissive;
-    cb.params[2] = unlit ? 1.0f : 0.0f;
-    cb.params[3] = static_cast<float>(lightCount);
-    cb.ambient[0] = opt.ambient.x; cb.ambient[1] = opt.ambient.y; cb.ambient[2] = opt.ambient.z;
-    cb.fogColor[0] = opt.fogColor.x; cb.fogColor[1] = opt.fogColor.y; cb.fogColor[2] = opt.fogColor.z;
-    cb.fogParams[0] = opt.fogStart;
-    cb.fogParams[1] = opt.fogEnd;
-    cb.fogParams[2] = opt.fogEnabled ? 1.0f : 0.0f;
-    for (int k = 0; k < lightCount; ++k) {
-        const LightSample& s = lights_[k];
-        GpuLight& g = cb.lights[k];
+    // Static lights don't reach the real-time list; their effect only shows up
+    // via a bake (below). Everything else is uploaded, capped at kMaxLights.
+    int lightCount = 0;
+    for (const auto& s : lights_) {
+        if (s.isStatic)
+            continue;
+        if (lightCount >= kMaxLights)
+            break;
+        GpuLight& g = cb.lights[lightCount];
         g.pos[0] = s.pos.x; g.pos[1] = s.pos.y; g.pos[2] = s.pos.z;
         g.dir[0] = s.dir.x; g.dir[1] = s.dir.y; g.dir[2] = s.dir.z;
         g.color[0] = s.color.x; g.color[1] = s.color.y; g.color[2] = s.color.z;
         g.color[3] = static_cast<float>(s.type);
         g.params[0] = s.range; g.params[1] = s.cosInner; g.params[2] = s.cosOuter;
+        ++lightCount;
     }
+    cb.params[0] = texPath.empty() ? 0.0f : 1.0f;
+    cb.params[1] = emissive;
+    cb.params[2] = unlit ? 1.0f : 0.0f;
+    cb.params[3] = static_cast<float>(lightCount);
+
+    // Baked static-light contribution: the mesh's own bake if it has one,
+    // otherwise the nearest baked LightProbe (for actors that move at runtime).
+    Vec3 baked{0, 0, 0};
+    if (mr->bakedValid) {
+        baked = {mr->bakedLight[0], mr->bakedLight[1], mr->bakedLight[2]};
+    } else if (!probes_.empty()) {
+        const ProbeSample* nearest = &probes_[0];
+        float best = length(probes_[0].pos - w.position);
+        for (const auto& p : probes_) {
+            float d = length(p.pos - w.position);
+            if (d < best) { best = d; nearest = &p; }
+        }
+        baked = nearest->baked;
+    }
+    cb.ambient[0] = opt.ambient.x + baked.x;
+    cb.ambient[1] = opt.ambient.y + baked.y;
+    cb.ambient[2] = opt.ambient.z + baked.z;
+    cb.fogColor[0] = opt.fogColor.x; cb.fogColor[1] = opt.fogColor.y; cb.fogColor[2] = opt.fogColor.z;
+    cb.fogParams[0] = opt.fogStart;
+    cb.fogParams[1] = opt.fogEnd;
+    cb.fogParams[2] = opt.fogEnabled ? 1.0f : 0.0f;
 
     D3D11_MAPPED_SUBRESOURCE ms;
     if (SUCCEEDED(ctx_->Map(cb_, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms))) {
@@ -447,9 +579,11 @@ void Renderer::drawActor(Actor& actor, const Mat4& viewProj, const Options& opt)
         ctx_->Unmap(cb_, 0);
     }
 
-    auto* srv = static_cast<ID3D11ShaderResourceView*>(texPath.empty() ? whiteSrv_
-                                                                       : loadTexture(texPath));
-    ctx_->PSSetShaderResources(0, 1, &srv);
+    if (!shadowPass) {
+        auto* srv = static_cast<ID3D11ShaderResourceView*>(texPath.empty() ? whiteSrv_
+                                                                           : loadTexture(texPath));
+        ctx_->PSSetShaderResources(0, 1, &srv);
+    }
 
     const GpuMesh& gm =
         meshFor(mr->meshKey(), mr->primitive.empty() ? "Cube" : mr->primitive);
@@ -457,6 +591,108 @@ void Renderer::drawActor(Actor& actor, const Mat4& viewProj, const Options& opt)
     ctx_->IASetVertexBuffers(0, 1, &gm.vb, &stride, &offset);
     ctx_->IASetIndexBuffer(gm.ib, DXGI_FORMAT_R32_UINT, 0);
     ctx_->DrawIndexed(gm.indexCount, 0, 0);
+}
+
+bool Renderer::ensureShadowMap() {
+    if (shadowTex_)
+        return true;
+    D3D11_TEXTURE2D_DESC td = {};
+    td.Width = td.Height = kShadowSize;
+    td.MipLevels = 1;
+    td.ArraySize = 1;
+    td.Format = DXGI_FORMAT_R32_TYPELESS;
+    td.SampleDesc.Count = 1;
+    td.Usage = D3D11_USAGE_DEFAULT;
+    td.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
+    if (FAILED(device_->CreateTexture2D(&td, nullptr, &shadowTex_)))
+        return false;
+    D3D11_DEPTH_STENCIL_VIEW_DESC dvd = {};
+    dvd.Format = DXGI_FORMAT_D32_FLOAT;
+    dvd.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+    device_->CreateDepthStencilView(shadowTex_, &dvd, &shadowDsv_);
+    D3D11_SHADER_RESOURCE_VIEW_DESC svd = {};
+    svd.Format = DXGI_FORMAT_R32_FLOAT;
+    svd.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+    svd.Texture2D.MipLevels = 1;
+    device_->CreateShaderResourceView(shadowTex_, &svd, &shadowSrv_);
+    return shadowDsv_ && shadowSrv_;
+}
+
+// Build the world -> light clip matrix for the first shadow-casting light
+// (directional or spot). Returns false when there is none.
+bool Renderer::computeShadowVP(Mat4& out) const {
+    for (const auto& s : lights_) {
+        if (s.type == 0) { // directional: ortho box around the origin
+            Vec3 dir = normalize(s.dir);
+            Vec3 up = (std::fabs)(dir.y) > 0.95f ? Vec3{1, 0, 0} : Vec3{0, 1, 0};
+            Vec3 center{0, 0.5f, 0};
+            Mat4 view = Mat4::lookAtLH(center - dir * 30.0f, center, up);
+            out = view * Mat4::orthoLH(40.0f, 40.0f, 0.1f, 70.0f);
+            return true;
+        }
+        if (s.type == 2) { // spot: perspective from the light
+            Vec3 dir = normalize(s.dir);
+            Vec3 up = (std::fabs)(dir.y) > 0.95f ? Vec3{1, 0, 0} : Vec3{0, 1, 0};
+            Mat4 view = Mat4::lookAtLH(s.pos, s.pos + dir, up);
+            float fov = 2.0f * std::acos((std::max)(0.05f, s.cosOuter)) * (180.0f / kPi);
+            out = view * Mat4::perspectiveLH(fov, 1.0f, 0.1f, (std::max)(2.0f, s.range));
+            return true;
+        }
+    }
+    return false;
+}
+
+void Renderer::bakeLighting(Scene& scene) {
+    lights_.clear();
+    probes_.clear();
+    for (const auto& child : scene.root().children())
+        collectLights(*child);
+
+    const Vec3 N{0, 1, 0}; // coarse per-object bake: assumes an up-facing normal
+    auto eval = [&](const Vec3& p) -> Vec3 {
+        Vec3 acc{0, 0, 0};
+        for (const auto& s : lights_) {
+            if (!s.isStatic)
+                continue;
+            Vec3 Ldir;
+            float atten = 1.0f;
+            if (s.type == 0) {
+                Ldir = s.dir * -1.0f;
+            } else {
+                Vec3 toL = s.pos - p;
+                float d = length(toL);
+                Ldir = d > 1e-4f ? toL * (1.0f / d) : Vec3{0, 1, 0};
+                float f = (std::max)(0.0f, 1.0f - d / (std::max)(s.range, 1e-4f));
+                atten = f * f;
+                if (s.type == 2) {
+                    float cs = dot(Ldir * -1.0f, s.dir);
+                    float denom = (std::max)(s.cosInner - s.cosOuter, 1e-4f);
+                    atten *= (std::max)(0.0f, (std::min)(1.0f, (cs - s.cosOuter) / denom));
+                }
+            }
+            float ndl = (std::max)(0.0f, dot(N, Ldir));
+            acc = acc + s.color * (ndl * atten);
+        }
+        return acc;
+    };
+
+    std::function<void(Actor&)> walk = [&](Actor& a) {
+        if (auto* mr = a.getComponent<MeshRenderer>()) {
+            Vec3 c = eval(a.worldTransform().position);
+            mr->bakedLight[0] = c.x; mr->bakedLight[1] = c.y; mr->bakedLight[2] = c.z;
+            mr->bakedValid = true;
+        }
+        if (auto* lp = a.getComponent<LightProbeComponent>()) {
+            Vec3 c = eval(a.worldTransform().position);
+            lp->bakedLight[0] = c.x; lp->bakedLight[1] = c.y; lp->bakedLight[2] = c.z;
+            lp->bakedValid = true;
+        }
+        for (const auto& ch : a.children())
+            walk(*ch);
+    };
+    for (const auto& ch : scene.root().children())
+        walk(*ch);
+    CR_LOG("render", "Baked static lighting");
 }
 
 void Renderer::collectLights(Actor& actor) {
@@ -467,15 +703,21 @@ void Renderer::collectLights(Actor& actor) {
             LightSample s;
             s.type = static_cast<int>(lc->type);
             s.pos = w.position;
-            // local -Z transformed to world (row-vector: v * R => -row 2 of R).
-            s.dir = normalize(Vec3{-rot.at(2, 0), -rot.at(2, 1), -rot.at(2, 2)});
+            // The light shines along its local +Z (same as the actor normal):
+            // row-vector (0,0,1) * R == row 2 of R.
+            s.dir = normalize(Vec3{rot.at(2, 0), rot.at(2, 1), rot.at(2, 2)});
             s.color = Vec3{lc->color[0], lc->color[1], lc->color[2]} * lc->intensity;
             s.range = lc->range;
             s.cosInner = std::cos(radians(lc->spotInnerDeg));
             s.cosOuter = std::cos(radians(lc->spotOuterDeg));
+            s.isStatic = lc->isStatic;
             lights_.push_back(s);
         }
     }
+    if (auto* lp = actor.getComponent<LightProbeComponent>())
+        if (lp->bakedValid)
+            probes_.push_back({actor.worldTransform().position,
+                               Vec3{lp->bakedLight[0], lp->bakedLight[1], lp->bakedLight[2]}});
     for (const auto& child : actor.children())
         collectLights(*child);
 }
@@ -485,35 +727,62 @@ void* Renderer::render(Scene& scene, const OrbitCamera& cam, int width, int heig
     if (!ready() || !ensureTargets(width, height))
         return nullptr;
 
+    lights_.clear();
+    probes_.clear();
+    for (const auto& child : scene.root().children())
+        collectLights(*child);
+    shadowActive_ =
+        opt.shadows && ensureShadowMap() && vsShadow_ && computeShadowVP(shadowVP_);
+
+    ctx_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    ctx_->IASetInputLayout(layout_);
+    ctx_->VSSetConstantBuffers(0, 1, &cb_);
+    ctx_->PSSetConstantBuffers(0, 1, &cb_);
+    ctx_->OMSetDepthStencilState(depthState_, 0);
+
+    // --- Shadow depth pass (from the shadow light) -------------------------
+    if (shadowActive_) {
+        ID3D11ShaderResourceView* noSrv[2] = {nullptr, nullptr};
+        ctx_->PSSetShaderResources(0, 2, noSrv); // release t1 from the main pass
+        ID3D11RenderTargetView* noRtv = nullptr;
+        ctx_->OMSetRenderTargets(1, &noRtv, shadowDsv_);
+        ctx_->ClearDepthStencilView(shadowDsv_, D3D11_CLEAR_DEPTH, 1.0f, 0);
+        D3D11_VIEWPORT sv = {0, 0, float(kShadowSize), float(kShadowSize), 0.0f, 1.0f};
+        ctx_->RSSetViewports(1, &sv);
+        ctx_->RSSetState(shadowRaster_);
+        ctx_->VSSetShader(vsShadow_, nullptr, 0);
+        ctx_->PSSetShader(nullptr, nullptr, 0);
+        for (const auto& child : scene.root().children())
+            drawActor(*child, shadowVP_, opt, /*shadowPass=*/true);
+        ID3D11RenderTargetView* nr = nullptr;
+        ctx_->OMSetRenderTargets(1, &nr, nullptr);
+    }
+
+    // --- Main pass -------------------------------------------------------
     D3D11_VIEWPORT vp = {0, 0, float(width), float(height), 0.0f, 1.0f};
     ctx_->RSSetViewports(1, &vp);
     ctx_->OMSetRenderTargets(1, &colorRtv_, depthDsv_);
     const float clear[4] = {opt.clear.x, opt.clear.y, opt.clear.z, 1.0f};
     ctx_->ClearRenderTargetView(colorRtv_, clear);
     ctx_->ClearDepthStencilView(depthDsv_, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
-
-    ctx_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    ctx_->IASetInputLayout(layout_);
     ctx_->VSSetShader(vs_, nullptr, 0);
     ctx_->PSSetShader(ps_, nullptr, 0);
-    ctx_->VSSetConstantBuffers(0, 1, &cb_);
-    ctx_->PSSetConstantBuffers(0, 1, &cb_);
     ctx_->PSSetSamplers(0, 1, &sampler_);
+    ctx_->PSSetSamplers(1, 1, &shadowSamp_);
     ctx_->RSSetState(raster_);
-    ctx_->OMSetDepthStencilState(depthState_, 0);
-
-    lights_.clear();
-    for (const auto& child : scene.root().children())
-        collectLights(*child);
+    if (shadowActive_)
+        ctx_->PSSetShaderResources(1, 1, &shadowSrv_);
 
     float aspect = height > 0 ? float(width) / float(height) : 1.0f;
     Mat4 viewProj = cam.view() * cam.proj(aspect);
     for (const auto& child : scene.root().children())
-        drawActor(*child, viewProj, opt);
+        drawActor(*child, viewProj, opt, /*shadowPass=*/false);
 
-    // Unbind the render target so the SRV can be sampled by ImGui.
+    // Unbind so the colour SRV (and shadow SRV) can be re-bound next frame.
     ID3D11RenderTargetView* nullRtv = nullptr;
     ctx_->OMSetRenderTargets(1, &nullRtv, nullptr);
+    ID3D11ShaderResourceView* noSrv2[2] = {nullptr, nullptr};
+    ctx_->PSSetShaderResources(0, 2, noSrv2);
     return colorSrv_;
 }
 

@@ -91,6 +91,16 @@ struct Mat4 {
         return r;
     }
 
+    static Mat4 orthoLH(float w, float h, float zn, float zf) {
+        Mat4 r{};
+        r.m[0] = 2.0f / w;
+        r.m[5] = 2.0f / h;
+        r.m[10] = 1.0f / (zf - zn);
+        r.m[14] = -zn / (zf - zn);
+        r.m[15] = 1.0f;
+        return r;
+    }
+
     static Mat4 lookAtLH(const Vec3& eye, const Vec3& target, const Vec3& up) {
         Vec3 z = normalize(target - eye);
         Vec3 x = normalize(cross(up, z));

@@ -24,6 +24,13 @@ public:
     std::string texturePath;        // albedo override when no material is set
     float tint[4] = {1.0f, 1.0f, 1.0f, 1.0f};
     bool castShadows = true;
+    bool receiveShadows = true;
+
+    // Baked contribution of static lights (task 59), filled by "Bake Lighting".
+    // Sampled with an up-facing normal at the object's position - a coarse
+    // per-object bake rather than a real per-texel lightmap.
+    float bakedLight[3] = {0.0f, 0.0f, 0.0f};
+    bool bakedValid = false;
 
     // MeshLibrary key for the geometry: empty -> use the primitive fallback.
     std::string meshKey() const { return usePrimitive ? std::string() : meshPath; }
@@ -48,6 +55,25 @@ public:
     float range = 8.0f;        // point / spot falloff distance
     float spotInnerDeg = 22.0f; // full brightness inside this cone half-angle
     float spotOuterDeg = 32.0f; // zero past this one
+
+    // Static lights are excluded from the real-time pass; their contribution
+    // only reaches meshes/probes via "Bake Lighting" (task 59).
+    bool isStatic = false;
+};
+
+// A fixed sample point for baked static lighting. Dynamic (moving) actors with
+// no bake of their own borrow the nearest probe's baked colour as extra
+// ambient each frame, so they still read as lit by static-only lights.
+class LightProbeComponent : public Component {
+public:
+    const char* typeName() const override { return "Light Probe"; }
+    void drawInspector() override;
+    std::unique_ptr<Component> clone() const override {
+        return std::make_unique<LightProbeComponent>(*this);
+    }
+
+    float bakedLight[3] = {0.0f, 0.0f, 0.0f};
+    bool bakedValid = false;
 };
 
 // A tiny demonstration component: spins its actor about an axis while playing.

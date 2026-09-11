@@ -47,6 +47,9 @@ private:
     void drawInspector();
     void drawViewport();
     void drawViewportGizmo(float x, float y, float w, float h); // ImGuizmo overlay
+    // Non-interactive overlays: selected actor's +Z normal arrow, and light
+    // range / spot-cone wireframes.
+    void drawViewportOverlays(float x, float y, float w, float h);
     bool gizmoActive() const; // gizmo hovered or being dragged (suppresses orbit)
     void drawBottomPanel(); // Asset Browser / Engine Console / Game Console
     void assetBrowserMenu(); // right-click menu: create / import / new folder
@@ -99,6 +102,7 @@ private:
     bool gizmoLocal_ = true; // local vs world axes
     bool gizmoInit_ = false;
     bool fog_ = false;       // viewport distance fog
+    bool shadows_ = true;    // viewport real-time shadows
 
     // Input Map editing.
     InputMap inputMap_;         // the project's active input map

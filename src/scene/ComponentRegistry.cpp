@@ -47,6 +47,7 @@ void registerBuiltinComponents() {
     auto& r = ComponentRegistry::get();
     r.add("Mesh Renderer", "Rendering", [] { return std::make_unique<MeshRenderer>(); });
     r.add("Light", "Rendering", [] { return std::make_unique<LightComponent>(); });
+    r.add("Light Probe", "Rendering", [] { return std::make_unique<LightProbeComponent>(); });
     r.add("Spinner", "Debug", [] { return std::make_unique<SpinnerComponent>(); });
 }
 
