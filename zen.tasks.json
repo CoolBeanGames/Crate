@@ -4,7 +4,7 @@
   "name": "Crate",
   "nextCardIndex": 67,
   "latestExePath": "build-Release/Crate.exe",
-  "latestReleasePath": "https://github.com/CoolBeanGames/Crate/releases/tag/v0.10.0-rc1",
+  "latestReleasePath": "https://github.com/CoolBeanGames/Crate/releases/tag/v0.10.0-rc2",
   "tagCatalog": [
     {
       "name": "bug",
@@ -228,8 +228,7 @@
           "title": "Not Quite Right",
           "task": "I made this script\r\nclass Player : Actor\n{\n float move_speed = 1;\n float turn_speed = 1;\n int turn_axis = 0;\n func start()\n {\n }\n\n func update(float delta)\n {\n  transform.rotation.y \u002B= move_speed * delta;\n  transform.position \u002B= transform.forward * move_speed * delta;\n }\n\n func physics_update(float delta)\n {\n }\n \n func update_turn_axis()\n {\n  \n }\n}\nactors have no forward vector as a child of transform, see that that gets added in, autocorrect doesnt work (see next task), brackets dont auto get added (nor do parenthesis) and auto indent doesnt work. Fix it",
           "tags": [
-            "task",
-            "in progress"
+            "task"
           ],
           "files": [],
           "requirements": [],
@@ -239,11 +238,11 @@
             "release": true,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": false,
           "createdAt": "2026-09-11T03:23:35.9865492+00:00",
-          "updatedAt": "2026-09-10T23:40:00+00:00"
+          "updatedAt": "2026-09-11T00:00:00+00:00"
         },
         {
           "id": "769acfc712fb49248d994d64d0620f18",
@@ -257,8 +256,7 @@
           "tags": [
             "Scripting",
             "script editor",
-            "autocomplete",
-            "in progress"
+            "autocomplete"
           ],
           "files": [],
           "requirements": [],
@@ -268,11 +266,11 @@
             "release": true,
             "merge": false
           },
-          "isDone": false,
+          "isDone": true,
           "isLocked": false,
           "isCollapsed": false,
           "createdAt": "2026-09-11T03:23:41.6781365+00:00",
-          "updatedAt": "2026-09-10T23:40:00+00:00"
+          "updatedAt": "2026-09-11T00:00:00+00:00"
         },
         {
           "id": "5012b56ad8fc4ef29e334010340436f7",
