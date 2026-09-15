@@ -1316,13 +1316,126 @@ void EditorApp::scanAssets() {
     }
 }
 
-// One icon-grid cell: a coloured glyph tile (the "icon") plus a wrapped label
-// underneath, sized/selectable like a real asset-browser tile. Everything
-// that used to be a text row (folders, files, materials, imported assets) is
-// drawn as one of these now; the click/drag/context-menu logic per item is
-// unchanged (task 61 - keep functionality, change presentation).
-bool EditorApp::assetIconTile(const char* strId, const char* glyph, unsigned int argb,
-                              const std::string& label, bool selected, bool* dbl) {
+// Draws the per-type icon glyph into [iconMin, iconMax]: a folder silhouette,
+// a shaded sphere, a document with a folded corner and a "C", an isometric
+// cube tagged "fbx", a gamepad, or (for images) an actual thumbnail loaded
+// through the renderer's texture cache. `accent` is the tile's background
+// tint for every kind except Image, which draws directly against a neutral
+// backing so the thumbnail's own colours read clearly.
+void EditorApp::drawAssetIconGlyph(ImDrawList* dl, ImVec2 iconMin, ImVec2 iconMax,
+                                   AssetIconKind kind, unsigned int accent,
+                                   const std::string& imagePath) {
+    const float w = iconMax.x - iconMin.x, h = iconMax.y - iconMin.y;
+    const ImVec2 c((iconMin.x + iconMax.x) * 0.5f, (iconMin.y + iconMax.y) * 0.5f);
+
+    if (kind == AssetIconKind::Image) {
+        dl->AddRectFilled(iconMin, iconMax, IM_COL32(20, 22, 28, 255), 6.0f);
+        if (void* srv = renderer_.loadTexture(imagePath)) {
+            ImVec2 pad(4.0f, 4.0f);
+            dl->AddImageRounded(reinterpret_cast<ImTextureID>(srv),
+                                ImVec2(iconMin.x + pad.x, iconMin.y + pad.y),
+                                ImVec2(iconMax.x - pad.x, iconMax.y - pad.y), ImVec2(0, 0),
+                                ImVec2(1, 1), IM_COL32_WHITE, 4.0f);
+        }
+        return;
+    }
+
+    dl->AddRectFilled(iconMin, iconMax, accent, 6.0f);
+
+    switch (kind) {
+    case AssetIconKind::Folder: {
+        unsigned int fg = IM_COL32(255, 255, 255, 235);
+        float bodyTop = iconMin.y + h * 0.34f;
+        dl->AddRectFilled(ImVec2(iconMin.x + w * 0.14f, iconMin.y + h * 0.22f),
+                          ImVec2(iconMin.x + w * 0.14f + w * 0.42f, bodyTop + 2.0f), fg, 2.0f);
+        dl->AddRectFilled(ImVec2(iconMin.x + w * 0.10f, bodyTop),
+                          ImVec2(iconMax.x - w * 0.10f, iconMax.y - h * 0.16f), fg, 3.0f);
+        break;
+    }
+    case AssetIconKind::Material: {
+        float r = h * 0.30f;
+        dl->AddCircleFilled(c, r, IM_COL32(212, 205, 226, 255), 32);
+        dl->AddCircle(c, r, IM_COL32(16, 16, 20, 130), 32, 1.5f);
+        ImVec2 hl(c.x - r * 0.35f, c.y - r * 0.38f);
+        dl->AddCircleFilled(hl, r * 0.34f, IM_COL32(255, 255, 255, 190), 16);
+        break;
+    }
+    case AssetIconKind::Script: {
+        float pw = w * 0.5f, ph = h * 0.62f;
+        ImVec2 pMin(c.x - pw * 0.5f, c.y - ph * 0.5f), pMax(c.x + pw * 0.5f, c.y + ph * 0.5f);
+        dl->AddRectFilled(pMin, pMax, IM_COL32(240, 240, 245, 255), 3.0f);
+        float fold = pw * 0.30f;
+        ImVec2 f0(pMax.x - fold, pMin.y), f1(pMax.x, pMin.y), f2(pMax.x, pMin.y + fold);
+        dl->AddTriangleFilled(f0, f1, f2, IM_COL32(200, 200, 210, 255));
+        dl->AddLine(f0, f2, IM_COL32(165, 165, 176, 255), 1.0f);
+        const char* letter = "C";
+        ImVec2 lsz = ImGui::CalcTextSize(letter);
+        dl->AddText(ImVec2(c.x - lsz.x * 0.5f, c.y - lsz.y * 0.5f + ph * 0.06f), accent, letter);
+        break;
+    }
+    case AssetIconKind::Fbx: {
+        float s = h * 0.26f, d = h * 0.30f;
+        ImVec2 T(c.x, c.y - s - d * 0.15f);
+        ImVec2 L(c.x - s * 0.87f, c.y - s * 0.5f - d * 0.15f);
+        ImVec2 R(c.x + s * 0.87f, c.y - s * 0.5f - d * 0.15f);
+        ImVec2 B(c.x, c.y - d * 0.15f);
+        ImVec2 Ld(L.x, L.y + d), Rd(R.x, R.y + d), Bd(B.x, B.y + d);
+        ImVec2 top[4] = {T, R, B, L};
+        ImVec2 left[4] = {L, B, Bd, Ld};
+        ImVec2 right[4] = {R, B, Bd, Rd};
+        dl->AddConvexPolyFilled(top, 4, IM_COL32(226, 226, 233, 255));
+        dl->AddConvexPolyFilled(left, 4, IM_COL32(166, 166, 179, 255));
+        dl->AddConvexPolyFilled(right, 4, IM_COL32(120, 120, 133, 255));
+        dl->AddPolyline(top, 4, IM_COL32(18, 18, 22, 140), ImDrawFlags_Closed, 1.0f);
+        dl->AddPolyline(left, 4, IM_COL32(18, 18, 22, 140), ImDrawFlags_Closed, 1.0f);
+        dl->AddPolyline(right, 4, IM_COL32(18, 18, 22, 140), ImDrawFlags_Closed, 1.0f);
+        const char* tag = "fbx";
+        ImVec2 tsz = ImGui::CalcTextSize(tag);
+        ImVec2 tagMin(iconMax.x - tsz.x - 6.0f, iconMax.y - tsz.y - 4.0f);
+        dl->AddRectFilled(tagMin, ImVec2(iconMax.x - 2.0f, iconMax.y - 2.0f),
+                          IM_COL32(15, 16, 20, 210), 2.0f);
+        dl->AddText(ImVec2(tagMin.x + 2.0f, tagMin.y + 1.0f), IM_COL32(232, 234, 240, 255), tag);
+        break;
+    }
+    case AssetIconKind::InputMap: {
+        float bw = w * 0.64f, bh = h * 0.36f;
+        ImVec2 bMin(c.x - bw * 0.5f, c.y - bh * 0.5f), bMax(c.x + bw * 0.5f, c.y + bh * 0.5f);
+        dl->AddRectFilled(bMin, bMax, IM_COL32(238, 238, 243, 255), bh * 0.5f);
+        float padCx = bMin.x + bw * 0.28f, padCy = c.y;
+        float armLen = bh * 0.30f, armW = bh * 0.15f;
+        dl->AddRectFilled(ImVec2(padCx - armW * 0.5f, padCy - armLen),
+                          ImVec2(padCx + armW * 0.5f, padCy + armLen), accent, 1.0f);
+        dl->AddRectFilled(ImVec2(padCx - armLen, padCy - armW * 0.5f),
+                          ImVec2(padCx + armLen, padCy + armW * 0.5f), accent, 1.0f);
+        float btnR = bh * 0.17f;
+        dl->AddCircleFilled(ImVec2(bMax.x - bw * 0.22f, c.y - bh * 0.15f), btnR, accent, 12);
+        dl->AddCircleFilled(ImVec2(bMax.x - bw * 0.34f, c.y + bh * 0.15f), btnR, accent, 12);
+        break;
+    }
+    case AssetIconKind::Generic: {
+        float pw = w * 0.46f, ph = h * 0.60f;
+        ImVec2 pMin(c.x - pw * 0.5f, c.y - ph * 0.5f), pMax(c.x + pw * 0.5f, c.y + ph * 0.5f);
+        dl->AddRectFilled(pMin, pMax, IM_COL32(220, 220, 226, 255), 3.0f);
+        float fold = pw * 0.30f;
+        ImVec2 f0(pMax.x - fold, pMin.y), f1(pMax.x, pMin.y), f2(pMax.x, pMin.y + fold);
+        dl->AddTriangleFilled(f0, f1, f2, IM_COL32(190, 190, 198, 255));
+        dl->AddLine(f0, f2, IM_COL32(150, 150, 160, 255), 1.0f);
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+// One icon-grid cell: a per-type drawn icon plus a wrapped label underneath,
+// sized/selectable like a real asset-browser tile. Everything that used to
+// be a text row (folders, files, materials, imported assets) is drawn as one
+// of these now; the click/drag/context-menu logic per item is unchanged
+// (task 61 - keep functionality, change presentation; task 74 - real icons
+// instead of 2-3 letter text glyphs).
+bool EditorApp::assetIconTile(const char* strId, AssetIconKind kind, unsigned int accent,
+                              const std::string& label, bool selected, bool* dbl,
+                              const std::string& imagePath) {
     constexpr float kTileW = 84.0f, kTileH = 96.0f, kIconH = 64.0f;
     ImGui::PushID(strId);
     ImVec2 topLeft = ImGui::GetCursorScreenPos();
@@ -1335,11 +1448,7 @@ bool EditorApp::assetIconTile(const char* strId, const char* glyph, unsigned int
     ImDrawList* dl = ImGui::GetWindowDrawList();
     ImVec2 iconMin(topLeft.x + 6.0f, topLeft.y + 4.0f);
     ImVec2 iconMax(topLeft.x + kTileW - 6.0f, topLeft.y + 4.0f + kIconH);
-    dl->AddRectFilled(iconMin, iconMax, argb, 6.0f);
-    ImVec2 gsz = ImGui::CalcTextSize(glyph);
-    dl->AddText(ImVec2(iconMin.x + (iconMax.x - iconMin.x - gsz.x) * 0.5f,
-                       iconMin.y + (iconMax.y - iconMin.y - gsz.y) * 0.5f),
-               IM_COL32(18, 18, 22, 255), glyph);
+    drawAssetIconGlyph(dl, iconMin, iconMax, kind, accent, imagePath);
 
     ImGui::PushClipRect(topLeft, ImVec2(topLeft.x + kTileW, topLeft.y + kTileH), true);
     ImGui::PushTextWrapPos(topLeft.x + kTileW - 2.0f);
@@ -1384,8 +1493,8 @@ void EditorApp::drawAssetFolders() {
         std::string rel = assetCwd_.empty() ? name : assetCwd_ + "/" + name;
         unsigned int col = folderColor(rel);
         bool dbl = false;
-        assetIconTile(rel.c_str(), "DIR", col ? col : IM_COL32(120, 110, 200, 255), name, false,
-                     &dbl);
+        assetIconTile(rel.c_str(), AssetIconKind::Folder, col ? col : IM_COL32(120, 110, 200, 255),
+                     name, false, &dbl);
         if (dbl)
             assetCwd_ = rel;
         folderContextMenu(rel);
@@ -1400,13 +1509,20 @@ void EditorApp::drawAssetFolders() {
         bool isImg = isSupportedImageExt(ext);
         bool isFbx = ext == "fbx";
         bool isMap = ext == "inputmap";
-        const char* glyph = isImg ? "IMG" : isFbx ? "MDL" : isMap ? "IN" : "FILE";
-        unsigned int col = isImg   ? IM_COL32(70, 150, 170, 255)
-                          : isFbx  ? IM_COL32(150, 110, 190, 255)
-                          : isMap  ? IM_COL32(90, 130, 200, 255)
-                                   : IM_COL32(90, 94, 104, 255);
+        bool isScript = ext == "cscript";
+        AssetIconKind kind = isImg      ? AssetIconKind::Image
+                            : isFbx     ? AssetIconKind::Fbx
+                            : isMap     ? AssetIconKind::InputMap
+                            : isScript  ? AssetIconKind::Script
+                                        : AssetIconKind::Generic;
+        unsigned int col = isImg      ? IM_COL32(70, 150, 170, 255)
+                          : isFbx     ? IM_COL32(150, 110, 190, 255)
+                          : isMap     ? IM_COL32(90, 130, 200, 255)
+                          : isScript  ? IM_COL32(56, 109, 154, 255)
+                                      : IM_COL32(90, 94, 104, 255);
         bool dbl = false;
-        bool clicked = assetIconTile(path.c_str(), glyph, col, name, false, &dbl);
+        bool clicked = assetIconTile(path.c_str(), kind, col, name, false, &dbl,
+                                     isImg ? path : std::string());
         if (clicked) {
             if (isMap) {
                 if (dbl) {
@@ -1580,8 +1696,8 @@ void EditorApp::drawBottomPanel() {
         auto matNames = materialLib_.names();
         for (size_t i = 0; i < matNames.size(); ++i) {
             const std::string& mn = matNames[i];
-            if (assetIconTile(("mat:" + mn).c_str(), "MAT", IM_COL32(180, 130, 220, 255), mn,
-                              selectedMaterial_ == mn)) {
+            if (assetIconTile(("mat:" + mn).c_str(), AssetIconKind::Material,
+                              IM_COL32(180, 130, 220, 255), mn, selectedMaterial_ == mn)) {
                 selectedMaterial_ = mn;
                 selectedAsset_.clear();
                 scene_.select(nullptr);
@@ -1601,9 +1717,9 @@ void EditorApp::drawBottomPanel() {
                 name = name.substr(s + 1);
             const std::string ext = lowerExt(a);
             bool isImg = isSupportedImageExt(ext);
-            if (assetIconTile(("ia:" + a).c_str(), isImg ? "IMG" : "MDL",
+            if (assetIconTile(("ia:" + a).c_str(), isImg ? AssetIconKind::Image : AssetIconKind::Fbx,
                               isImg ? IM_COL32(70, 150, 170, 255) : IM_COL32(150, 110, 190, 255),
-                              name, selectedAsset_ == a)) {
+                              name, selectedAsset_ == a, nullptr, isImg ? a : std::string())) {
                 selectedAsset_ = a;
                 selectedMaterial_.clear();
                 if (isImg) {
