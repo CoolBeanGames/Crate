@@ -252,7 +252,7 @@ static char lastCodeChar(const std::string& line) {
 // them; typing a closer that's already sitting right at the caret (i.e. the
 // one we just auto-inserted) steps over it instead of adding a duplicate.
 void ScriptEditor::applyAutoBrackets() {
-    if (acOpen_ || !ImGui::IsItemFocused())
+    if (acOpen_ || !editor_.IsFocused())
         return;
     // Only handle the common case of a single typed character: bulk input
     // (e.g. a paste that went through the character queue) is left alone.
@@ -272,8 +272,17 @@ void ScriptEditor::applyAutoBrackets() {
         // Render() already inserted a second `c` right before whatever was
         // at the caret. If that was the *same* closer, it's a type-over:
         // undo the duplicate and just step past the existing one.
-        if (preCursor_.mColumn >= 0 && preCursor_.mColumn < (int)preLine_.size() &&
-            preLine_[preCursor_.mColumn] == c) {
+        //
+        // preCursor_.mColumn is a *visual* column (tabs expand to the next
+        // tab stop, see TextEditor::Coordinates), not a raw index into
+        // preLine_ -- on any indented line those differ, so this has to go
+        // through GetCharacterIndex() rather than indexing preLine_ directly
+        // (indexing directly either reads the wrong character or, on a
+        // short-looking-but-tab-expanded line, silently fails the bounds
+        // check and never fires at all, leaving the duplicate closer sitting
+        // there unremoved).
+        int preIdx = editor_.GetCharacterIndex(preCursor_);
+        if (preIdx >= 0 && preIdx < (int)preLine_.size() && preLine_[preIdx] == c) {
             // Backspace() is private; step back onto the just-typed
             // duplicate and forward-delete it instead.
             auto cur = editor_.GetCursorPosition();
@@ -299,7 +308,10 @@ bool ScriptEditor::handleBracketCharForAc(char c) {
     if (c == '}' || c == ')') {
         std::string line = editor_.GetCurrentLineText();
         auto cur = editor_.GetCursorPosition();
-        if (cur.mColumn >= 0 && cur.mColumn < (int)line.size() && line[cur.mColumn] == c) {
+        // See the matching comment in applyAutoBrackets(): mColumn is a
+        // visual (tab-expanded) column, not a raw index into `line`.
+        int idx = editor_.GetCharacterIndex(cur);
+        if (idx >= 0 && idx < (int)line.size() && line[idx] == c) {
             editor_.SetCursorPosition(TextEditor::Coordinates(cur.mLine, cur.mColumn + 1));
             return true;
         }
@@ -308,7 +320,7 @@ bool ScriptEditor::handleBracketCharForAc(char c) {
 }
 
 void ScriptEditor::applyElectricIndent() {
-    if (!ImGui::IsItemFocused() || acOpen_)
+    if (!editor_.IsFocused() || acOpen_)
         return;
 
     auto cur = editor_.GetCursorPosition();
@@ -494,7 +506,7 @@ void ScriptEditor::collectLocalsInScope(int line, std::vector<std::string>& out)
 
 void ScriptEditor::updateAutocomplete() {
     ImGuiIO& io = ImGui::GetIO();
-    const bool editorFocused = ImGui::IsItemFocused() || acOpen_;
+    const bool editorFocused = editor_.IsFocused() || acOpen_;
 
     // current line text up to the caret
     TextEditor::Coordinates cur = editor_.GetCursorPosition();

@@ -212,11 +212,26 @@ public:
 	bool IsTextChanged() const { return mTextChanged; }
 	bool IsCursorPositionChanged() const { return mCursorPositionChanged; }
 
+	// True if the editor's own child window had focus as of the last Render()
+	// call. Unlike ImGui::IsItemFocused() on the item that follows Render(),
+	// this is accurate for a manually-drawn widget like this one: nothing
+	// inside ever becomes ImGui's g.NavId (there are no real ImGui widgets in
+	// the text area, just ImDrawList calls), so IsItemFocused() never sees a
+	// match and always reports false regardless of real focus state.
+	bool IsFocused() const { return mFocused; }
+
 	bool IsColorizerEnabled() const { return mColorizerEnabled; }
 	void SetColorizerEnable(bool aValue);
 
 	Coordinates GetCursorPosition() const { return GetActualCursorCoordinates(); }
 	void SetCursorPosition(const Coordinates& aPosition);
+
+	// Coordinates::mColumn is a *visual* column (tabs count as
+	// [1..mTabSize] columns, see the Coordinates comment below) -- callers
+	// indexing into a raw line string (e.g. from GetCurrentLineText()) need
+	// this to convert first, or they'll read the wrong character on any
+	// line with a tab before the target column.
+	int GetCharacterIndex(const Coordinates& aCoordinates) const;
 
 	inline void SetHandleMouseInputs    (bool aValue){ mHandleMouseInputs    = aValue;}
 	inline bool IsHandleMouseInputsEnabled() const { return mHandleKeyboardInputs; }
@@ -329,7 +344,6 @@ private:
 	Coordinates FindWordStart(const Coordinates& aFrom) const;
 	Coordinates FindWordEnd(const Coordinates& aFrom) const;
 	Coordinates FindNextWord(const Coordinates& aFrom) const;
-	int GetCharacterIndex(const Coordinates& aCoordinates) const;
 	int GetCharacterColumn(int aLine, int aIndex) const;
 	int GetLineCharacterCount(int aLine) const;
 	int GetLineMaxColumn(int aLine) const;
@@ -358,6 +372,7 @@ private:
 	bool mOverwrite;
 	bool mReadOnly;
 	bool mWithinRender;
+	bool mFocused = false;
 	bool mScrollToCursor;
 	bool mScrollToTop;
 	bool mTextChanged;
