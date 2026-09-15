@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "projectId": "8afe2a0217d7419db234ceda7ecb9dff",
   "name": "Crate",
-  "nextCardIndex": 67,
+  "nextCardIndex": 78,
   "latestExePath": "build-Release/Crate.exe",
-  "latestReleasePath": "https://github.com/CoolBeanGames/Crate/releases/tag/v0.10.0-rc1",
+  "latestReleasePath": "build-Release/Crate.exe",
   "tagCatalog": [
     {
       "name": "bug",
@@ -137,8 +137,21 @@
     {
       "name": "autocomplete",
       "color": "#6557B8"
+    },
+    {
+      "name": "art",
+      "color": "#8C553E"
+    },
+    {
+      "name": "fog",
+      "color": "#8C553E"
+    },
+    {
+      "name": "camera",
+      "color": "#8C553E"
     }
   ],
+  "customCardTypes": [],
   "branches": [
     {
       "id": "main",
@@ -147,6 +160,26 @@
       "isArchive": false,
       "isCollapsed": false,
       "isSystem": true,
+      "isLocked": false,
+      "tasks": []
+    },
+    {
+      "id": "9463e19afcbe4cd18681afff19b840a9",
+      "name": "Scripting",
+      "branch": "scripting",
+      "isArchive": false,
+      "isCollapsed": false,
+      "isSystem": false,
+      "isLocked": false,
+      "tasks": []
+    },
+    {
+      "id": "2b668c739ffe45aaa32fa229a7aff5ed",
+      "name": "Assets",
+      "branch": "assets",
+      "isArchive": false,
+      "isCollapsed": false,
+      "isSystem": false,
       "isLocked": false,
       "tasks": []
     },
@@ -160,205 +193,144 @@
       "isLocked": false,
       "tasks": [
         {
-          "id": "2eaff1cefdcf4140b1fa74091c8bea5d",
-          "index": 59,
+          "id": "9b12342b8f7b401cba512baa8be13b66",
+          "index": 76,
           "kind": "task",
           "dueDate": null,
           "startedDate": null,
           "priority": null,
-          "title": "static lights \u002B lightmap baking",
-          "task": "add a setting to lights that mark them as static, static lights are only applied when lightmaps are baked.",
+          "title": "basic fog",
+          "task": "add basic height/distance/global volumetric fog as a spawnable actor component, if it exists in the scene fog is rendered. can be tinted and adjusted. is base type Actor3D and can be referenced as parent_actor.fog to set parameters",
           "tags": [
-            "lighting",
-            "rendering"
+            "rendering",
+            "fog"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [
             {
-              "id": "b8dec3296a064fcf8142c253bd49090c",
-              "text": "static lights",
-              "isDone": true
+              "id": "a727e2ae5b89408e8a5a525c4e660ef2",
+              "index": 1,
+              "text": "add fog to autocorrect",
+              "isDone": false
             },
             {
-              "id": "5bb533383d824a27b3e8df1c7ee5bef1",
-              "text": "lightmap baking",
-              "isDone": true
+              "id": "9dd9691857674f2e86fdfa31fce30952",
+              "index": 2,
+              "text": "can add fog",
+              "isDone": false
             },
             {
-              "id": "f68ab9250f8c4db7bdf6a106cf6f5ea7",
-              "text": "lightmaps",
-              "isDone": true
-            },
-            {
-              "id": "61dbba170e834cd3aed8650e6ee47822",
-              "text": "light probes",
-              "isDone": true
+              "id": "e35d176e5eb147d09c02674338146387",
+              "index": 3,
+              "text": "fog renders",
+              "isDone": false
             }
           ],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
             "release": true,
             "merge": false
           },
-          "isDone": true,
+          "isDone": false,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": false,
-          "createdAt": "2026-09-10T23:29:43.7833772+00:00",
-          "updatedAt": "2026-09-10T23:45:00+00:00"
+          "createdAt": "2026-09-11T07:22:55.0394445+00:00",
+          "updatedAt": "2026-09-11T07:24:25.6050534+00:00"
+        },
+        {
+          "id": "fa544be0c3284e9a96c12489c3b0b568",
+          "index": 75,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "volumetric fog volume",
+          "task": "a square volume where volumetric fog is rendered",
+          "tags": [
+            "rendering",
+            "fog"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [
+            {
+              "id": "3712d96af18942ffa61ced7807ec8b85",
+              "index": 1,
+              "text": "volumetric fog only rendered inside the volume",
+              "isDone": false
+            },
+            {
+              "id": "689a0f6b6c654fb0bd0ee0341bb1a928",
+              "index": 2,
+              "text": "reacts to light",
+              "isDone": false
+            },
+            {
+              "id": "643f9ed973ea4015b1c55d1e2aae60b8",
+              "index": 3,
+              "text": "mutiple shapes (cube,sphere)",
+              "isDone": false
+            }
+          ],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-11T07:21:59.4904551+00:00",
+          "updatedAt": "2026-09-11T07:22:50.3831391+00:00"
+        },
+        {
+          "id": "7608f2b669544fc8a4a648709650a5df",
+          "index": 77,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Camera",
+          "task": "add a camera with a view frustrum gizmo. if the camera is present then game view renders the cameras view (scene view is still free view). Only 1 camera can be active at a time, if a new camera is activated it becomes the 1 active camera. if that camera becomes deactivated then it looks for a present camera and activates that",
+          "tags": [
+            "rendering",
+            "camera"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [
+            {
+              "id": "f87077e6971b452fa515f03eac80ad15",
+              "index": 1,
+              "text": "camera in place and usable",
+              "isDone": false
+            }
+          ],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-11T07:24:32.0883338+00:00",
+          "updatedAt": "2026-09-11T07:25:54.4580051+00:00"
         }
       ]
-    },
-    {
-      "id": "9463e19afcbe4cd18681afff19b840a9",
-      "name": "Scripting",
-      "branch": "scripting",
-      "isArchive": false,
-      "isCollapsed": false,
-      "isSystem": false,
-      "isLocked": false,
-      "tasks": [
-        {
-          "id": "fd4414c9b4c54d73adf8ceed74d7668a",
-          "index": 62,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": "high",
-          "title": "Not Quite Right",
-          "task": "I made this script\r\nclass Player : Actor\n{\n float move_speed = 1;\n float turn_speed = 1;\n int turn_axis = 0;\n func start()\n {\n }\n\n func update(float delta)\n {\n  transform.rotation.y \u002B= move_speed * delta;\n  transform.position \u002B= transform.forward * move_speed * delta;\n }\n\n func physics_update(float delta)\n {\n }\n \n func update_turn_axis()\n {\n  \n }\n}\nactors have no forward vector as a child of transform, see that that gets added in, autocorrect doesnt work (see next task), brackets dont auto get added (nor do parenthesis) and auto indent doesnt work. Fix it",
-          "tags": [
-            "task",
-            "in progress"
-          ],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": true,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-11T03:23:35.9865492+00:00",
-          "updatedAt": "2026-09-10T23:40:00+00:00"
-        },
-        {
-          "id": "769acfc712fb49248d994d64d0620f18",
-          "index": 63,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": "high",
-          "title": "Autocomplete",
-          "task": "I made this script:\r\nclass Player : Actor\n{\n float move_speed = 1;\n float turn_speed = 1;\n int turn_axis = 0;\n func start()\n {\n }\n\n func update(float delta)\n {\n  transform.rotation.y \u002B= move_speed * delta;\n  transform.position \u002B= transform.forward * move_speed * delta;\n }\n\n func physics_update(float delta)\n {\n }\n \n func update_turn_axis()\n {\n  \n }\n}\n\r\nAutocomplete should have tried to complete:\r\ntransform\r\ntransform.position\r\ntransform.rotation\r\nmove_speed\r\ndelta\r\n\r\nhowever none of it even started to auto complete, fix the autocomplete. As Soon as a variable function or class exists the scripting engine should be aware of it and ready for autocomplete",
-          "tags": [
-            "Scripting",
-            "script editor",
-            "autocomplete",
-            "in progress"
-          ],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": true,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-11T03:23:41.6781365+00:00",
-          "updatedAt": "2026-09-10T23:40:00+00:00"
-        },
-        {
-          "id": "5012b56ad8fc4ef29e334010340436f7",
-          "index": 64,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Documentation",
-          "task": "Crreate a \u0022Wiki\u0022 to go along with the scripting language so i can look up how to do things. Keep it updated as we add more stuff",
-          "tags": [
-            "documentation"
-          ],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": true,
-            "merge": true
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-11T03:23:48.6295219+00:00",
-          "updatedAt": "2026-09-11T03:24:21.3912423+00:00"
-        },
-        {
-          "id": "048b62f5db3943cbb887b9cf15f2461b",
-          "index": 66,
-          "kind": "cleanup",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "",
-          "task": "",
-          "tags": [],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": false,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-11T03:27:38.0423229+00:00",
-          "updatedAt": "2026-09-11T03:27:38.042323+00:00"
-        },
-        {
-          "id": "115447b334554c04aa1e059e0daa0821",
-          "index": 65,
-          "kind": "break",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "",
-          "task": "",
-          "tags": [],
-          "files": [],
-          "requirements": [],
-          "flags": {
-            "commit": false,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-11T03:27:31.1614384+00:00",
-          "updatedAt": "2026-09-11T03:27:31.1614386+00:00"
-        }
-      ]
-    },
-    {
-      "id": "2b668c739ffe45aaa32fa229a7aff5ed",
-      "name": "Assets",
-      "branch": "assets",
-      "isArchive": false,
-      "isCollapsed": false,
-      "isSystem": false,
-      "isLocked": false,
-      "tasks": []
     },
     {
       "id": "archive",
@@ -383,28 +355,35 @@
             "bug"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [
             {
               "id": "cc22000000004b0e9a00000000000001",
+              "index": 1,
               "text": "recompiling a script keeps its ClassInfo pointer stable",
               "isDone": true
             },
             {
               "id": "cc22000000004b0e9a00000000000002",
+              "index": 2,
               "text": "edit a script, add it to an actor, hit Play -\u003E no crash",
               "isDone": true
             },
             {
               "id": "cc22000000004b0e9a00000000000003",
+              "index": 3,
               "text": "edit a script already attached to an actor, hit Play -\u003E the new code runs",
               "isDone": true
             },
             {
               "id": "cc22000000004b0e9a00000000000004",
+              "index": 4,
               "text": "script objects re-run field initialisers after their class recompiles",
               "isDone": true
             }
           ],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -413,6 +392,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T09:00:00+00:00",
           "updatedAt": "2026-09-10T00:00:00+00:00"
@@ -431,7 +411,10 @@
             "task"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [],
+          "notes": [],
           "flags": {
             "commit": false,
             "build": false,
@@ -440,6 +423,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T13:04:03.8199065+00:00",
           "updatedAt": "2026-09-10T12:30:00+00:00"
@@ -464,7 +448,10 @@
               "size": 11641
             }
           ],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [],
+          "notes": [],
           "flags": {
             "commit": false,
             "build": false,
@@ -473,6 +460,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T13:07:07.1683815+00:00",
           "updatedAt": "2026-09-10T12:30:00+00:00"
@@ -491,7 +479,10 @@
             "assets"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -500,9 +491,244 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T18:48:08.7959899+00:00",
           "updatedAt": "2026-09-10T15:00:00+00:00"
+        },
+        {
+          "id": "b7f3a1c6e9d3411a8b6e2f0a7c5d9e41",
+          "index": 67,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": "critical",
+          "title": "Play button crashes on click (ImGui style-color stack imbalance)",
+          "task": "Reported: attaching this script to an actor and pressing Play appeared to do nothing (\\u0022script isn\u0027t working\\u0022):\r\n\r\nclass Player : Actor\n{\n float move_speed = 1;\n float turn_speed = 1;\n int turn_axis = 0;\n func start()\n {\n }\n\n func update(float delta)\n {\n  transform.rotation.y \u002B= move_speed * delta;\n  transform.position \u002B= transform.forward * move_speed * delta;\n }\n\n func physics_update(float delta)\n {\n }\n \n func update_turn_axis()\n {\n  \n }\n}\n\r\nActual root cause had nothing to do with the script (verified the script\u0027s language semantics work correctly in isolation): EditorApp::drawToolbar() pushed a style color only \u0060if (playing_)\u0060, then called the Play button, whose click handler flips \u0060playing_\u0060 synchronously via setPlaying(), and then popped the style color \u0060if (playing_)\u0060 again \u2014 now true post-click \u2014 producing an unbalanced ImGui::PopStyleColor() on every single Play click (Debug builds hit the ImGui assertion and abort(); Release builds silently corrupt the style-color stack). Reproduced live via the actual editor (attach script, click Play), confirmed the exact assertion (\\u0022Calling PopStyleColor() too many times!\\u0022, imgui.cpp:3356) by bisecting the script content down to an empty update() body \u2014 the crash was 100% present with zero script content, proving it was unrelated to the reported script.\r\n\r\nFix: capture \u0060wasPlaying = playing_\u0060 before the button, and gate both the push and the pop on that captured snapshot instead of the live (mutable-mid-frame) \u0060playing_\u0060 flag.",
+          "tags": [
+            "bug",
+            "UI"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [
+            {
+              "id": "d4e1a2b3c4d5e6f7a8b9c0d1e2f3a4b5",
+              "index": 1,
+              "text": "root cause identified (ImGui PushStyleColor/PopStyleColor gated on a flag that mutates mid-frame)",
+              "isDone": true
+            },
+            {
+              "id": "e5f2b3c4d5e6f7a8b9c0d1e2f3a4b5c6",
+              "index": 2,
+              "text": "fixed by snapshotting playing_ before the Play button and using that snapshot for both push and pop",
+              "isDone": true
+            },
+            {
+              "id": "f6a3c4d5e6f7a8b9c0d1e2f3a4b5c6d7",
+              "index": 3,
+              "text": "verified live: attach the reported script, press Play, engine runs without crashing (14\u002B seconds observed, hundreds of frames)",
+              "isDone": true
+            },
+            {
+              "id": "a7b4d5e6f7a8b9c0d1e2f3a4b5c6d7e8",
+              "index": 4,
+              "text": "full test suite still passes after the fix",
+              "isDone": true
+            }
+          ],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-11T01:55:00+00:00",
+          "updatedAt": "2026-09-11T02:00:00+00:00"
+        },
+        {
+          "id": "2f71e8848d2a4551a90ebc65ff196c4e",
+          "index": 68,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "inspector changes do not persist",
+          "task": "I made changes to player turn speed from the inspector, when i hit play the crate object (which it was attached to) gets deselected, and the turn speed reverts to its built in default value.",
+          "tags": [
+            "bug",
+            "Scripting",
+            "inspector"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-11T07:14:10.8204586+00:00",
+          "updatedAt": "2026-09-11T07:37:04.8837801+00:00"
+        },
+        {
+          "id": "93eddc6e70d6412ea4d86e7d19475589",
+          "index": 69,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "autocomplete still not working",
+          "task": "i still have no autocomplete for any of the things i draw squares around in the screenshot. each one should have autocompleted. none of them did.",
+          "tags": [
+            "bug",
+            "Scripting",
+            "script editor"
+          ],
+          "files": [
+            {
+              "id": "f5dfa5015a7b44d092cc4a9ff6ec3ae4",
+              "name": "Aye_2026-09-11_02-17-45.png",
+              "relativePath": "files/Aye_2026-09-11_02-17-45.png",
+              "size": 12249
+            }
+          ],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [
+            {
+              "id": "0ea22b90cba343f39444b7f41d782e46",
+              "index": 1,
+              "text": "autocomplete tested and working",
+              "isDone": true
+            }
+          ],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-11T07:15:10.455427+00:00",
+          "updatedAt": "2026-09-15T22:22:00.6333118+00:00"
+        },
+        {
+          "id": "67be086b66bb4b1d98b776a53090233c",
+          "index": 70,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "auto bracket still not working",
+          "task": "brackets should be inserted automatically as soon as you finish the function signature, the cursor should be placed between the brackets indented. \r\n\r\nthe same should happen for if statments and loops.",
+          "tags": [
+            "bug",
+            "scripting"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [
+            {
+              "id": "7c0ced3db8294383ae66415640d4470f",
+              "index": 1,
+              "text": "auto brackets fixed",
+              "isDone": true
+            }
+          ],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-11T07:15:44.4532364+00:00",
+          "updatedAt": "2026-09-15T22:22:01.0594038+00:00"
+        },
+        {
+          "id": "d5e68b22d83f4362b79b67850e95047f",
+          "index": 71,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "auto indent still not working",
+          "task": "entering into the line between brackets does not automatically indent (tab) the cursor",
+          "tags": [
+            "bug",
+            "scripting"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-11T07:15:53.5654196+00:00",
+          "updatedAt": "2026-09-15T22:22:01.4959625+00:00"
+        },
+        {
+          "id": "cf3521fe8c5944378fec9e74fa6794a9",
+          "index": 72,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "auto parenthesis still not working",
+          "task": "parenthesis are not automatically added after typing the first \u0027(\u0027",
+          "tags": [
+            "bug",
+            "script editor"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-11T07:16:00.9884077+00:00",
+          "updatedAt": "2026-09-15T22:22:01.898201+00:00"
         },
         {
           "id": "c9d4482b33c94eeda497726091ff6dbf",
@@ -524,33 +750,41 @@
               "size": 268294
             }
           ],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [
             {
               "id": "8f679dd02f7240c3b8884d6a75e0fc14",
+              "index": 1,
               "text": "left side -\u003E scene view/hierarchy lists all of the actors in the scene",
               "isDone": true
             },
             {
               "id": "2495b145fb63433580a55838fddc008f",
+              "index": 2,
               "text": "bottom -\u003E asset browser / engine console / game console : used for browsing files to use and for giving debugging info",
               "isDone": true
             },
             {
               "id": "914db7ceb0a248e2a03aa4cd73bf3483",
+              "index": 3,
               "text": "right side -\u003E inspector, shows settings for the currently selected actor or file",
               "isDone": true
             },
             {
               "id": "b038b74f5ce041a1ab7a0a8f218c958a",
+              "index": 4,
               "text": "top -\u003E menu bar / play \u0026 stop buttons / settings",
               "isDone": true
             },
             {
               "id": "b85427402483436eb497b87586edd35b",
+              "index": 5,
               "text": "middle -\u003E viewport / game view / scripts",
               "isDone": true
             }
           ],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -559,6 +793,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T00:37:04.4617862+00:00",
           "updatedAt": "2026-09-09T00:00:00+00:00"
@@ -578,23 +813,29 @@
             "Data"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [
             {
               "id": "3aac2063308f422896ffc69b9e8f9848",
+              "index": 1,
               "text": "Actor, Actor2D, Actor3D, base types implemented",
               "isDone": true
             },
             {
               "id": "dedc16e4997a4d42a3d44a1784a8d643",
+              "index": 2,
               "text": "Actors can be added to the scene",
               "isDone": true
             },
             {
               "id": "03b581ce51c94dc99bbc6dee8eda6014",
+              "index": 3,
               "text": "Actors can be selected and show the details in the inspector",
               "isDone": true
             }
           ],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -603,6 +844,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T00:37:17.0769602+00:00",
           "updatedAt": "2026-09-09T00:00:00+00:00"
@@ -621,33 +863,41 @@
             "ui"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [
             {
               "id": "de1411007dcb435e8556d65e71d426fc",
+              "index": 1,
               "text": "visual indicator of where the actor originally was",
               "isDone": true
             },
             {
               "id": "c018d1aab3af4f9ea278ab155853600d",
+              "index": 2,
               "text": "indicator of where it will be",
               "isDone": true
             },
             {
               "id": "c34203078061494dbf833b2bd71d2df5",
+              "index": 3,
               "text": "ability to drag them BETWEEN other actors if dropped between them or reparented if dropped ON them",
               "isDone": true
             },
             {
               "id": "c951f66364d54940a2bb18c764ca3251",
+              "index": 4,
               "text": "ability to unparent by dragging into empty space",
               "isDone": true
             },
             {
               "id": "6c10daa3fac3408c8aad38ddec848976",
+              "index": 5,
               "text": "transform adjusts to relect new local transforms relative to parent (or root if no parent)",
               "isDone": true
             }
           ],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": false,
@@ -656,6 +906,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:01:20.8620906+00:00",
           "updatedAt": "2026-09-09T00:00:00+00:00"
@@ -673,7 +924,10 @@
             "ui"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [],
+          "notes": [],
           "flags": {
             "commit": false,
             "build": false,
@@ -682,6 +936,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:01:31.8569817+00:00",
           "updatedAt": "2026-09-09T00:00:00+00:00"
@@ -701,58 +956,71 @@
             "scene tree"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [
             {
               "id": "460d45918f9e42649d628072841659fd",
+              "index": 1,
               "text": "cut",
               "isDone": true
             },
             {
               "id": "03e5bafbaf414419a2638a29da7ea865",
+              "index": 2,
               "text": "pase",
               "isDone": true
             },
             {
               "id": "cbbe7ada6d85404ca44660171ff50a95",
+              "index": 3,
               "text": "copy",
               "isDone": true
             },
             {
               "id": "72617e9ab42e4df3a137bb496f701aab",
+              "index": 4,
               "text": "delete",
               "isDone": true
             },
             {
               "id": "af6a0ed528854cd398ca1908cd7fc7ec",
+              "index": 5,
               "text": "add-new-child",
               "isDone": true
             },
             {
               "id": "50e9a167b8e14088aad5f6fbc0a6c16a",
+              "index": 6,
               "text": "reparent-to-new-node",
               "isDone": true
             },
             {
               "id": "089e82a3e9ee4646a3082bf7c1d2eb54",
+              "index": 7,
               "text": "duplicate",
               "isDone": true
             },
             {
               "id": "d8f61c06a39c4989b3c910e1ba492f20",
+              "index": 8,
               "text": "hide/show",
               "isDone": true
             },
             {
               "id": "320b0cd008e54f0c92c97521a2ef2da5",
+              "index": 9,
               "text": "enable/disable",
               "isDone": true
             },
             {
               "id": "4347015094774387a7817f27918bce03",
+              "index": 10,
               "text": "once done, move to the rendering branch",
               "isDone": true
             }
           ],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -761,6 +1029,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T01:10:56.4220575+00:00",
           "updatedAt": "2026-09-09T00:00:00+00:00"
@@ -780,23 +1049,29 @@
             "viewport"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [
             {
               "id": "8da65a3684494d369a9650cbbadb8524",
+              "index": 1,
               "text": "rendering a vertex lit cube",
               "isDone": true
             },
             {
               "id": "33ba7e59c94049529a4969ec0a0c6fbb",
+              "index": 2,
               "text": "cube rotates around",
               "isDone": true
             },
             {
               "id": "eebbcfb6ceaa457da8cfb34b3f04a94e",
+              "index": 3,
               "text": "can apply textures to the cube",
               "isDone": true
             }
           ],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -805,6 +1080,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:05:27.8469932+00:00",
           "updatedAt": "2026-09-09T00:00:00+00:00"
@@ -825,23 +1101,29 @@
             "files"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [
             {
               "id": "8123bb3cb8e44465b5080516e0584ec6",
+              "index": 1,
               "text": "can drag and drop files from explorer",
               "isDone": true
             },
             {
               "id": "1674c506a8454198bdf312ef7e0aa406",
+              "index": 2,
               "text": "can import FBX",
               "isDone": true
             },
             {
               "id": "7b7930e85b2b46f29bce97df1c7d4bd7",
+              "index": 3,
               "text": "also Imports Materials",
               "isDone": true
             }
           ],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -850,6 +1132,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:05:33.2822087+00:00",
           "updatedAt": "2026-09-09T00:00:00+00:00"
@@ -870,28 +1153,35 @@
             "images"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [
             {
               "id": "ae82532e064346d0a9cc8bfa62cc9534",
+              "index": 1,
               "text": "jpeg",
               "isDone": true
             },
             {
               "id": "bc7262872e514129bb74a6a002f6a7b5",
+              "index": 2,
               "text": "png",
               "isDone": true
             },
             {
               "id": "e69ee8a09d5f472dabb5ceeb1c0496e3",
+              "index": 3,
               "text": "bmp",
               "isDone": true
             },
             {
               "id": "9bea2664106e4bb69221e320dcdceb90",
+              "index": 4,
               "text": "tiff",
               "isDone": true
             }
           ],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": false,
@@ -900,6 +1190,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:15:44.1816267+00:00",
           "updatedAt": "2026-09-09T00:00:00+00:00"
@@ -919,33 +1210,41 @@
             "Actors"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [
             {
               "id": "7e001d4c46ca48ee9eb26bb52c32cf67",
+              "index": 1,
               "text": "add component button to inspector for actors",
               "isDone": true
             },
             {
               "id": "b10a665ab13442e2ae19c2990b55c837",
+              "index": 2,
               "text": "right click blank space in actors inspector for add component",
               "isDone": true
             },
             {
               "id": "4a5e08878b774972b4143340ac4ffe90",
+              "index": 3,
               "text": "can delete componetns from an actor",
               "isDone": true
             },
             {
               "id": "b78e5d55bdc049d8ac48dcc1d53f614d",
+              "index": 4,
               "text": "can collapse components in the inspector",
               "isDone": true
             },
             {
               "id": "fbf2e07eccc04802a35410ee37b713f4",
+              "index": 5,
               "text": "components have Start,Update,PhysicsUpdate methods Update and PhysicsUpdate Take (float delta) as a parameter for the time since the last time it was called",
               "isDone": true
             }
           ],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -954,6 +1253,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:18:44.3429429+00:00",
           "updatedAt": "2026-09-09T00:00:00+00:00"
@@ -973,43 +1273,53 @@
             "Actors"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [
             {
               "id": "038b4a6487bd48adadef0b1fbfe1ca65",
+              "index": 1,
               "text": "can add mesh renderer",
               "isDone": true
             },
             {
               "id": "62f5d9277504441c81c32af558de2c3b",
+              "index": 2,
               "text": "can render cubes",
               "isDone": true
             },
             {
               "id": "c6bc0cd600124961a97509dedbb26972",
+              "index": 3,
               "text": "can render spheres",
               "isDone": true
             },
             {
               "id": "9823e560cec34c6d989983cfeef04464",
+              "index": 4,
               "text": "can render quads",
               "isDone": true
             },
             {
               "id": "1fa69d73cd6f4e48923b8a4a1a947708",
+              "index": 5,
               "text": "can render planes",
               "isDone": true
             },
             {
               "id": "f1ded36b329543558967b018c6131b0b",
+              "index": 6,
               "text": "can render capsules",
               "isDone": true
             },
             {
               "id": "5379fc3f54a041d3b8fc6bf94fa2eb35",
+              "index": 7,
               "text": "can render cylinders",
               "isDone": true
             }
           ],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -1018,6 +1328,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:18:37.2355825+00:00",
           "updatedAt": "2026-09-09T00:00:00+00:00"
@@ -1037,28 +1348,35 @@
             "assets"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [
             {
               "id": "5fe009c24d8c4e00a0cede1032e816cf",
+              "index": 1,
               "text": "importing a FBX should create any materials it uses and apply its textures if any are present",
               "isDone": true
             },
             {
               "id": "7cfef429c6e241419a64e85c10b90541",
+              "index": 2,
               "text": "can create materials via asset window",
               "isDone": true
             },
             {
               "id": "43975aeccf434000927a6448b2553315",
+              "index": 3,
               "text": "can set material properties via inspector if one is selected",
               "isDone": true
             },
             {
               "id": "03cf926d34ac4869b00fe4b4bf4c3829",
+              "index": 4,
               "text": "materials can be applied to any mesh renderer",
               "isDone": true
             }
           ],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -1067,6 +1385,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:05:39.9304386+00:00",
           "updatedAt": "2026-09-09T00:00:00+00:00"
@@ -1084,18 +1403,23 @@
             "merge"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [
             {
               "id": "d4caecccb7774f9da89ee2ec5ceb597b",
+              "index": 1,
               "text": "merged",
               "isDone": true
             },
             {
               "id": "14161c226dcd4d11aabfcc0b03ac22f8",
+              "index": 2,
               "text": "created scripting branch",
               "isDone": true
             }
           ],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -1104,6 +1428,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:17:34.877755+00:00",
           "updatedAt": "2026-09-09T00:00:00+00:00"
@@ -1128,38 +1453,47 @@
               "size": 378
             }
           ],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [
             {
               "id": "8a4b7d74cc254914a69161ebb867d08c",
+              "index": 1,
               "text": "basic script format .cscript (crate script)",
               "isDone": true
             },
             {
               "id": "1a0ef6fa1a814b44860c5bfbf0cd0948",
+              "index": 2,
               "text": "all scripts have Start Update and Physics Update Functions",
               "isDone": true
             },
             {
               "id": "36160867ac1045b185550d8b44e25af7",
+              "index": 3,
               "text": "code blocks use curley brackets {}",
               "isDone": true
             },
             {
               "id": "4bc41f563da54a449c8db49b212b0bfa",
+              "index": 4,
               "text": "each bracket increases indentation automatically",
               "isDone": true
             },
             {
               "id": "61d23bdb4c8446d5aed3e2590ec2aefc",
+              "index": 5,
               "text": "var untyped to be interpreited at runtime",
               "isDone": true
             },
             {
               "id": "23acf86232e04ee48117c72778b51422",
+              "index": 6,
               "text": "things can also be implicity typed",
               "isDone": true
             }
           ],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": false,
@@ -1168,6 +1502,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:25:29.3205373+00:00",
           "updatedAt": "2026-09-09T00:00:00+00:00"
@@ -1188,28 +1523,35 @@
             "ui"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [
             {
               "id": "112ddf8184604f0d89925703b8a85ddc",
+              "index": 1,
               "text": "lined interface",
               "isDone": true
             },
             {
               "id": "b452ff95aac245c286b48111a3379d6c",
+              "index": 2,
               "text": "auto complete for known types,variables,functions,classes",
               "isDone": true
             },
             {
               "id": "d4bc460c95864887be5fc7c803f002f5",
+              "index": 3,
               "text": "color hilight for keywords or types (also strings and numbers)",
               "isDone": true
             },
             {
               "id": "a085e834e0854e31bf50c249a9d327c4",
+              "index": 4,
               "text": "auto save on play, save button, ctrl \u002B s support",
               "isDone": true
             }
           ],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": false,
@@ -1218,6 +1560,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:29:31.2023123+00:00",
           "updatedAt": "2026-09-09T00:00:00+00:00"
@@ -1238,63 +1581,77 @@
             "data"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [
             {
               "id": "bacf6fd604a4406cacdb8d685b615cf2",
+              "index": 1,
               "text": "implimented int",
               "isDone": true
             },
             {
               "id": "50c8c39ed4194ebf8d93d588fa4de019",
+              "index": 2,
               "text": "implimented float",
               "isDone": true
             },
             {
               "id": "503227ae2afb4dbf8079db5fe2eb7ebc",
+              "index": 3,
               "text": "implimented string",
               "isDone": true
             },
             {
               "id": "a85fea407bd8464ea49f70195a6ffb49",
+              "index": 4,
               "text": "implimented char",
               "isDone": true
             },
             {
               "id": "ab9fec779fff417d816ca9a87b19a084",
+              "index": 5,
               "text": "implimented array",
               "isDone": true
             },
             {
               "id": "327a77d2404845469a504f8eb85a5d1c",
+              "index": 6,
               "text": "implemented Vector3",
               "isDone": true
             },
             {
               "id": "7081a7ebd7b3425982e95cdd572e7da3",
+              "index": 7,
               "text": "implimented  Vector2 (a vector 3 with z disabled)",
               "isDone": true
             },
             {
               "id": "db868c6c9a6b4cf49c5028849bb1df4c",
+              "index": 8,
               "text": "implimented Actor",
               "isDone": true
             },
             {
               "id": "4eeb6f27867d40a0ab09e2c58fc20fce",
+              "index": 9,
               "text": "implimented Actor2D (just the type, we are actually hooking this one up yet)",
               "isDone": true
             },
             {
               "id": "2a2a8e7cc7134cb1828d4c67d324f815",
+              "index": 10,
               "text": "implimented Actor3D",
               "isDone": true
             },
             {
               "id": "132bfe2a473b4fd48867bb51862b88a3",
+              "index": 11,
               "text": "implimented bool",
               "isDone": true
             }
           ],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -1303,6 +1660,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:25:33.5372597+00:00",
           "updatedAt": "2026-09-09T00:00:00+00:00"
@@ -1320,7 +1678,10 @@
             "Scripting"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -1329,6 +1690,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:25:37.3311946+00:00",
           "updatedAt": "2026-09-09T00:00:00+00:00"
@@ -1346,18 +1708,23 @@
             "Scripting"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [
             {
               "id": "3e67fa7bfe7f4a62b2416343f3bc0cf4",
+              "index": 1,
               "text": "classes implimented",
               "isDone": true
             },
             {
               "id": "8780b8062a814679835686bd449ed671",
+              "index": 2,
               "text": "statics implimented",
               "isDone": true
             }
           ],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -1366,6 +1733,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:25:43.3710568+00:00",
           "updatedAt": "2026-09-09T00:00:00+00:00"
@@ -1383,7 +1751,10 @@
             "task"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -1392,6 +1763,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:25:59.1808498+00:00",
           "updatedAt": "2026-09-09T00:00:00+00:00"
@@ -1409,33 +1781,41 @@
             "task"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [
             {
               "id": "c23de4095555478490a5cac7bcf9de83",
+              "index": 1,
               "text": "do(while) {} : for as long is while is true loop through the brackets",
               "isDone": true
             },
             {
               "id": "d924cd44277a47c394ed2d49472cccc9",
+              "index": 2,
               "text": "do_async(while) {} : similar to do except only process 1 cycle per frame",
               "isDone": true
             },
             {
               "id": "082804971edf43219d434f21e7b980e5",
+              "index": 3,
               "text": "if(exp) {} if expression is true process the brackets otherwise skip",
               "isDone": true
             },
             {
               "id": "f442b8ec060446cab02c454974a61b4b",
+              "index": 4,
               "text": "if(exp) {} else {} if expressions is false, skip the first bracket and do the second",
               "isDone": true
             },
             {
               "id": "8850fad1dba4411c8c5f5f5e8e9cfca4",
+              "index": 5,
               "text": "switch(value) case 1: {} - if value is 1, process case 1 brackets, otherwise check other cases or default if none are true",
               "isDone": true
             }
           ],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -1444,6 +1824,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:50:16.9498468+00:00",
           "updatedAt": "2026-09-09T00:00:00+00:00"
@@ -1461,13 +1842,17 @@
             "merge"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [
             {
               "id": "4286fe75bcd54dac888b68c1ba2b30be",
+              "index": 1,
               "text": "merge and stop processing",
               "isDone": true
             }
           ],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -1476,6 +1861,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T01:50:21.8523643+00:00",
           "updatedAt": "2026-09-09T00:00:00+00:00"
@@ -1496,38 +1882,47 @@
             "scripting"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [
             {
               "id": "a1a1000000004b0e9a00000000000001",
+              "index": 1,
               "text": "right-click anywhere in the asset browser opens a styled context menu",
               "isDone": true
             },
             {
               "id": "a1a1000000004b0e9a00000000000002",
+              "index": 2,
               "text": "single Import Asset action that detects the file type and imports it (model / image / script)",
               "isDone": true
             },
             {
               "id": "a1a1000000004b0e9a00000000000003",
+              "index": 3,
               "text": "Create Material in the menu",
               "isDone": true
             },
             {
               "id": "a1a1000000004b0e9a00000000000004",
+              "index": 4,
               "text": "Scripting submenu with a working New Script item",
               "isDone": true
             },
             {
               "id": "a1a1000000004b0e9a00000000000005",
+              "index": 5,
               "text": "New Script writes a compiling template, registers the component and opens it in the editor",
               "isDone": true
             },
             {
               "id": "a1a1000000004b0e9a00000000000006",
+              "index": 6,
               "text": "the old top buttons are gone",
               "isDone": true
             }
           ],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -1536,6 +1931,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T09:00:00+00:00",
           "updatedAt": "2026-09-10T00:00:00+00:00"
@@ -1554,28 +1950,35 @@
             "assets"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [
             {
               "id": "dd28000000004b0e9a00000000000001",
+              "index": 1,
               "text": "a Reload Scripts action re-scans assets/scripts/",
               "isDone": true
             },
             {
               "id": "dd28000000004b0e9a00000000000002",
+              "index": 2,
               "text": "newly added .cscript files appear in the editor and the Add Component menu",
               "isDone": true
             },
             {
               "id": "dd28000000004b0e9a00000000000003",
+              "index": 3,
               "text": "files deleted on disk are dropped from the list",
               "isDone": true
             },
             {
               "id": "dd28000000004b0e9a00000000000004",
+              "index": 4,
               "text": "files edited on disk are recompiled",
               "isDone": true
             }
           ],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -1584,6 +1987,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T09:00:00+00:00",
           "updatedAt": "2026-09-10T00:00:00+00:00"
@@ -1602,18 +2006,23 @@
             "components"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [
             {
               "id": "ee29000000004b0e9a00000000000001",
+              "index": 1,
               "text": "renaming a class in the editor removes the stale component-menu entry",
               "isDone": true
             },
             {
               "id": "ee29000000004b0e9a00000000000002",
+              "index": 2,
               "text": "a ScriptComponent attached to an actor reflects code edits without being re-added",
               "isDone": true
             }
           ],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -1622,6 +2031,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T09:00:00+00:00",
           "updatedAt": "2026-09-10T00:00:00+00:00"
@@ -1640,7 +2050,10 @@
             "input"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -1649,6 +2062,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T09:20:16.9395664+00:00",
           "updatedAt": "2026-09-10T00:00:00+00:00"
@@ -1666,7 +2080,10 @@
             "ui"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": false,
@@ -1675,6 +2092,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T09:24:55.259222+00:00",
           "updatedAt": "2026-09-10T00:00:00+00:00"
@@ -1694,7 +2112,10 @@
             "inspector"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": false,
@@ -1703,6 +2124,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T09:21:22.3352162+00:00",
           "updatedAt": "2026-09-10T00:00:00+00:00"
@@ -1722,7 +2144,10 @@
             "Scripting"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": false,
@@ -1731,6 +2156,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T09:21:39.0198254+00:00",
           "updatedAt": "2026-09-10T00:00:00+00:00"
@@ -1749,7 +2175,10 @@
             "assets"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -1758,6 +2187,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T09:27:10.9740788+00:00",
           "updatedAt": "2026-09-10T00:00:00+00:00"
@@ -1775,7 +2205,10 @@
             "scripting"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": false,
@@ -1784,6 +2217,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T09:13:17.1312912+00:00",
           "updatedAt": "2026-09-10T00:00:00+00:00"
@@ -1801,7 +2235,10 @@
             "scripting"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": false,
@@ -1810,6 +2247,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T09:13:27.1340252+00:00",
           "updatedAt": "2026-09-10T00:00:00+00:00"
@@ -1827,7 +2265,10 @@
             "script editor"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": false,
@@ -1836,6 +2277,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T09:15:52.6145076+00:00",
           "updatedAt": "2026-09-10T00:00:00+00:00"
@@ -1853,7 +2295,10 @@
             "assets"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -1862,6 +2307,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T09:17:08.1056713+00:00",
           "updatedAt": "2026-09-10T00:00:00+00:00"
@@ -1879,23 +2325,29 @@
             "assets"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [
             {
               "id": "b9bd2a65a77144cdb91f146ef213ede6",
+              "index": 1,
               "text": "add folder to right click menu",
               "isDone": true
             },
             {
               "id": "32363801ccd8491cba575df0ce4b4ee4",
+              "index": 2,
               "text": "when you make a folder immediatly ask for name",
               "isDone": true
             },
             {
               "id": "a1e0cbff95ec45228b0779a11e1a4ff5",
+              "index": 3,
               "text": "can right click folder for delete, rename, cut, copy, paste, and change color",
               "isDone": true
             }
           ],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": false,
@@ -1904,6 +2356,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T09:18:02.7332995+00:00",
           "updatedAt": "2026-09-10T10:00:00+00:00"
@@ -1921,7 +2374,10 @@
             "assets"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -1930,6 +2386,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T09:19:07.9235141+00:00",
           "updatedAt": "2026-09-10T10:30:00+00:00"
@@ -1948,7 +2405,10 @@
             "Actors"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -1957,6 +2417,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T09:28:51.6976967+00:00",
           "updatedAt": "2026-09-10T10:45:00+00:00"
@@ -1974,33 +2435,41 @@
             "scripting"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [
             {
               "id": "ae3bbea7fcd656cd9e4bb900a1d5c7da",
+              "index": 1,
               "text": "lexer/parser accept \u002B= -= *= /= %=",
               "isDone": true
             },
             {
               "id": "a7a342fb30fc1aa6c92cbd00c57616b0",
+              "index": 2,
               "text": "compound assignment works on locals, fields, indices and transform proxies",
               "isDone": true
             },
             {
               "id": "088900e95b6114bda711b09e4422b59d",
+              "index": 3,
               "text": "Vector3 \u002B/- Vector3 component-wise; Vector3 */ scalar",
               "isDone": true
             },
             {
               "id": "9718b1d9a5575db04c6e61105cf86bbe",
+              "index": 4,
               "text": "transform.position.y = / \u002B= writes back to the actor transform",
               "isDone": true
             },
             {
               "id": "0bb2ac07d4555b4475b1acfd09b43f08",
+              "index": 5,
               "text": "covered by script tests",
               "isDone": true
             }
           ],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -2009,6 +2478,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T11:15:00+00:00",
           "updatedAt": "2026-09-10T11:45:00+00:00"
@@ -2028,7 +2498,10 @@
             "viewport"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -2037,6 +2510,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T18:56:02.4556693+00:00",
           "updatedAt": "2026-09-10T13:30:00+00:00"
@@ -2055,38 +2529,47 @@
             "lighting"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [
             {
               "id": "dbc829087e664b90915e718ac57c4800",
+              "index": 1,
               "text": "vertex lighting",
               "isDone": true
             },
             {
               "id": "eeaa7f724d1748d0af7e832546db1dfd",
+              "index": 2,
               "text": "point",
               "isDone": true
             },
             {
               "id": "ce79e82e59e34987bf6dae440610a697",
+              "index": 3,
               "text": "spot",
               "isDone": true
             },
             {
               "id": "1fc24c789faf4cfb9c347a4513113b8a",
+              "index": 4,
               "text": "directional",
               "isDone": true
             },
             {
               "id": "c8c495b950f245439fe8b9e85b9b878c",
+              "index": 5,
               "text": "future support for fog",
               "isDone": true
             },
             {
               "id": "949c6f24ec314b96b4688a025dc65307",
+              "index": 6,
               "text": "colors",
               "isDone": true
             }
           ],
+          "notes": [],
           "flags": {
             "commit": false,
             "build": false,
@@ -2095,6 +2578,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T18:54:52.3916047+00:00",
           "updatedAt": "2026-09-10T13:45:00+00:00"
@@ -2112,63 +2596,77 @@
             "Scripting"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [
             {
               "id": "6449437cc447421aad7c120e112b05dd",
+              "index": 1,
               "text": "clamp",
               "isDone": true
             },
             {
               "id": "0ad05c2f38ba48858ad588aa2f69989d",
+              "index": 2,
               "text": "lerp",
               "isDone": true
             },
             {
               "id": "3843119c025c4a068ee3dfda9bcc05e8",
+              "index": 3,
               "text": "sine",
               "isDone": true
             },
             {
               "id": "bebd2c87865c4ccea0f4d76f08acc612",
+              "index": 4,
               "text": "cos",
               "isDone": true
             },
             {
               "id": "4374fc4e4846454e98314d8c4aa281d9",
+              "index": 5,
               "text": "tan",
               "isDone": true
             },
             {
               "id": "ae8cefd32d824cd3adaa2ca58e4bfce7",
+              "index": 6,
               "text": "rand_i",
               "isDone": true
             },
             {
               "id": "a93d9b7ca9a74d94a6703cf5d34f114e",
+              "index": 7,
               "text": "rand_f",
               "isDone": true
             },
             {
               "id": "caa8af890a1b40669e6d2fc9eb779f5c",
+              "index": 8,
               "text": "rand_i_range",
               "isDone": true
             },
             {
               "id": "b3b18a3cc74b4cb28add8a301c86e83c",
+              "index": 9,
               "text": "rand_f_range",
               "isDone": true
             },
             {
               "id": "08c88778c35249fea2cd5d2b148f5d4b",
+              "index": 10,
               "text": "exp",
               "isDone": true
             },
             {
               "id": "c799ef99e4844bec91233f2355b1dd8e",
+              "index": 11,
               "text": "sqrt",
               "isDone": true
             }
           ],
+          "notes": [],
           "flags": {
             "commit": false,
             "build": false,
@@ -2177,6 +2675,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T18:43:39.1779404+00:00",
           "updatedAt": "2026-09-10T14:00:00+00:00"
@@ -2194,7 +2693,10 @@
             "Scripting"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -2203,6 +2705,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T18:45:33.3098217+00:00",
           "updatedAt": "2026-09-10T14:20:00+00:00"
@@ -2220,7 +2723,10 @@
             "assets"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -2229,6 +2735,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T18:46:27.6148496+00:00",
           "updatedAt": "2026-09-10T15:00:00+00:00"
@@ -2247,48 +2754,59 @@
             "Input_Map"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [
             {
               "id": "58c0348720144cdcbe25391f6ab27f97",
+              "index": 1,
               "text": "input map asset",
               "isDone": true
             },
             {
               "id": "87c4d7f157d248c586f258793523c186",
+              "index": 2,
               "text": "double click to open",
               "isDone": true
             },
             {
               "id": "e9bb3d7d52a1404f99b7c89fae453434",
+              "index": 3,
               "text": "buttons",
               "isDone": true
             },
             {
               "id": "066e7a2528ae43978fdb0bdb66aab7ac",
+              "index": 4,
               "text": "4 button axis",
               "isDone": true
             },
             {
               "id": "294fca622c1740b6a542a72cec9be9f6",
+              "index": 5,
               "text": "2 button axis",
               "isDone": true
             },
             {
               "id": "af2acfc39ab24f59becf6e2da4124ac8",
+              "index": 6,
               "text": "scripting side",
               "isDone": true
             },
             {
               "id": "7fed62bdad144e638209edeb27b2b5f8",
+              "index": 7,
               "text": "window",
               "isDone": true
             },
             {
               "id": "28b452e548f7401da9da663729fbb9c6",
+              "index": 8,
               "text": "listen for input",
               "isDone": true
             }
           ],
+          "notes": [],
           "flags": {
             "commit": false,
             "build": false,
@@ -2297,6 +2815,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T18:49:29.7370408+00:00",
           "updatedAt": "2026-09-10T15:00:00+00:00"
@@ -2315,7 +2834,10 @@
             "rendering"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -2324,6 +2846,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T23:25:50.684687+00:00",
           "updatedAt": "2026-09-10T16:00:00+00:00"
@@ -2342,7 +2865,10 @@
             "lighting"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": false,
@@ -2351,6 +2877,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T23:27:43.2275822+00:00",
           "updatedAt": "2026-09-10T16:00:00+00:00"
@@ -2369,7 +2896,10 @@
             "lighting"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -2378,6 +2908,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T23:28:13.5157392+00:00",
           "updatedAt": "2026-09-10T16:00:00+00:00"
@@ -2397,7 +2928,10 @@
             "shadows"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -2406,6 +2940,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-10T23:28:50.3611686+00:00",
           "updatedAt": "2026-09-10T16:00:00+00:00"
@@ -2424,7 +2959,10 @@
             "lighting"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -2433,6 +2971,7 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T23:30:33.5271578+00:00",
           "updatedAt": "2026-09-10T16:30:00+00:00"
@@ -2450,7 +2989,10 @@
             "asset browser swapped"
           ],
           "files": [],
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [],
+          "notes": [],
           "flags": {
             "commit": true,
             "build": true,
@@ -2459,9 +3001,255 @@
           },
           "isDone": true,
           "isLocked": false,
+          "isAwaitingFeedback": false,
           "isCollapsed": false,
           "createdAt": "2026-09-10T23:31:27.0917012+00:00",
           "updatedAt": "2026-09-10T17:00:00+00:00"
+        },
+        {
+          "id": "2eaff1cefdcf4140b1fa74091c8bea5d",
+          "index": 59,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "static lights \u002B lightmap baking",
+          "task": "add a setting to lights that mark them as static, static lights are only applied when lightmaps are baked.",
+          "tags": [
+            "lighting",
+            "rendering"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [
+            {
+              "id": "b8dec3296a064fcf8142c253bd49090c",
+              "index": 1,
+              "text": "static lights",
+              "isDone": true
+            },
+            {
+              "id": "5bb533383d824a27b3e8df1c7ee5bef1",
+              "index": 2,
+              "text": "lightmap baking",
+              "isDone": true
+            },
+            {
+              "id": "f68ab9250f8c4db7bdf6a106cf6f5ea7",
+              "index": 3,
+              "text": "lightmaps",
+              "isDone": true
+            },
+            {
+              "id": "61dbba170e834cd3aed8650e6ee47822",
+              "index": 4,
+              "text": "light probes",
+              "isDone": true
+            }
+          ],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-10T23:29:43.7833772+00:00",
+          "updatedAt": "2026-09-10T23:45:00+00:00"
+        },
+        {
+          "id": "fd4414c9b4c54d73adf8ceed74d7668a",
+          "index": 62,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": "high",
+          "title": "Not Quite Right",
+          "task": "I made this script\r\nclass Player : Actor\n{\n float move_speed = 1;\n float turn_speed = 1;\n int turn_axis = 0;\n func start()\n {\n }\n\n func update(float delta)\n {\n  transform.rotation.y \u002B= move_speed * delta;\n  transform.position \u002B= transform.forward * move_speed * delta;\n }\n\n func physics_update(float delta)\n {\n }\n \n func update_turn_axis()\n {\n  \n }\n}\nactors have no forward vector as a child of transform, see that that gets added in, autocorrect doesnt work (see next task), brackets dont auto get added (nor do parenthesis) and auto indent doesnt work. Fix it",
+          "tags": [
+            "task"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-11T03:23:35.9865492+00:00",
+          "updatedAt": "2026-09-11T00:00:00+00:00"
+        },
+        {
+          "id": "769acfc712fb49248d994d64d0620f18",
+          "index": 63,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": "high",
+          "title": "Autocomplete",
+          "task": "I made this script:\r\nclass Player : Actor\n{\n float move_speed = 1;\n float turn_speed = 1;\n int turn_axis = 0;\n func start()\n {\n }\n\n func update(float delta)\n {\n  transform.rotation.y \u002B= move_speed * delta;\n  transform.position \u002B= transform.forward * move_speed * delta;\n }\n\n func physics_update(float delta)\n {\n }\n \n func update_turn_axis()\n {\n  \n }\n}\n\r\nAutocomplete should have tried to complete:\r\ntransform\r\ntransform.position\r\ntransform.rotation\r\nmove_speed\r\ndelta\r\n\r\nhowever none of it even started to auto complete, fix the autocomplete. As Soon as a variable function or class exists the scripting engine should be aware of it and ready for autocomplete",
+          "tags": [
+            "Scripting",
+            "script editor",
+            "autocomplete"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-11T03:23:41.6781365+00:00",
+          "updatedAt": "2026-09-11T00:00:00+00:00"
+        },
+        {
+          "id": "5012b56ad8fc4ef29e334010340436f7",
+          "index": 64,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Documentation",
+          "task": "Crreate a \u0022Wiki\u0022 to go along with the scripting language so i can look up how to do things. Keep it updated as we add more stuff",
+          "tags": [
+            "documentation"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": true
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-11T03:23:48.6295219+00:00",
+          "updatedAt": "2026-09-11T00:15:00+00:00"
+        },
+        {
+          "id": "63dfc4ee55fe4e55bafd72370f1a4b32",
+          "index": 73,
+          "kind": "cleanup",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "",
+          "task": "",
+          "tags": [],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-11T07:19:46.2387749+00:00",
+          "updatedAt": "2026-09-15T22:23:50.27018+00:00"
+        },
+        {
+          "id": "3af020690c974a0eaa5bd074d41d4f05",
+          "index": 74,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "add better icons to assets",
+          "task": "the asset browser is hard to tell what everything is, lets add icons to everythign in requirements",
+          "tags": [
+            "art",
+            "images",
+            "assets"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [
+            {
+              "id": "57868c79f7ef4183a401c3c63e662269",
+              "index": 1,
+              "text": "materials (a sphere icon)",
+              "isDone": true
+            },
+            {
+              "id": "0ae226bff5c14190a665d179c2de3173",
+              "index": 2,
+              "text": "scripts (a piece of paper with a c on it)",
+              "isDone": true
+            },
+            {
+              "id": "db15926dcdf14146b7e8185058c22a9e",
+              "index": 3,
+              "text": "images (just show a small preview of the image)",
+              "isDone": true
+            },
+            {
+              "id": "f2ba41a05f1942699b15dc2a0421bec6",
+              "index": 4,
+              "text": "fbx\u0027s (a cube with the text fbx in the bottom right)",
+              "isDone": true
+            },
+            {
+              "id": "d5b0d5e26ba04554802ca001ab7d5e11",
+              "index": 5,
+              "text": "folders (a folder)",
+              "isDone": true
+            },
+            {
+              "id": "2cfbfaa0f743415ca38c46f619885667",
+              "index": 6,
+              "text": "input map (a gamepad)",
+              "isDone": true
+            }
+          ],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-11T07:19:57.8891782+00:00",
+          "updatedAt": "2026-09-15T23:03:20.3231085+00:00"
         }
       ]
     }
