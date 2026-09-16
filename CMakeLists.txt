@@ -229,3 +229,9 @@ target_link_libraries(get_component_parity_tests PRIVATE crate_core)
 target_compile_definitions(get_component_parity_tests PRIVATE
     CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
 add_test(NAME get_component_parity_tests COMMAND get_component_parity_tests)
+
+add_executable(camera_main_parity_tests tests/camera_main_parity_tests.cpp)
+target_link_libraries(camera_main_parity_tests PRIVATE crate_core)
+target_compile_definitions(camera_main_parity_tests PRIVATE
+    CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
+add_test(NAME camera_main_parity_tests COMMAND camera_main_parity_tests)

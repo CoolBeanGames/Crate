@@ -5,6 +5,7 @@
 #include "script/Runtime.h"
 
 #include "scene/Actor.h"
+#include "scene/BuiltinComponents.h"
 
 namespace crate::script {
 
@@ -140,13 +141,28 @@ Value getComponentOn(ScriptContext* ctx, const Value& receiver, const std::strin
 }
 } // namespace
 
-Value getValueMember(const Value& v, const std::string& name, int line) {
+Value getValueMember(const Value& v, const std::string& name, int line, crate::Actor* callerOwner) {
     if (v.t == Value::T::Object && v.obj)
         return getObjectMember(v.obj, name, line);
     if (v.t == Value::T::Actor)
         return actorMember(v.actor, name, line);
     if (v.t == Value::T::Array && name == "length")
         return arrayLength(v);
+    // Camera.main (Phase 9c), mirroring Interpreter::evalMember's TypeRef
+    // "Camera"+"main" branch exactly: the scene to search is found by
+    // walking up from the CALLING script's own actor (see the header
+    // comment), not from anything reachable off `v` itself (a bare TypeRef
+    // carries no actor at all).
+    if (v.t == Value::T::TypeRef && v.s == "Camera" && name == "main") {
+        CameraComponent* cc = mainCameraFrom(callerOwner);
+        if (!cc)
+            return Value::Null_();
+        auto o = std::make_shared<ScriptObject>();
+        o->builtin = "Camera";
+        o->nativePtr = cc;
+        o->owner = cc->actor();
+        return Value::Obj(o);
+    }
     throw RuntimeError("cannot read '." + name + "' on " + v.typeName(), line);
 }
 
@@ -175,6 +191,16 @@ bool trySetValueMember(const Value& v, const std::string& name, const Value& val
         if (name == "scale")
             return setVec(a->transform().scale);
         return false;
+    }
+    // Camera.main = someCamera; (Phase 9c), mirroring Interpreter::assign's
+    // TypeRef "Camera"+"main" branch exactly -- unlike the read side, this
+    // needs no caller-owner context: activateMainCamera walks up from the
+    // CAMERA VALUE BEING ASSIGNED's own owner, not the caller's.
+    if (v.t == Value::T::TypeRef && v.s == "Camera" && name == "main") {
+        if (val.t != Value::T::Object || !val.obj || val.obj->builtin != "Camera" || !val.obj->nativePtr)
+            return false;
+        activateMainCamera(val.obj->owner, *static_cast<CameraComponent*>(val.obj->nativePtr));
+        return true;
     }
     return false;
 }

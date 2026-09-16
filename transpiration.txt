@@ -2369,3 +2369,57 @@ entries above.
   Next step: commit + push sub-phase 9b, then continue to 9c (Camera.main
   completeness in CodeGen: read via TypeRef member access + assignment).
 ===========================================================================
+
+2026-09-16 — SUB-PHASE 9c COMPLETE AND VERIFIED (Camera.main completeness
+  in CodeGen: read + assignment).
+  Turned out to need almost no CodeGen.cpp changes at all: since 9b's
+  general-receiver Member read/write dispatch already routes ANY
+  non-special-cased receiver expression through getValueMember/
+  trySetValueMember, and `Camera` (a bare identifier) already evaluates to
+  `Value::Type("Camera")` via CodeGen's existing kBuiltinTypeNames handling,
+  `Camera.main` and `Camera.main = X` ALREADY reach those two dispatchers --
+  they just didn't handle a TypeRef receiver yet. So this sub-phase is
+  almost entirely in ObjectDispatch.cpp:
+  getValueMember gained a `crate::Actor* callerOwner` parameter (REQUIRED,
+  not defaulted -- every call site is generated code, which always has
+  `owner_`) used ONLY for the new TypeRef "Camera"+"main" branch: unlike
+  every other receiver kind, a bare Camera TypeRef carries no actor of its
+  own to search the scene from, so mainCameraFrom() walks up from the
+  CALLING script's own actor instead, exactly mirroring
+  Interpreter::evalMember's identical branch (which uses self_->owner).
+  trySetValueMember gained the matching TypeRef "Camera"+"main" branch,
+  calling activateMainCamera -- this one needs NO caller-owner parameter,
+  since (matching Interpreter::assign() exactly) it walks up from the
+  CAMERA VALUE BEING ASSIGNED's own owner (v.obj->owner), not the caller's.
+  CodeGen.cpp: the ONE existing getValueMember call site (general-receiver
+  Member read, from 9b) now also passes `owner_` through; harmless for
+  every other receiver kind, which ignores the parameter.
+  New tests: 2 codegen_tests.cpp must-compile scenarios (Camera.main read,
+  Camera.main assignment via a get_component(type_of(Camera)) result) --
+  codegen_tests.cpp now at 111 checks (was 105). New end-to-end parity test
+  file tests/camera_main_parity_tests.cpp (per 9c's own plan text): a
+  two-camera scene (CamA fov=11 enabled, CamB fov=22 disabled), a Reader
+  script (interpreted AND native combos) that reads Camera.main.fov,
+  switches Camera.main to CamB (found via get_component() off an
+  Inspector-drag-drop-style Actor field), and re-reads -- asserts identical
+  results (beforeFov=11, afterFov=22, camA.enabled flips to false, camB.
+  enabled flips to true) for BOTH the interpreted and native caller. 18
+  checks. Registered in CMakeLists.txt (camera_main_parity_tests target).
+  Verification performed: `powershell -ExecutionPolicy Bypass -File
+  scripts\build.ps1 Debug` built clean; ran all 19 test executables
+  directly (camera_main_parity_tests included) -- all passed, zero
+  regressions.
+  Files touched this sub-phase: src/script/ObjectDispatch.h/.cpp (modified:
+  getValueMember/trySetValueMember gain Camera.main TypeRef handling;
+  getValueMember's signature gained the callerOwner parameter -- its only
+  existing call site, in CodeGen.cpp, updated to match), src/script/
+  CodeGen.cpp (modified: one call site passes owner_ through),
+  tests/codegen_tests.cpp (modified: 2 new scenarios),
+  tests/camera_main_parity_tests.cpp (new), CMakeLists.txt (modified: new
+  camera_main_parity_tests target).
+  NOT YET COMMITTED to git as of writing this entry -- see next action.
+  Next step: commit + push sub-phase 9c, then continue to 9d (first-class
+  function references + signals -- explicitly including InputButton
+  signals per the user's own reminder). This is the largest remaining
+  sub-phase; re-read the 9d plan section above in full before starting.
+===========================================================================

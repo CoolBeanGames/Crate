@@ -408,6 +408,25 @@ int main() {
         }
     )", vcvars, scratchDir)) return 1;
 
+    // ---- Phase 9c: Camera.main read + assignment -------------------------
+
+    if (expectCompiles("Camera.main read", R"(
+        class GenCameraMainRead : Actor {
+            func update(float delta) {
+                var cam = Camera.main;
+            }
+        }
+    )", vcvars, scratchDir)) return 1;
+
+    if (expectCompiles("Camera.main assignment", R"(
+        class GenCameraMainWrite : Actor {
+            func update(float delta) {
+                var cam = this.get_component(type_of(Camera));
+                Camera.main = cam;
+            }
+        }
+    )", vcvars, scratchDir)) return 1;
+
     if (expectRefused("bare own-method name used as a value is refused", R"(
         class GenBareMethod : Actor {
             func helper() { return 1; }

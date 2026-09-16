@@ -62,7 +62,13 @@ Value callObjectMethod(ScriptContext* ctx, const std::shared_ptr<ScriptObject>& 
 
 // Member read. Throws RuntimeError for a null/unsupported receiver or an
 // unknown member (matches Interpreter::evalMember's fail-fast contract).
-Value getValueMember(const Value& v, const std::string& name, int line);
+// `callerOwner` is the CALLING script's own actor (generated code's
+// `owner_`) -- needed only for Camera.main (Phase 9c): unlike every other
+// receiver kind, a Camera TypeRef Value carries no actor of its own to
+// search from, so mainCameraFrom() walks up from the caller instead,
+// exactly like Interpreter::evalMember's own TypeRef "Camera"+"main"
+// branch (which uses self_->owner) does.
+Value getValueMember(const Value& v, const std::string& name, int line, crate::Actor* callerOwner);
 
 // Member write. Returns false (does not throw) if `v`'s receiver kind or
 // `name` isn't recognized -- caller produces its own appropriately-worded

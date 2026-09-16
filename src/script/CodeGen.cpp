@@ -653,17 +653,19 @@ std::string Gen::expr(const Expr& e, FnCtx& fc) {
             if (!ok())
                 return "";
             // General receiver: dispatch generically via getValueMember
-            // (Phase 9b), which mirrors Interpreter::evalMember's own
+            // (Phase 9b/9c), which mirrors Interpreter::evalMember's own
             // post-special-case fallback over Object (fields/actor/signal/
             // bound-method)/Actor (position/rotation/scale/forward/right/
-            // up/name)/Array (.length) receivers -- this also subsumes the
-            // old narrow `.x/.y/.z`-via-vfield special case (vfield()
-            // silently returns 0.0 for a non-vector or missing field,
-            // whereas the interpreter always throws for a missing member on
-            // a general Object receiver -- getValueMember matches the
-            // interpreter, not the old shortcut).
+            // up/name)/Array (.length)/Camera.main receivers -- this also
+            // subsumes the old narrow `.x/.y/.z`-via-vfield special case
+            // (vfield() silently returns 0.0 for a non-vector or missing
+            // field, whereas the interpreter always throws for a missing
+            // member on a general Object receiver -- getValueMember matches
+            // the interpreter, not the old shortcut). `owner_` is passed
+            // through for Camera.main's own use (see ObjectDispatch.h) --
+            // harmless for every other receiver kind, which ignores it.
             return "crate::script::getValueMember((" + objText + "), " + cppStringLiteral(name) +
-                   ", " + std::to_string(e.line) + ")";
+                   ", " + std::to_string(e.line) + ", owner_)";
         }
 
         case ExprKind::Index: {
