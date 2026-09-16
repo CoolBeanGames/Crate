@@ -48,6 +48,7 @@ struct CBData {
     float ambient[4];   // rgb = ambient light
     float fogColor[4];
     float fogParams[4]; // x=start y=end z=enabled
+    float fogHeight[4]; // x=base height y=falloff range (0 = disabled)
     float shadow[4];    // x=enabled y=receive z=1/mapSize w=bias
     float dither[4];    // x=enabled y=levels
     GpuLight lights[kMaxLights];
@@ -66,6 +67,7 @@ cbuffer CB : register(b0)
     float4   uAmbient;
     float4   uFogColor;
     float4   uFogParams;
+    float4   uFogHeight;
     float4   uShadow;
     float4   uDither;
     Light    uLights[MAX_LIGHTS];
@@ -126,9 +128,16 @@ VSOut VSMain(VSIn i)
     float3 N = normalize(mul((float3x3)uModel, i.nrm));
     o.uv = i.uv;
     o.light = (uParams.z > 0.5) ? float3(1,1,1) : shadeVertex(wpos, N);
-    o.fog = (uFogParams.z > 0.5)
+    float distFog = (uFogParams.z > 0.5)
               ? saturate((uFogParams.y - o.pos.w) / max(uFogParams.y - uFogParams.x, 1e-4))
               : 1.0;
+    // Height fog: full density at/below uFogHeight.x, fading to none over the
+    // next uFogHeight.y world units of altitude. y <= 0 disables the term
+    // (heightFog stays 1, i.e. pure distance fog -- unchanged behaviour).
+    float heightFog = (uFogParams.z > 0.5 && uFogHeight.y > 1e-4)
+              ? saturate((wpos.y - uFogHeight.x) / uFogHeight.y)
+              : 1.0;
+    o.fog = saturate(distFog * heightFog);
     o.lpos = mul(uLightVP, float4(wpos, 1.0));
     return o;
 }
@@ -576,6 +585,8 @@ void Renderer::drawActor(Actor& actor, const Mat4& viewProj, const Options& opt,
     cb.fogParams[0] = opt.fogStart;
     cb.fogParams[1] = opt.fogEnd;
     cb.fogParams[2] = opt.fogEnabled ? 1.0f : 0.0f;
+    cb.fogHeight[0] = opt.fogHeightBase;
+    cb.fogHeight[1] = opt.fogHeightRange;
 
     D3D11_MAPPED_SUBRESOURCE ms;
     if (SUCCEEDED(ctx_->Map(cb_, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms))) {
@@ -821,6 +832,26 @@ void Renderer::collectLights(Actor& actor) {
         collectLights(*child);
 }
 
+// First enabled FogComponent anywhere in the tree wins; siblings/descendants
+// past that point are left unvisited once found (there's only one scene fog).
+void Renderer::collectFog(Actor& actor) {
+    if (fogSample_.found)
+        return;
+    if (auto* fc = actor.getComponent<FogComponent>()) {
+        if (fc->enabled) {
+            fogSample_.found = true;
+            fogSample_.color = Vec3{fc->color[0], fc->color[1], fc->color[2]};
+            fogSample_.start = fc->start;
+            fogSample_.end = fc->end;
+            fogSample_.heightBase = actor.worldTransform().position.y;
+            fogSample_.heightRange = fc->heightRange;
+            return;
+        }
+    }
+    for (const auto& child : actor.children())
+        collectFog(*child);
+}
+
 void* Renderer::render(Scene& scene, const OrbitCamera& cam, int width, int height,
                        const Options& opt) {
     if (!ready() || !ensureTargets(width, height))
@@ -828,10 +859,23 @@ void* Renderer::render(Scene& scene, const OrbitCamera& cam, int width, int heig
 
     lights_.clear();
     probes_.clear();
-    for (const auto& child : scene.root().children())
+    fogSample_ = FogSample{};
+    for (const auto& child : scene.root().children()) {
         collectLights(*child);
+        collectFog(*child);
+    }
+    // A FogComponent in the scene wins over the editor's manual fog toggle.
+    Options resolved = opt;
+    if (fogSample_.found) {
+        resolved.fogEnabled = true;
+        resolved.fogColor = fogSample_.color;
+        resolved.fogStart = fogSample_.start;
+        resolved.fogEnd = fogSample_.end;
+        resolved.fogHeightBase = fogSample_.heightBase;
+        resolved.fogHeightRange = fogSample_.heightRange;
+    }
     shadowActive_ =
-        opt.shadows && ensureShadowMap() && vsShadow_ && computeShadowVP(shadowVP_);
+        resolved.shadows && ensureShadowMap() && vsShadow_ && computeShadowVP(shadowVP_);
 
     ctx_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     ctx_->IASetInputLayout(layout_);
@@ -852,7 +896,7 @@ void* Renderer::render(Scene& scene, const OrbitCamera& cam, int width, int heig
         ctx_->VSSetShader(vsShadow_, nullptr, 0);
         ctx_->PSSetShader(nullptr, nullptr, 0);
         for (const auto& child : scene.root().children())
-            drawActor(*child, shadowVP_, opt, /*shadowPass=*/true);
+            drawActor(*child, shadowVP_, resolved, /*shadowPass=*/true);
         ID3D11RenderTargetView* nr = nullptr;
         ctx_->OMSetRenderTargets(1, &nr, nullptr);
     }
@@ -861,7 +905,7 @@ void* Renderer::render(Scene& scene, const OrbitCamera& cam, int width, int heig
     D3D11_VIEWPORT vp = {0, 0, float(width), float(height), 0.0f, 1.0f};
     ctx_->RSSetViewports(1, &vp);
     ctx_->OMSetRenderTargets(1, &colorRtv_, depthDsv_);
-    const float clear[4] = {opt.clear.x, opt.clear.y, opt.clear.z, 1.0f};
+    const float clear[4] = {resolved.clear.x, resolved.clear.y, resolved.clear.z, 1.0f};
     ctx_->ClearRenderTargetView(colorRtv_, clear);
     ctx_->ClearDepthStencilView(depthDsv_, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
     ctx_->VSSetShader(vs_, nullptr, 0);
@@ -875,7 +919,7 @@ void* Renderer::render(Scene& scene, const OrbitCamera& cam, int width, int heig
     float aspect = height > 0 ? float(width) / float(height) : 1.0f;
     Mat4 viewProj = cam.view() * cam.proj(aspect);
     for (const auto& child : scene.root().children())
-        drawActor(*child, viewProj, opt, /*shadowPass=*/false);
+        drawActor(*child, viewProj, resolved, /*shadowPass=*/false);
 
     // Unbind so the colour SRV (and shadow SRV) can be re-bound next frame.
     ID3D11RenderTargetView* nullRtv = nullptr;

@@ -61,6 +61,26 @@ public:
     bool isStatic = false;
 };
 
+// Scene-wide height/distance fog. The renderer looks for the first enabled
+// FogComponent anywhere in the scene tree and, if found, fades every pixel's
+// colour toward `color` based on distance from the camera (start..end) and,
+// if heightRange > 0, on how far above this actor's own world Y the pixel
+// sits (full fog at/below that height, fading out over heightRange units).
+// heightRange == 0 disables the height term entirely (pure distance fog).
+class FogComponent : public Component {
+public:
+    const char* typeName() const override { return "Fog"; }
+    void drawInspector() override;
+    std::unique_ptr<Component> clone() const override {
+        return std::make_unique<FogComponent>(*this);
+    }
+
+    float color[3] = {0.043f, 0.051f, 0.070f};
+    float start = 6.0f;
+    float end = 40.0f;
+    float heightRange = 0.0f; // 0 = disabled (no height falloff)
+};
+
 // A fixed sample point for baked static lighting. Dynamic (moving) actors with
 // no bake of their own borrow the nearest probe's baked colour as extra
 // ambient each frame, so they still read as lit by static-only lights.

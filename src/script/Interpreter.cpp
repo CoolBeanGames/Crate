@@ -2,6 +2,7 @@
 
 #include "core/Math.h"
 #include "scene/Actor.h"
+#include "scene/BuiltinComponents.h"
 
 #include <algorithm>
 #include <cmath>
@@ -300,7 +301,8 @@ Value Interpreter::eval(const Expr& e) {
                 return Value::ActorRef(self_->owner);
             // a bare type name evaluates to a TypeRef
             if (ctx_->findType(e.strVal) || e.strVal == "Actor" || e.strVal == "Actor2D" ||
-                e.strVal == "Actor3D" || e.strVal == "Vector2" || e.strVal == "Vector3")
+                e.strVal == "Actor3D" || e.strVal == "Vector2" || e.strVal == "Vector3" ||
+                e.strVal == "Fog")
                 return Value::Type(e.strVal);
             // a bare signal name on `this`.
             if (self_ && self_->cls && self_->cls->hasSignal(e.strVal))
@@ -436,6 +438,40 @@ Value Interpreter::actorMember(crate::Actor* a, const std::string& name, int lin
     throw RuntimeError("Actor has no member '" + name + "'", line);
 }
 
+// Native (non-script) components are exposed through get_component() as a
+// "live" ScriptObject: builtin names which kind and nativePtr points at the
+// real component, so reads/writes below go straight to it instead of a
+// disposable fields-map snapshot. Add a case here (and in setNativeField)
+// for each native component type that should be get_component()-able.
+static bool getNativeField(const ScriptObject& o, const std::string& name, Value& out) {
+    if (o.builtin == "Fog") {
+        auto* fc = static_cast<FogComponent*>(o.nativePtr);
+        if (name == "color") { out = makeVector("Vector3", fc->color[0], fc->color[1], fc->color[2]); return true; }
+        if (name == "start") { out = Value::Float(fc->start); return true; }
+        if (name == "end") { out = Value::Float(fc->end); return true; }
+        if (name == "height_range") { out = Value::Float(fc->heightRange); return true; }
+    }
+    return false;
+}
+
+static bool setNativeField(ScriptObject& o, const std::string& name, const Value& v) {
+    if (o.builtin == "Fog") {
+        auto* fc = static_cast<FogComponent*>(o.nativePtr);
+        if (name == "start") { fc->start = (float)v.num(); return true; }
+        if (name == "end") { fc->end = (float)v.num(); return true; }
+        if (name == "height_range") { fc->heightRange = (float)v.num(); return true; }
+        if (name == "color") {
+            if (v.t == Value::T::Object && v.obj) {
+                fc->color[0] = (float)v.obj->fields["x"].num();
+                fc->color[1] = (float)v.obj->fields["y"].num();
+                fc->color[2] = (float)v.obj->fields["z"].num();
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
 Value Interpreter::evalMember(const Expr& e) {
     // this.base.method(...)  -> handled in evalCall; a bare this.base is just this.
     Value obj = eval(*e.a);
@@ -446,6 +482,12 @@ Value Interpreter::evalMember(const Expr& e) {
         if (obj.obj->builtin == "InputButton" &&
             (name == "just_pressed" || name == "just_released" || name == "pressed"))
             return Value::SignalRef(obj.obj, name);
+        if (obj.obj->nativePtr) {
+            Value out;
+            if (getNativeField(*obj.obj, name, out))
+                return out;
+            throw RuntimeError(obj.obj->builtin + " has no member '" + name + "'", e.line);
+        }
         auto it = obj.obj->fields.find(name);
         if (it != obj.obj->fields.end())
             return it->second;
@@ -845,6 +887,16 @@ void Interpreter::assign(const Expr& target, Value v) {
     // Actor transform proxies: this.actor.position = Vector3(...)
     if (target.kind == ExprKind::Member) {
         Value obj = eval(*target.a);
+        // Native component write-back, e.g. get_component(type_of(Fog)).start = 10:
+        // such an object is a live view onto the real component (see
+        // getNativeField/setNativeField), not a fields-map snapshot, whether
+        // reached directly off the call or via a variable holding it.
+        if (obj.t == Value::T::Object && obj.obj && obj.obj->nativePtr) {
+            if (setNativeField(*obj.obj, target.strVal, v))
+                return;
+            throw RuntimeError(obj.obj->builtin + " has no member '" + target.strVal + "'",
+                               target.line);
+        }
         if (obj.t == Value::T::Actor) {
             crate::Actor* a = obj.actor;
             auto setVec = [&](Vec3& dst) {

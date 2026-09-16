@@ -50,6 +50,19 @@ void LightComponent::drawInspector() {
         ImGui::TextDisabled("Static: only affects meshes/probes via Bake Lightmaps");
 }
 
+void FogComponent::drawInspector() {
+    ImGui::ColorEdit3("Color", color);
+    ImGui::DragFloat("Start", &start, 0.1f, 0.0f, 1000.0f);
+    if (end < start)
+        end = start + 0.01f;
+    ImGui::DragFloat("End", &end, 0.1f, 0.01f, 2000.0f);
+    ImGui::DragFloat("Height Range", &heightRange, 0.1f, 0.0f, 500.0f);
+    ImGui::TextDisabled(
+        "Height Range: fades out this many units above this actor's own height\n"
+        "(0 = disabled, pure distance fog)");
+    ImGui::TextDisabled("Only the first Fog found in the scene is used.");
+}
+
 void LightProbeComponent::drawInspector() {
     ImGui::TextDisabled(bakedValid ? "baked" : "not baked yet - Object > Bake Lightmaps");
     ImGui::ColorButton("##baked", ImVec4(bakedLight[0], bakedLight[1], bakedLight[2], 1.0f));

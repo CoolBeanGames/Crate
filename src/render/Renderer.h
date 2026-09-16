@@ -74,6 +74,10 @@ public:
         Vec3 fogColor{0.043f, 0.051f, 0.070f};
         float fogStart = 6.0f;
         float fogEnd = 40.0f;
+        // Height falloff: 0 = pure distance fog (fogHeightBase unused).
+        // Overridden by render() when a FogComponent exists in the scene.
+        float fogHeightBase = 0.0f;
+        float fogHeightRange = 0.0f;
     };
 
     // Render the scene; returns an SRV (as void* for ImGui::Image) valid until
@@ -109,6 +113,15 @@ private:
     };
     std::vector<ProbeSample> probes_;
 
+    // The first enabled FogComponent found in the scene tree, if any (task 76:
+    // "if it exists in the scene fog is rendered").
+    struct FogSample {
+        bool found = false;
+        Vec3 color{};
+        float start = 0.0f, end = 0.0f, heightBase = 0.0f, heightRange = 0.0f;
+    };
+    FogSample fogSample_;
+
     bool ensureTargets(int w, int h);
     bool ensureShadowMap();
     bool compileShaders();
@@ -116,6 +129,7 @@ private:
     GpuMesh upload(const MeshData& data);
     void drawActor(Actor& actor, const Mat4& viewProj, const Options& opt, bool shadowPass);
     void collectLights(Actor& actor); // fills lights_ (world space), capped
+    void collectFog(Actor& actor);    // fills fogSample_; first match wins
     bool computeShadowVP(Mat4& out) const; // false if no shadow-casting light
     void releaseTargets();
     static std::string lightmapPath(const Scene& scene, const std::string& assetDir);
