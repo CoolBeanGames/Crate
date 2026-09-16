@@ -1215,7 +1215,17 @@ entries — this is a running history, not a status snapshot.)
   CMakeLists.txt (modified: NativeModule.cpp/NativeClassRegistry.cpp added
   to crate_core's sources, new native_module_tests target).
   NOT YET COMMITTED to git as of writing this entry -- see next action.
-  Next step: git commit Phase 4, then continue to Phase 5 (reflection/
+  *** ROLLBACK POINT: pushed to origin/main as commit cf40e31
+  ("Transplation Phase 4: runtime DLL loading + factory ABI + registry
+  integration"), 2026-09-16. User explicitly asked this commit be pushed
+  and remembered as a safe point to return to before Phase 5 (the riskiest
+  remaining phase) begins. If Phase 5 goes badly wrong and needs to be
+  abandoned/rolled back, `git reset --hard cf40e31` (after confirming with
+  the user, per this repo's own safety norms -- never run a hard reset
+  without explicit confirmation) returns to this exact, fully-tested,
+  already-pushed state: Phases 0-4 complete, 14 green test suites, working
+  end-to-end cScript-to-loaded-native-DLL path. ***
+  Next step: continue to Phase 5 (reflection/
   accessor table: CompiledClassInfo gains field get/set + method invoke
   tables; new NativeScriptComponent replaces NativeComponentShim as the
   thing ComponentRegistry actually constructs, additionally owning an
