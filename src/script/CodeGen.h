@@ -2,6 +2,7 @@
 #include "script/Ast.h"
 
 #include <string>
+#include <unordered_set>
 
 namespace crate::script {
 
@@ -36,6 +37,13 @@ struct CodeGenResult {
     std::string error;     // set iff !ok (first problem found, with a line number if known)
 };
 
-CodeGenResult generateClass(const ClassDecl& decl);
+// `knownClassNames` (Phase 9b): every script class name ScriptSystem knows
+// about at build time (across ALL namespaces, not just this one), so
+// `type_of(SomeOtherScriptClass)` resolves to a real TypeRef instead of
+// falling through to the dynamic-overflow-map guess Identifier's fallback
+// makes for an unrecognized bare name. Defaults to empty for callers (tests)
+// that only care about this class's own name / the fixed builtin list.
+CodeGenResult generateClass(const ClassDecl& decl,
+                            const std::unordered_set<std::string>& knownClassNames = {});
 
 } // namespace crate::script

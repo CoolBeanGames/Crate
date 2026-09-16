@@ -111,12 +111,13 @@ static bool parseOne(const std::string& src, ClassDecl& outDecl, std::string& er
 }
 
 static int expectCompiles(const std::string& label, const std::string& src, const std::string& vcvars,
-                          const std::string& scratchDir) {
+                          const std::string& scratchDir,
+                          const std::unordered_set<std::string>& knownClassNames = {}) {
     ClassDecl decl;
     std::string perr;
     CHECK(parseOne(src, decl, perr));
 
-    CodeGenResult r = generateClass(decl);
+    CodeGenResult r = generateClass(decl, knownClassNames);
     if (!r.ok)
         std::printf("  (%s) generateClass error: %s\n", label.c_str(), r.error.c_str());
     CHECK(r.ok);
@@ -431,13 +432,86 @@ int main() {
         }
     )", "signal")) return 1;
 
-    if (expectRefused("get_component is refused", R"(
+    if (expectRefused("bare get_component(...) (no such global function -- only "
+                      "this.get_component/actor.get_component exist) is refused", R"(
         class GenGetComponent : Actor {
             func update(float delta) {
                 var fog = get_component(type_of(Fog));
             }
         }
-    )", "")) return 1;
+    )", "unknown function")) return 1;
+
+    // ---- Phase 9b: get_component / type_of(AnyClass) / general cross-
+    // object access, now real (not refused) ---------------------------------
+
+    if (expectCompiles("this.get_component(type_of(Fog))", R"(
+        class GenThisGetComponent : Actor {
+            func update(float delta) {
+                var fog = this.get_component(type_of(Fog));
+            }
+        }
+    )", vcvars, scratchDir)) return 1;
+
+    if (expectCompiles("actor.get_component(...) on the bare actor/transform alias", R"(
+        class GenActorGetComponent : Actor {
+            func update(float delta) {
+                var fog = actor.get_component(type_of(Fog));
+            }
+        }
+    )", vcvars, scratchDir)) return 1;
+
+    if (expectCompiles("get_component on a general (non-this) receiver expression", R"(
+        class GenGeneralGetComponent : Actor {
+            var other = null;
+            func update(float delta) {
+                var c = this.other.get_component(type_of(Fog));
+            }
+        }
+    )", vcvars, scratchDir)) return 1;
+
+    if (expectCompiles("type_of() on another known script class name", R"(
+        class GenTypeOfOther : Actor {
+            func update(float delta) {
+                var t = type_of(GenOtherKnownClass);
+            }
+        }
+    )", vcvars, scratchDir, {"GenOtherKnownClass"})) return 1;
+
+    if (expectCompiles("method call on a general (non-this) object-typed expression", R"(
+        class GenGeneralMethodCall : Actor {
+            var other = null;
+            func update(float delta) {
+                var r = this.other.some_method(1, 2);
+            }
+        }
+    )", vcvars, scratchDir)) return 1;
+
+    if (expectCompiles("member read on a general (non-this) expression -- field, .length, "
+                      "and an Actor-typed receiver's position", R"(
+        class GenGeneralMemberRead : Actor {
+            var other = null;
+            var otherActor = null;
+            func update(float delta) {
+                var f = this.other.some_field;
+                var n = this.other.length;
+                var p = this.otherActor.position;
+                var nm = this.otherActor.name;
+            }
+        }
+    )", vcvars, scratchDir)) return 1;
+
+    if (expectCompiles("member write on a general (non-this) expression -- field and "
+                      "an Actor-typed receiver's position/rotation.y", R"(
+        class GenGeneralMemberWrite : Actor {
+            var other = null;
+            var otherActor = null;
+            func update(float delta) {
+                this.other.some_field = 42;
+                this.otherActor.position = Vector3(1, 2, 3);
+                this.otherActor.rotation.y = 10;
+            }
+        }
+    )", vcvars, scratchDir)) return 1;
 
     if (expectRefused("this.base.method() is refused", R"(
         class GenBaseCall : Actor {

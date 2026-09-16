@@ -4,6 +4,8 @@
 #include "script/CompiledClassInfo.h"
 #include "script/Runtime.h"
 
+#include "scene/Actor.h"
+
 namespace crate::script {
 
 Value getObjectMember(const std::shared_ptr<ScriptObject>& obj, const std::string& name, int line) {
@@ -114,6 +116,105 @@ Value callObjectMethod(ScriptContext* ctx, const std::shared_ptr<ScriptObject>& 
     }
 
     throw RuntimeError("cannot call '" + method + "' on a non-script value", line);
+}
+
+namespace {
+// args[0] as a get_component() type-name argument: a TypeRef's own name, or
+// str() of anything else -- mirrors both of Interpreter::evalCall's
+// `get_component` branches (Object-escape-hatch and native-Actor-method)
+// resolving their type-name argument identically.
+std::string typeArgOrEmpty(const std::vector<Value>& args) {
+    if (args.empty())
+        return {};
+    return args[0].t == Value::T::TypeRef ? args[0].s : args[0].str();
+}
+
+Value getComponentOn(ScriptContext* ctx, const Value& receiver, const std::string& typeName) {
+    crate::Actor* owner = receiver.t == Value::T::Object && receiver.obj ? receiver.obj->owner
+                          : receiver.t == Value::T::Actor                ? receiver.actor
+                                                                          : nullptr;
+    if (ctx && ctx->getComponent)
+        if (auto so = ctx->getComponent(owner, typeName))
+            return Value::Obj(so);
+    return Value::Null_();
+}
+} // namespace
+
+Value getValueMember(const Value& v, const std::string& name, int line) {
+    if (v.t == Value::T::Object && v.obj)
+        return getObjectMember(v.obj, name, line);
+    if (v.t == Value::T::Actor)
+        return actorMember(v.actor, name, line);
+    if (v.t == Value::T::Array && name == "length")
+        return arrayLength(v);
+    throw RuntimeError("cannot read '." + name + "' on " + v.typeName(), line);
+}
+
+bool trySetValueMember(const Value& v, const std::string& name, const Value& val) {
+    if (v.t == Value::T::Object && v.obj)
+        return trySetObjectMember(v.obj, name, val);
+    // General Actor-typed receiver write-back: position/rotation/scale,
+    // exactly mirroring Interpreter::assign()'s Actor branch (previously
+    // only reachable for the bare `transform`/`actor` identifiers CodeGen
+    // special-cases -- this lets a field/get_component-result/etc holding
+    // an Actor reference support the same writes).
+    if (v.t == Value::T::Actor && v.actor) {
+        crate::Actor* a = v.actor;
+        auto setVec = [&](Vec3& dst) -> bool {
+            if (val.t != Value::T::Object || !val.obj)
+                return false;
+            dst.x = (float)vfield(val, "x");
+            dst.y = (float)vfield(val, "y");
+            dst.z = (float)vfield(val, "z");
+            return true;
+        };
+        if (name == "position")
+            return setVec(a->transform().position);
+        if (name == "rotation")
+            return setVec(a->transform().rotationEuler);
+        if (name == "scale")
+            return setVec(a->transform().scale);
+        return false;
+    }
+    return false;
+}
+
+Value callValueMethod(ScriptContext* ctx, const Value& v, const std::string& method,
+                      std::vector<Value> args, int line) {
+    if (v.t == Value::T::Object && v.obj && (v.obj->cls || (v.obj->nativePtr && v.obj->compiledInfo))) {
+        bool hasOwnMethod =
+            v.obj->cls ? v.obj->cls->findFunction(method) != nullptr
+                      : [&] {
+                            const CompiledClassInfo* ci = v.obj->compiledInfo;
+                            for (size_t i = 0; i < ci->methodCount; ++i)
+                                if (ci->methods[i].name == method)
+                                    return true;
+                            return false;
+                        }();
+        // get_component is an escape hatch available on any script instance
+        // that doesn't declare its own method of that name, exactly as in
+        // Interpreter::evalCall (signals/emit_signal/connect/disconnect/
+        // is_connected on a general Object receiver are Phase 9d, not yet
+        // handled here -- they fall through to callObjectMethod below,
+        // which throws "method not found" until then).
+        if (!hasOwnMethod && method == "get_component")
+            return getComponentOn(ctx, v, typeArgOrEmpty(args));
+        return callObjectMethod(ctx, v.obj, method, std::move(args), line);
+    }
+    if (v.t == Value::T::Actor) {
+        if (method == "get_component")
+            return getComponentOn(ctx, v, typeArgOrEmpty(args));
+        throw RuntimeError("Actor has no method '" + method + "'", line);
+    }
+    if (v.t == Value::T::Array) {
+        if (method == "add" && !args.empty() && arrayAdd(v, args[0]))
+            return Value::Null_();
+        if (method == "length" && v.arr)
+            return arrayLength(v);
+    }
+    if (method == "str")
+        return Value::Str(v.str());
+    throw RuntimeError("no method '" + method + "'", line);
 }
 
 } // namespace crate::script

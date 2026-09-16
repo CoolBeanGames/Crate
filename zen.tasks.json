@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "projectId": "8afe2a0217d7419db234ceda7ecb9dff",
   "name": "Crate",
-  "nextCardIndex": 92,
+  "nextCardIndex": 99,
   "latestExePath": "build-Release/Crate.exe",
   "latestReleasePath": "build-Release/Crate.exe",
   "tagCatalog": [
@@ -165,6 +165,14 @@
     {
       "name": "performance",
       "color": "#815B32"
+    },
+    {
+      "name": "scenes",
+      "color": "#9A6334"
+    },
+    {
+      "name": "projects",
+      "color": "#386D9A"
     }
   ],
   "customCardTypes": [
@@ -404,6 +412,34 @@
           "updatedAt": "2026-09-16T05:05:38.2999314+00:00"
         },
         {
+          "id": "ce4da97362bc454fa892fcb0c3e9f9aa",
+          "index": 93,
+          "kind": "break",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "",
+          "task": "",
+          "tags": [],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-16T05:15:07.9747248+00:00",
+          "updatedAt": "2026-09-16T05:15:07.9747252+00:00"
+        },
+        {
           "id": "3f89cf8e4c0c42e38ad52eced68c0fdb",
           "index": 89,
           "kind": "task",
@@ -442,6 +478,34 @@
           "isCollapsed": true,
           "createdAt": "2026-09-16T05:02:25.2819086+00:00",
           "updatedAt": "2026-09-16T05:05:40.5015102+00:00"
+        },
+        {
+          "id": "f87b07350dfa493dbd05f914c8dd3998",
+          "index": 94,
+          "kind": "break",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "",
+          "task": "",
+          "tags": [],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-16T05:15:09.7974184+00:00",
+          "updatedAt": "2026-09-16T05:15:09.797419+00:00"
         },
         {
           "id": "3eb7c0e0966f4a0b93d38b4cb8feb603",
@@ -483,26 +547,18 @@
           "updatedAt": "2026-09-16T05:05:41.8487856+00:00"
         },
         {
-          "id": "c95aa21c18c84dd1811ebfec78f7831a",
-          "index": 91,
-          "kind": "task",
+          "id": "d37562518e3a4e3fb5f006a43953193a",
+          "index": 95,
+          "kind": "break",
           "dueDate": null,
           "startedDate": null,
           "priority": null,
-          "title": "Scenes",
+          "title": "",
           "task": "",
           "tags": [],
           "files": [],
-          "customTypeId": "e361978d91d9447f97033586db3c87b0",
-          "customValues": {
-            "c474f092663247ebb286cc5b978853d3": "",
-            "77f8b466f2874429a253d2256f62c42a": "",
-            "0bd42f02c9ae40469818cbbd6986994f": "",
-            "203da294781c41a1b1e7f760ea47047e": "",
-            "469fc66c5553490daed4c54f36ac81b4": "",
-            "ce370daef7e94671b0b947c000ce780e": "",
-            "37571d4735f1403b85a48880a05ec554": ""
-          },
+          "customTypeId": null,
+          "customValues": {},
           "requirements": [],
           "notes": [],
           "flags": {
@@ -515,8 +571,170 @@
           "isLocked": false,
           "isAwaitingFeedback": false,
           "isCollapsed": false,
+          "createdAt": "2026-09-16T05:15:11.0356429+00:00",
+          "updatedAt": "2026-09-16T05:15:11.0356434+00:00"
+        },
+        {
+          "id": "c95aa21c18c84dd1811ebfec78f7831a",
+          "index": 91,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Scenes",
+          "task": "",
+          "tags": [
+            "scenes",
+            "ui"
+          ],
+          "files": [],
+          "customTypeId": "e361978d91d9447f97033586db3c87b0",
+          "customValues": {
+            "c474f092663247ebb286cc5b978853d3": "Scenes",
+            "77f8b466f2874429a253d2256f62c42a": "currently we have a hard coded startup scene, now we are going to create scenes (like in godot, or levels / prefabs in unity) A scene is a collection of Actors. Every Scene must have a parent actor. and it then has children. Scenes are saved in the asset browser and can be instantiated. a New scene can be made via the new scene toolbar button, right click -\u003E new scene in the asset menu, or file-\u003Enew scene in the top tool bar. Multiple scenes can be open in the scene view via a tabbed interface. double clicking a scene asset opens it. When the game starts a blank scene is created called root. this scene can be gotten by calling get_root() which returns a Scene of type Actor. Scenes can be nested within other scenes. Draging a scene to the asset window creates a new saved scene (after prompting for a name) and it then contains the scene you dragged and ALL of its children. The scene tree scene is then deleted, and replaced with the new prefab. The children of the scene you made an asset will not be visible unless you open the scene. Scene prefabs are blue in color. Scenes are of type Asset for reference assignment. If a script wants an Asset type that means with wants a Saved Scene file. If it wants an actor then it wants a Actor from the scene tree or a instantiated scene.",
+            "0bd42f02c9ae40469818cbbd6986994f": "",
+            "203da294781c41a1b1e7f760ea47047e": "Scenes",
+            "469fc66c5553490daed4c54f36ac81b4": "built\u002Bcommit\u002Brelease",
+            "ce370daef7e94671b0b947c000ce780e": "0",
+            "37571d4735f1403b85a48880a05ec554": "scenes,ui"
+          },
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": true,
           "createdAt": "2026-09-16T05:05:54.0779954+00:00",
-          "updatedAt": "2026-09-16T05:05:54.0779989+00:00"
+          "updatedAt": "2026-09-16T05:11:07.2605949+00:00"
+        },
+        {
+          "id": "be0e80e74f0b47b59ce207875181c7a5",
+          "index": 96,
+          "kind": "break",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "",
+          "task": "",
+          "tags": [],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-16T05:15:12.1306068+00:00",
+          "updatedAt": "2026-09-16T05:15:12.1306075+00:00"
+        },
+        {
+          "id": "96b87037baea420e8622c10f07f98c27",
+          "index": 92,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Projects",
+          "task": "",
+          "tags": [
+            "projects",
+            "ui"
+          ],
+          "files": [],
+          "customTypeId": "e361978d91d9447f97033586db3c87b0",
+          "customValues": {
+            "c474f092663247ebb286cc5b978853d3": "Projects",
+            "77f8b466f2874429a253d2256f62c42a": "a Project basically owns all of the files in the asset window and the scenes/settings. A project contains a .crate project file with some simple info and is in a folder containing an /assets folder that is the asset library. later we will build a launcher for creating/opening/managing projects. but for now just get this working. Add a file -\u003E new project/save project/open project button.",
+            "0bd42f02c9ae40469818cbbd6986994f": "",
+            "203da294781c41a1b1e7f760ea47047e": "Projects",
+            "469fc66c5553490daed4c54f36ac81b4": "built\u002Bcommit\u002Brelease",
+            "ce370daef7e94671b0b947c000ce780e": "0",
+            "37571d4735f1403b85a48880a05ec554": "projects,ui"
+          },
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-16T05:12:29.9552007+00:00",
+          "updatedAt": "2026-09-16T05:12:32.7603105+00:00"
+        },
+        {
+          "id": "1a6aa1e889d344ddb37c47a8b4534944",
+          "index": 98,
+          "kind": "break",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "",
+          "task": "",
+          "tags": [],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-16T05:15:37.2996006+00:00",
+          "updatedAt": "2026-09-16T05:15:37.2996012+00:00"
+        },
+        {
+          "id": "24497791d58e462d8ab719311fbd2e17",
+          "index": 97,
+          "kind": "cleanup",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "",
+          "task": "",
+          "tags": [],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-16T05:15:13.4134766+00:00",
+          "updatedAt": "2026-09-16T05:15:13.4134771+00:00"
         }
       ]
     },
@@ -548,36 +766,7 @@
       "isCollapsed": false,
       "isSystem": false,
       "isLocked": false,
-      "tasks": [
-        {
-          "id": "c7f4820a842f4a4fa1bef703571ff58f",
-          "index": 86,
-          "kind": "merge",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "",
-          "task": "",
-          "tags": [],
-          "files": [],
-          "customTypeId": null,
-          "customValues": {},
-          "requirements": [],
-          "notes": [],
-          "flags": {
-            "commit": false,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-16T04:51:07.9237798+00:00",
-          "updatedAt": "2026-09-16T04:51:07.92378+00:00"
-        }
-      ]
+      "tasks": []
     },
     {
       "id": "archive",
@@ -3953,6 +4142,34 @@
           "isCollapsed": false,
           "createdAt": "2026-09-16T03:53:57.6853469+00:00",
           "updatedAt": "2026-09-16T04:11:31.7126441+00:00"
+        },
+        {
+          "id": "c7f4820a842f4a4fa1bef703571ff58f",
+          "index": 86,
+          "kind": "merge",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "",
+          "task": "",
+          "tags": [],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-16T04:51:07.9237798+00:00",
+          "updatedAt": "2026-09-16T05:25:01.8668112+00:00"
         }
       ]
     }

@@ -98,6 +98,15 @@ Value mathCall(const std::string& fn, std::vector<Value>& args, int line);
 bool getNativeField(const ScriptObject& o, const std::string& name, Value& out);
 bool setNativeField(ScriptObject& o, const std::string& name, const Value& v);
 
+// Reads a member off an arbitrary Actor* (position/rotation/scale/forward/
+// right/up/name) -- the free-function form of what was
+// Interpreter::actorMember, moved here (Phase 9b) so generated code can
+// read a member off a GENERAL Actor-typed value (e.g. a field holding an
+// Actor reference assigned via the Inspector's drag-drop picker), not just
+// the statically-known bare `transform`/`actor` identifiers CodeGen already
+// special-cases. Throws RuntimeError for a null actor or an unknown member.
+Value actorMember(crate::Actor* a, const std::string& name, int line);
+
 // ---- Camera.main resolution (task 77) ----
 // Camera.main isn't reached from a specific actor -- it's a bare global, so
 // the scene it searches is found by walking up from the calling script's own

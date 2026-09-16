@@ -360,9 +360,18 @@ BuildResult buildNamespace(const std::string& namespaceName, const std::string& 
     fs::create_directories(genDir, ec);
     fs::create_directories(binDir, ec);
 
+    // Every script class name ScriptSystem knows, across ALL namespaces --
+    // not just this one -- so a cross-namespace type_of(SomeOtherScript)
+    // resolves at codegen time (Phase 9b). Computed once per buildNamespace
+    // call rather than per class.
+    std::unordered_set<std::string> knownClassNames;
+    for (const auto& [name, ci] : sys.types())
+        if (ci->decl)
+            knownClassNames.insert(name);
+
     std::vector<std::string> cppFiles;
     for (const auto* ci : classes) {
-        script::CodeGenResult cg = script::generateClass(*ci->decl);
+        script::CodeGenResult cg = script::generateClass(*ci->decl, knownClassNames);
         if (!cg.ok) {
             r.error = ci->name + ": " + cg.error;
             return r;

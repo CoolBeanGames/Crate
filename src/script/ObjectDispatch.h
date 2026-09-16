@@ -44,4 +44,36 @@ bool trySetObjectMember(const std::shared_ptr<ScriptObject>& obj, const std::str
 Value callObjectMethod(ScriptContext* ctx, const std::shared_ptr<ScriptObject>& obj,
                        const std::string& method, std::vector<Value> args, int line);
 
+// ---- Value-level generic dispatch (Phase 9b) ----
+// A "general receiver" in generated native code (anything not statically
+// known at codegen time to be `this`/bare `transform`/`actor`/Math/Input --
+// e.g. a get_component() result, or a field holding an Actor reference
+// assigned via the Inspector's drag-drop picker) evaluates to an arbitrary
+// crate::script::Value, not necessarily an Object. These three mirror
+// Interpreter::evalMember/evalCall/assign's own fallback dispatch (the part
+// reached AFTER their syntactic special cases, which depend on identifier
+// text, not the evaluated value, and so stay separately hand-written at
+// each call site) over Object/Actor/Array receivers, so CodeGen has exactly
+// one dispatcher to call regardless of what the receiver turns out to be at
+// runtime. Signal/Callable/TypeRef-static receivers are not handled here
+// yet (signals are Phase 9d, static classes are Phase 9e) -- an unhandled
+// receiver kind throws/returns false exactly as the interpreter's own
+// fallthrough does today for those not-yet-compiled forms.
+
+// Member read. Throws RuntimeError for a null/unsupported receiver or an
+// unknown member (matches Interpreter::evalMember's fail-fast contract).
+Value getValueMember(const Value& v, const std::string& name, int line);
+
+// Member write. Returns false (does not throw) if `v`'s receiver kind or
+// `name` isn't recognized -- caller produces its own appropriately-worded
+// RuntimeError, matching trySetObjectMember's contract.
+bool trySetValueMember(const Value& v, const std::string& name, const Value& val);
+
+// Method call, including the get_component(...) escape hatch on an Object
+// OR Actor receiver (mirrors evalCall's two separate get_component
+// branches in one place). Throws RuntimeError for a null/unsupported
+// receiver or an unknown method.
+Value callValueMethod(ScriptContext* ctx, const Value& v, const std::string& method,
+                      std::vector<Value> args, int line);
+
 } // namespace crate::script

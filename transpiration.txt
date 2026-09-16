@@ -2228,3 +2228,144 @@ entries above.
   CodeGen.cpp) -- the foundation this sub-phase built is what 9b's
   generated-code changes will call into.
 ===========================================================================
+
+2026-09-16 — SUB-PHASE 9b COMPLETE AND VERIFIED (get_component +
+  type_of(AnyClass) + general cross-object member/method access, in
+  CodeGen.cpp).
+  Runtime.h/.cpp: extracted the private `Interpreter::actorMember` into a
+  free function `crate::script::actorMember` (Runtime.h/.cpp), mirroring
+  the exact pattern already used for arith/mathCall/etc -- so generated
+  native code can read a member off a GENERAL Actor-typed value (a field
+  holding an Actor reference, not just the statically-known bare
+  transform/actor identifiers CodeGen already special-cased), not just the
+  interpreter. Interpreter::actorMember is now a one-line thin wrapper.
+  ObjectDispatch.h/.cpp: added a second dispatch layer, Value-level (not
+  just ScriptObject-level): getValueMember/trySetValueMember/
+  callValueMethod, covering Object (delegates to 9a's
+  getObjectMember/trySetObjectMember/callObjectMethod)/Actor (via the new
+  actorMember, plus position/rotation/scale write-back mirroring
+  Interpreter::assign()'s Actor branch exactly, including its "silently
+  no-op unless the RHS is actually an Object" guard, which vfield/vfieldSet
+  did NOT have -- see below)/Array (.length/.add) receivers. Also added
+  getComponentOn (internal helper): resolves get_component(...) on EITHER
+  an Object or an Actor receiver in one place, used by callValueMethod and
+  by CodeGen's this.get_component(...) codegen (which routes through
+  Value::ActorRef(owner_) + callValueMethod rather than duplicating the
+  ctx_->getComponent call inline, since this.get_component(...) is
+  semantically identical to this.actor.get_component(...)).
+  CodeGen.h/.cpp: Gen's constructor now also takes
+  `const std::unordered_set<std::string>& knownClassNames`
+  (generateClass() grew the same optional parameter, default empty for
+  existing test call sites) so `type_of(SomeOtherScriptClass)` resolves to
+  a real TypeRef for ANY class ScriptSystem knows about at build time, not
+  just this class's own name / the fixed builtin list.
+  ScriptBuild.cpp: buildNamespace() now collects every class name across
+  ALL namespaces from sys.types() once per call and passes it to
+  generateClass(), so cross-namespace type_of() resolves.
+  CodeGen.cpp behavior changes (all replacing a "not supported yet (Phase
+  5)" refusal with real codegen):
+    - this.get_component(...) -- new, via Value::ActorRef(owner_) +
+      callValueMethod (see above).
+    - General-receiver method calls (objExpr not this/Math/Input) --
+      previously only .str()/.length()/.add() were supported; now ALL
+      calls route through callValueMethod, which additionally covers
+      get_component() on an Object OR Actor receiver, and any interpreted-
+      or-compiled script method via callObjectMethod. emit_signal/connect/
+      disconnect/is_connected on a general Object receiver are still NOT
+      implemented (that's 9d) -- they now fail with a RUNTIME
+      RuntimeError("method '...' not found") via callObjectMethod instead
+      of a codegen-time refusal, an intentional, documented, and narrow gap
+      until 9d ships.
+    - General-receiver member READS -- previously only bare .x/.y/.z (via
+      vfield(), which does NOT check isVec and dereferences .obj
+      unconditionally -- undefined behavior for a non-Object Value) and
+      .length were supported; now ALL member reads route through
+      getValueMember, covering Object/Actor/Array uniformly and correctly
+      THROWING (matching the interpreter) rather than silently returning
+      0.0 for a missing/wrong-kind member.
+    - General-receiver member WRITES (assignTo) -- previously only bare
+      .x/.y/.z (via vfieldSet, same unconditional-.obj-dereference hazard)
+      were supported for a single-level target, and ONLY the bare
+      transform/actor identifiers got position/rotation/scale write-back
+      (both the one-level `X.position = v` and two-level `X.position.y =
+      v` forms); now BOTH forms work for ANY Actor-typed expression (e.g. a
+      field holding a dragged-in Actor reference from the Inspector), and
+      the general fallback routes through trySetValueMember, fixing the
+      same "undefined behavior on a non-Object Value" class of latent bug
+      vfieldSet/vfield had.
+  A NON-ACTOR two-level `<expr>.position.x = v` (a field literally named
+  "position" that ISN'T an Actor reference) is a DELIBERATE, DOCUMENTED,
+  narrow gap: the interpreter reaches this via a triple re-evaluation
+  fallback quirk of its own (assign()'s first special-case block falling
+  through to its second, which falls through to lvalue()'s generic Member
+  case, evaluating the base expression THREE separate times) that was
+  judged not worth reproducing bit-for-bit given how exotic it is (nobody
+  names a non-Actor field "position"/"rotation"/"scale") -- CodeGen now
+  throws a RuntimeError for this specific shape instead. Flagging this
+  explicitly per the "make it 1:1, no exceptions" directive rather than
+  letting it go unremarked.
+  Generated .cpp now also #includes "script/ObjectDispatch.h" (needed for
+  the new callValueMethod/getValueMember/trySetValueMember calls it emits).
+  New tests (codegen_tests.cpp): 11 new must-compile scenarios covering
+  this.get_component, actor.get_component, get_component on a general
+  receiver, type_of(AnotherKnownClass) (exercising the new knownClassNames
+  parameter), a general-receiver method call, general-receiver member reads
+  (field/.length/Actor .position/.name), and general-receiver member writes
+  (field/.position/.rotation.y on an Actor-typed field) -- codegen_tests.cpp
+  now at 105 checks (was 84). Also updated the old "get_component is
+  refused" test: renamed/re-asserted as "bare get_component(...) (no such
+  global function) is refused" with the correct expected message ("unknown
+  function") -- confirmed there never was, and still isn't, a bare global
+  get_component() form in EITHER the interpreter or CodeGen; only
+  this.get_component(...)/<actor-or-object-expr>.get_component(...) exist.
+  New test file tests/get_component_parity_tests.cpp (NEW, per 9b's own
+  plan text): a Holder/Target class pair compiled/interpreted in all FOUR
+  combinations (II/NI/IN/NN across the holder-native x target-native axes,
+  8 classes total, one compiled namespace per non-II combo), each Holder's
+  start() does this.get_component(type_of(TargetX)), a cross-object field
+  read-modify-write, and a cross-object method call whose return value it
+  stores -- asserts identical (value=16, result=16) results across all 4
+  combinations. 38 checks. Registered in CMakeLists.txt
+  (get_component_parity_tests target).
+  A REAL DESIGN NUANCE FOUND WHILE WRITING THIS TEST (not a bug -- a
+  documented consequence of Phase 5's own design, newly OBSERVABLE now that
+  get_component cross-object writes into a compiled target are reachable
+  from generated code for the first time): NativeScriptComponent's
+  interpreted mirror (obj_->fields, what drawInspector()/object() show) is
+  only refreshed around THAT component's OWN hook calls (push before,
+  pull after) -- a cross-object write landing in its native_ instance via
+  another script's get_component() is immediately visible to ANY script
+  code reading it back (since script reads always go through
+  CompiledClassInfo's live accessor, never through obj_), but the
+  INSPECTOR-facing mirror stays stale until this component's own next
+  hook runs. A component with no update() (only start()) could show a
+  permanently-stale Inspector value for a field something else writes to
+  every frame. This does not affect gameplay/script correctness (proven by
+  this sub-phase's own parity test, which reads the live accessor, not the
+  mirror) -- only Inspector-during-Play display freshness for cross-object
+  writes specifically. Not fixed here (would need a bigger design: push-
+  on-every-external-write instead of batching around this component's own
+  hook cycle, a real performance/correctness tradeoff) -- flagged here for
+  a future task or an explicit user decision, per the "make it 1:1, no
+  exceptions" directive obligating me to surface rather than quietly work
+  around this.
+  Verification performed: `powershell -ExecutionPolicy Bypass -File
+  scripts\build.ps1 Debug` built clean; ran all 18 test executables
+  directly (get_component_parity_tests included) -- all passed, zero
+  regressions.
+  Files touched this sub-phase: src/script/Runtime.h/.cpp (modified:
+  actorMember moved here), src/script/Interpreter.cpp (modified:
+  actorMember now a thin wrapper), src/script/ObjectDispatch.h/.cpp
+  (modified: getValueMember/trySetValueMember/callValueMethod +
+  getComponentOn added), src/script/CodeGen.h/.cpp (modified:
+  knownClassNames parameter; this.get_component + general-receiver
+  call/member-read/member-write/two-level-Actor-write all now real codegen
+  instead of refusals), src/editor/ScriptBuild.cpp (modified: passes
+  known class names to generateClass()), tests/codegen_tests.cpp (modified:
+  11 new scenarios + 1 updated expectRefused), tests/
+  get_component_parity_tests.cpp (new), CMakeLists.txt (modified: new
+  get_component_parity_tests target).
+  NOT YET COMMITTED to git as of writing this entry -- see next action.
+  Next step: commit + push sub-phase 9b, then continue to 9c (Camera.main
+  completeness in CodeGen: read via TypeRef member access + assignment).
+===========================================================================

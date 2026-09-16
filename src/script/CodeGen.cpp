@@ -149,7 +149,8 @@ struct FnCtx {
 
 class Gen {
 public:
-    explicit Gen(const ClassDecl& decl) : decl_(decl) {
+    Gen(const ClassDecl& decl, const std::unordered_set<std::string>& knownClassNames)
+        : decl_(decl), knownClassNames_(knownClassNames) {
         for (const auto& f : decl_.fields)
             fieldNames_.insert(f.name);
         for (const auto& f : decl_.functions)
@@ -202,6 +203,7 @@ private:
                   int indent, int line);
 
     const ClassDecl& decl_;
+    const std::unordered_set<std::string>& knownClassNames_;
     std::unordered_set<std::string> fieldNames_;
     std::unordered_set<std::string> funcNames_;
     std::string err_;
@@ -268,14 +270,15 @@ std::string Gen::expr(const Expr& e, FnCtx& fc) {
                 return "this->" + fieldMember(n);
             if (n == "transform" || n == "actor")
                 return "crate::script::Value::ActorRef(owner_)";
-            // A bare type name evaluates to a TypeRef. Phase 2 only knows
-            // about this class's own name and the hardcoded built-ins the
-            // interpreter itself hardcodes (Interpreter.cpp's Identifier
-            // case) -- anything else would need the cross-class type table
-            // (Phase 4/5).
+            // A bare type name evaluates to a TypeRef: this class's own
+            // name, the hardcoded built-ins the interpreter itself
+            // hardcodes (Interpreter.cpp's Identifier case), or (Phase 9b)
+            // any OTHER script class name known to ScriptSystem at build
+            // time -- e.g. `type_of(SomeOtherScript)` for a
+            // get_component(type_of(...)) call.
             static const std::unordered_set<std::string> kBuiltinTypeNames = {
                 "Actor", "Actor2D", "Actor3D", "Vector2", "Vector3", "Fog", "Camera"};
-            if (n == decl_.name || kBuiltinTypeNames.count(n))
+            if (n == decl_.name || kBuiltinTypeNames.count(n) || knownClassNames_.count(n))
                 return "crate::script::Value::Type(" + cppStringLiteral(n) + ")";
             // A bare reference to one of this class's own declared methods,
             // used as a first-class value rather than immediately called
@@ -536,44 +539,68 @@ std::string Gen::expr(const Expr& e, FnCtx& fc) {
                         out += "})";
                         return out;
                     }
+                    if (method == "get_component") {
+                        // this.get_component(...) is semantically identical
+                        // to this.actor.get_component(...) -- both just need
+                        // owner_ -- so route through the same generic
+                        // dispatcher a general Actor receiver uses (Phase
+                        // 9b), rather than duplicating the ctx_->getComponent
+                        // call inline.
+                        std::vector<std::string> args;
+                        for (const auto& a : e.items) {
+                            args.push_back(expr(*a, fc));
+                            if (!ok())
+                                return "";
+                        }
+                        std::string out = "crate::script::callValueMethod(ctx_, "
+                                          "crate::script::Value::ActorRef(owner_), "
+                                          "\"get_component\", std::vector<crate::script::Value>{";
+                        for (size_t i = 0; i < args.size(); ++i) {
+                            if (i)
+                                out += ", ";
+                            out += "(" + args[i] + ")";
+                        }
+                        out += "}, " + std::to_string(e.line) + ")";
+                        return out;
+                    }
                     fail("this." + method +
-                             "(...) is not supported yet (get_component / signals need Phase 5)",
+                             "(...) is not supported yet (signals / this.base need Phase 5)",
                          e.line);
                     return "";
                 }
 
-                // General receiver: only a small, fixed set of universal
-                // methods is supported without the Phase 5 reflection table.
+                // General receiver: kind isn't known until runtime (could be
+                // a get_component() result, a field holding an Actor
+                // reference, a Vector, an Array, ...) -- dispatch generically
+                // via callValueMethod (Phase 9b), which mirrors
+                // Interpreter::evalCall's own post-special-case fallback
+                // over Object/Actor/Array receivers, plus the universal
+                // .str() any value supports.
                 std::string objText = expr(objExpr, fc);
                 if (!ok())
                     return "";
-                if (method == "str")
-                    return "crate::script::Value::Str((" + objText + ").str())";
-                if (method == "length")
-                    return "crate::script::arrayLength((" + objText + "))";
-                if (method == "add") {
-                    if (e.items.size() != 1) {
-                        fail("array.add(...) expects exactly one argument", e.line);
-                        return "";
-                    }
-                    std::string item = expr(*e.items[0], fc);
+                std::vector<std::string> args;
+                for (const auto& a : e.items) {
+                    args.push_back(expr(*a, fc));
                     if (!ok())
                         return "";
-                    std::string tmp = freshTemp("recv");
-                    std::ostringstream o;
-                    o << "[&]() -> crate::script::Value {\n";
-                    o << ind(1) << "crate::script::Value " << tmp << " = (" << objText << ");\n";
-                    o << ind(1) << "if (!crate::script::arrayAdd(" << tmp << ", (" << item
-                      << ")))\n";
-                    o << ind(2) << "throw crate::script::RuntimeError(\"no method 'add'\", "
-                      << e.line << ");\n";
-                    o << ind(1) << "return crate::script::Value::Null_();\n";
-                    o << ind(0) << "}()";
-                    return o.str();
                 }
-                fail("method '" + method + "' is not supported yet on a general expression (Phase 5)",
-                     e.line);
-                return "";
+                std::string tmp = freshTemp("recv");
+                std::ostringstream o;
+                o << "[&]() -> crate::script::Value {\n";
+                o << ind(1) << "crate::script::Value " << tmp << " = (" << objText << ");\n";
+                o << ind(1) << "std::vector<crate::script::Value> " << tmp << "_args = {";
+                for (size_t i = 0; i < args.size(); ++i) {
+                    if (i)
+                        o << ", ";
+                    o << "(" << args[i] << ")";
+                }
+                o << "};\n";
+                o << ind(1) << "return crate::script::callValueMethod(ctx_, " << tmp << ", "
+                  << cppStringLiteral(method) << ", std::move(" << tmp << "_args), " << e.line
+                  << ");\n";
+                o << ind(0) << "}()";
+                return o.str();
             }
 
             fail("expression is not callable", e.line);
@@ -625,14 +652,18 @@ std::string Gen::expr(const Expr& e, FnCtx& fc) {
             std::string objText = expr(objExpr, fc);
             if (!ok())
                 return "";
-            if (name == "x" || name == "y" || name == "z")
-                return "crate::script::Value::Float(crate::script::vfield((" + objText + "), " +
-                       cppStringLiteral(name) + "))";
-            if (name == "length")
-                return "crate::script::arrayLength((" + objText + "))";
-            fail("member '" + name + "' is not supported yet on a general expression (Phase 5)",
-                 e.line);
-            return "";
+            // General receiver: dispatch generically via getValueMember
+            // (Phase 9b), which mirrors Interpreter::evalMember's own
+            // post-special-case fallback over Object (fields/actor/signal/
+            // bound-method)/Actor (position/rotation/scale/forward/right/
+            // up/name)/Array (.length) receivers -- this also subsumes the
+            // old narrow `.x/.y/.z`-via-vfield special case (vfield()
+            // silently returns 0.0 for a non-vector or missing field,
+            // whereas the interpreter always throws for a missing member on
+            // a general Object receiver -- getValueMember matches the
+            // interpreter, not the old shortcut).
+            return "crate::script::getValueMember((" + objText + "), " + cppStringLiteral(name) +
+                   ", " + std::to_string(e.line) + ")";
         }
 
         case ExprKind::Index: {
@@ -673,12 +704,41 @@ bool Gen::assignTo(const Expr& target, const std::string& valueExpr, FnCtx& fc, 
     if (target.kind == ExprKind::Member && target.a && target.a->kind == ExprKind::Member &&
         (target.strVal == "x" || target.strVal == "y" || target.strVal == "z")) {
         const Expr& mid = *target.a;
-        if (isTransformField(mid.strVal) && isTransformOrActorIdent(*mid.a)) {
+        if (isTransformField(mid.strVal)) {
             std::string f = mid.strVal == "position" ? "position"
                             : mid.strVal == "rotation" ? "rotationEuler"
                                                         : "scale";
-            out << ind(indent) << "owner_->transform()." << f << "." << target.strVal
+            if (isTransformOrActorIdent(*mid.a)) {
+                out << ind(indent) << "owner_->transform()." << f << "." << target.strVal
+                    << " = (float)(" << valueExpr << ").num();\n";
+                return true;
+            }
+            // General Actor-typed base (Phase 9b), e.g.
+            // someActorField.position.x = v: <expr>.position returns a
+            // FRESH Vector3 copy (see Runtime::actorMember), so a plain
+            // member-write on it would be silently lost -- evaluate the
+            // base once and, if it's an Actor, route straight into its
+            // Transform, mirroring Interpreter::assign()'s identical
+            // special case (also not restricted to a bare `transform`/
+            // `actor` identifier there). A non-Actor base with a field
+            // literally named position/rotation/scale is not supported
+            // here (an exotic case the interpreter itself only reaches via
+            // a triple re-evaluation fallback quirk of its own -- not worth
+            // reproducing bit-for-bit).
+            std::string baseText = expr(*mid.a, fc);
+            if (!ok())
+                return false;
+            std::string tmp = freshTemp("actorw");
+            out << ind(indent) << "{\n";
+            out << ind(indent + 1) << "crate::script::Value " << tmp << " = (" << baseText << ");\n";
+            out << ind(indent + 1) << "if (" << tmp << ".t != crate::script::Value::T::Actor || !"
+                << tmp << ".actor)\n";
+            out << ind(indent + 2)
+                << "throw crate::script::RuntimeError(\"cannot assign '." << target.strVal
+                << "' on \" + std::string(" << tmp << ".typeName()), " << line << ");\n";
+            out << ind(indent + 1) << tmp << ".actor->transform()." << f << "." << target.strVal
                 << " = (float)(" << valueExpr << ").num();\n";
+            out << ind(indent) << "}\n";
             return true;
         }
     }
@@ -696,30 +756,28 @@ bool Gen::assignTo(const Expr& target, const std::string& valueExpr, FnCtx& fc, 
             return true;
         }
 
-        if (isTransformOrActorIdent(objExpr) && isTransformField(target.strVal)) {
-            std::string f = target.strVal == "position" ? "position"
-                            : target.strVal == "rotation" ? "rotationEuler"
-                                                           : "scale";
-            std::string tmp = freshTemp("vecw");
-            out << ind(indent) << "{\n";
-            out << ind(indent + 1) << "crate::script::Value " << tmp << " = (" << valueExpr << ");\n";
-            out << ind(indent + 1) << "owner_->transform()." << f << " = crate::Vec3{(float)"
-                << "crate::script::vfield(" << tmp << ", \"x\"), (float)crate::script::vfield(" << tmp
-                << ", \"y\"), (float)crate::script::vfield(" << tmp << ", \"z\")};\n";
-            out << ind(indent) << "}\n";
-            return true;
-        }
-
+        // General receiver: dispatch generically via trySetValueMember
+        // (Phase 9b), which mirrors Interpreter::assign()'s own
+        // post-special-case fallback -- Object (nativePtr live-view write-
+        // back, or a plain fields-map write, which also covers `.x/.y/.z`
+        // on a Vector) and Actor (position/rotation/scale, replacing both
+        // this block's old isTransformOrActorIdent-only fast path AND the
+        // old vfieldSet-based `.x/.y/.z` shortcut -- vfieldSet/vfield
+        // dereference `.obj` unconditionally, which is undefined behavior
+        // for a non-Object Value; trySetValueMember/getObjectMember guard
+        // every receiver kind properly, exactly like the interpreter does).
         std::string objText = expr(objExpr, fc);
         if (!ok())
             return false;
-        if (target.strVal == "x" || target.strVal == "y" || target.strVal == "z") {
-            out << ind(indent) << "crate::script::vfieldSet((" << objText << "), "
-                << cppStringLiteral(target.strVal) << ", (" << valueExpr << ").num());\n";
-            return true;
-        }
-        fail("cannot assign member '" + target.strVal + "' on a general expression (Phase 5)", line);
-        return false;
+        std::string tmp = freshTemp("wrecv");
+        out << ind(indent) << "{\n";
+        out << ind(indent + 1) << "crate::script::Value " << tmp << " = (" << objText << ");\n";
+        out << ind(indent + 1) << "if (!crate::script::trySetValueMember(" << tmp << ", "
+            << cppStringLiteral(target.strVal) << ", (" << valueExpr << ")))\n";
+        out << ind(indent + 2) << "throw crate::script::RuntimeError(\"cannot assign member '"
+            << target.strVal << "' on \" + std::string(" << tmp << ".typeName()), " << line << ");\n";
+        out << ind(indent) << "}\n";
+        return true;
     }
 
     if (target.kind == ExprKind::Identifier) {
@@ -1110,7 +1168,8 @@ bool Gen::stmt(const Stmt& s, FnCtx& fc, std::ostringstream& out, int indent) {
 
 } // namespace
 
-CodeGenResult generateClass(const ClassDecl& decl) {
+CodeGenResult generateClass(const ClassDecl& decl,
+                            const std::unordered_set<std::string>& knownClassNames) {
     CodeGenResult r;
 
     if (decl.isStatic) {
@@ -1149,7 +1208,7 @@ CodeGenResult generateClass(const ClassDecl& decl) {
     // "Mover_Native").
     const std::string exportSuffix = sanitize(decl.name);
 
-    Gen gen(decl);
+    Gen gen(decl, knownClassNames);
 
     // Only override a lifecycle hook when the cScript class actually
     // declares it -- otherwise Component's own default no-op virtual
@@ -1207,7 +1266,8 @@ CodeGenResult generateClass(const ClassDecl& decl) {
     // ---- source ----
     std::ostringstream c;
     c << "#include \"" << cls << ".gen.h\"\n";
-    c << "#include \"script/CompiledClassInfo.h\"\n\n";
+    c << "#include \"script/CompiledClassInfo.h\"\n";
+    c << "#include \"script/ObjectDispatch.h\"\n\n";
     c << "namespace crate::script::generated {\n\n";
     c << cls << "::" << cls << "(crate::script::ScriptContext* ctx, crate::Actor* owner)\n";
     c << "    : ctx_(ctx), owner_(owner) {\n";

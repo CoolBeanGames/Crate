@@ -223,3 +223,9 @@ target_link_libraries(object_dispatch_tests PRIVATE crate_core)
 target_compile_definitions(object_dispatch_tests PRIVATE
     CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
 add_test(NAME object_dispatch_tests COMMAND object_dispatch_tests)
+
+add_executable(get_component_parity_tests tests/get_component_parity_tests.cpp)
+target_link_libraries(get_component_parity_tests PRIVATE crate_core)
+target_compile_definitions(get_component_parity_tests PRIVATE
+    CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
+add_test(NAME get_component_parity_tests COMMAND get_component_parity_tests)
