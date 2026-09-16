@@ -193,56 +193,6 @@
       "isLocked": false,
       "tasks": [
         {
-          "id": "fa544be0c3284e9a96c12489c3b0b568",
-          "index": 75,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "volumetric fog volume",
-          "task": "a square volume where volumetric fog is rendered",
-          "tags": [
-            "rendering",
-            "fog"
-          ],
-          "files": [],
-          "customTypeId": null,
-          "customValues": {},
-          "requirements": [
-            {
-              "id": "3712d96af18942ffa61ced7807ec8b85",
-              "index": 1,
-              "text": "volumetric fog only rendered inside the volume",
-              "isDone": false
-            },
-            {
-              "id": "689a0f6b6c654fb0bd0ee0341bb1a928",
-              "index": 2,
-              "text": "reacts to light",
-              "isDone": false
-            },
-            {
-              "id": "643f9ed973ea4015b1c55d1e2aae60b8",
-              "index": 3,
-              "text": "mutiple shapes (cube,sphere)",
-              "isDone": false
-            }
-          ],
-          "notes": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": true,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-11T07:21:59.4904551+00:00",
-          "updatedAt": "2026-09-11T07:22:50.3831391+00:00"
-        },
-        {
           "id": "7608f2b669544fc8a4a648709650a5df",
           "index": 77,
           "kind": "task",
@@ -3293,6 +3243,55 @@
           "isCollapsed": false,
           "createdAt": "2026-09-11T07:22:55.0394445+00:00",
           "updatedAt": "2026-09-16T00:50:21.2764667+00:00"
+        },
+        {
+          "id": "fa544be0c3284e9a96c12489c3b0b568",
+          "index": 75,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "volumetric fog volume",
+          "task": "a square volume where volumetric fog is rendered",
+          "tags": [
+            "rendering",
+            "fog"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [
+            {
+              "id": "3712d96af18942ffa61ced7807ec8b85",
+              "index": 1,
+              "text": "fog fills the entire world (global, not bounded to a shape - redesigned per user request)",
+              "isDone": true
+            },
+            {
+              "id": "689a0f6b6c654fb0bd0ee0341bb1a928",
+              "index": 2,
+              "text": "reacts to light",
+              "isDone": true
+            }
+          ],
+          "notes": [
+            {
+              "id": "c8c75b0a0df44774be2774b9e5ec8914",
+              "text": "Redesigned mid-task per user request: volumetric fog is now global (applies to the whole scene whenever the component exists, ignoring its actor\u0027s transform) instead of a bounded cube/sphere region. This resolved all the outstanding partial-overlap and sphere bugs by removing the shape-boundary math entirely."
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-11T07:21:59.4904551+00:00",
+          "updatedAt": "2026-09-16T02:34:39.0387114+00:00"
         }
       ]
     }
