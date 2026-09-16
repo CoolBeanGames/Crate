@@ -85,28 +85,30 @@ void emitSignal(ScriptContext* ctx, const std::shared_ptr<ScriptObject>& owner,
 // Interpreter::evalMember/evalCall/assign's own fallback dispatch (the part
 // reached AFTER their syntactic special cases, which depend on identifier
 // text, not the evaluated value, and so stay separately hand-written at
-// each call site) over Object/Actor/Array/Signal/Callable/Camera-TypeRef
-// receivers, so CodeGen has exactly one dispatcher to call regardless of
-// what the receiver turns out to be at runtime. A general TypeRef receiver
-// for anything but Camera.main is not handled here yet (static classes are
-// Phase 9e) -- an unhandled receiver kind throws/returns false exactly as
-// the interpreter's own fallthrough does today for that not-yet-compiled
-// form.
+// each call site) over Object/Actor/Array/Signal/Callable/TypeRef
+// (Camera.main, and -- Phase 9e -- any `static class`'s singleton via
+// ctx->getStatic) receivers, so CodeGen has exactly one dispatcher to call
+// regardless of what the receiver turns out to be at runtime.
 
 // Member read. Throws RuntimeError for a null/unsupported receiver or an
 // unknown member (matches Interpreter::evalMember's fail-fast contract).
-// `callerOwner` is the CALLING script's own actor (generated code's
-// `owner_`) -- needed only for Camera.main (Phase 9c): unlike every other
-// receiver kind, a Camera TypeRef Value carries no actor of its own to
-// search from, so mainCameraFrom() walks up from the caller instead,
-// exactly like Interpreter::evalMember's own TypeRef "Camera"+"main"
-// branch (which uses self_->owner) does.
-Value getValueMember(const Value& v, const std::string& name, int line, crate::Actor* callerOwner);
+// `ctx` is needed for a TypeRef receiver that names a `static class`
+// (ctx->getStatic) -- pass nullptr only when the caller can prove `v` will
+// never be such a TypeRef (no CodeGen call site does; every one has a
+// ctx_ in scope). `callerOwner` is the CALLING script's own actor
+// (generated code's `owner_`) -- needed only for Camera.main (Phase 9c):
+// unlike every other receiver kind, a Camera TypeRef Value carries no
+// actor of its own to search from, so mainCameraFrom() walks up from the
+// caller instead, exactly like Interpreter::evalMember's own TypeRef
+// "Camera"+"main" branch (which uses self_->owner) does.
+Value getValueMember(ScriptContext* ctx, const Value& v, const std::string& name, int line,
+                     crate::Actor* callerOwner);
 
 // Member write. Returns false (does not throw) if `v`'s receiver kind or
 // `name` isn't recognized -- caller produces its own appropriately-worded
-// RuntimeError, matching trySetObjectMember's contract.
-bool trySetValueMember(const Value& v, const std::string& name, const Value& val);
+// RuntimeError, matching trySetObjectMember's contract. `ctx` is needed for
+// the same static-class TypeRef case as getValueMember.
+bool trySetValueMember(ScriptContext* ctx, const Value& v, const std::string& name, const Value& val);
 
 // Method call: Object (declared method / get_component / the Godot-3
 // signal shortcuts, all via callObjectMethod), Actor (get_component only),

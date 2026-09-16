@@ -8,6 +8,7 @@
 #include "scene/ComponentRegistry.h"
 #include "script/Format.h"
 #include "script/Lexer.h"
+#include "script/NativeClassRegistry.h"
 #include "script/NativeScriptComponent.h"
 #include "script/ObjectDispatch.h"
 #include "script/Parser.h"
@@ -216,10 +217,32 @@ void ScriptSystem::reload() {
     rebuildTypeDocs();
 }
 
+void ScriptSystem::destroyNativeStaticIfAny(const std::string& className) {
+    auto it = nativeStatics_.find(className);
+    if (it == nativeStatics_.end())
+        return;
+    if (it->second.instance && it->second.destroy)
+        it->second.destroy(it->second.instance);
+    nativeStatics_.erase(it);
+}
+
 void ScriptSystem::rebuildStatic(const std::string& className) {
     auto it = types_.find(className);
     if (it == types_.end() || !it->second->isStatic)
         return;
+    // Always drop any existing native instance first -- whether we're
+    // about to construct a fresh native one (a rebuild) or fall back to
+    // interpreted (its namespace just unloaded), the OLD native instance
+    // must never survive this call, or a namespace unload would leave
+    // nativeStatics_ pointing at soon-to-be-freed DLL memory.
+    destroyNativeStaticIfAny(className);
+    if (const NativeClassExport* exp = NativeClassRegistry::get().find(className); exp && exp->isStatic) {
+        void* inst = exp->createStatic(&ctx_);
+        const CompiledClassInfo* ci = exp->classInfo();
+        nativeStatics_[className] = {inst, exp->destroyStatic};
+        statics_[className] = (ci && ci->selfView) ? ci->selfView(inst) : nullptr;
+        return;
+    }
     statics_[className] = Interpreter::instantiate(&ctx_, it->second.get(), nullptr);
 }
 
@@ -281,11 +304,40 @@ void ScriptSystem::resetInput() {
         obj->connections.clear();
 }
 
+namespace {
+// Calls a lifecycle hook on a static's ScriptObject, whichever kind it is
+// (Phase 9e) -- REAL BUG FIX, same class as dispatchInput()'s (Phase 9d):
+// before this, a NATIVE static's start/update/physics_update NEVER ran at
+// all, since Interpreter::call() silently bails out (self_->cls == nullptr
+// for a compiled instance) instead of dispatching through the reflection
+// table. A missing hook is a silent no-op for EITHER kind, matching
+// Interpreter::call()'s own required=false default and CodeGen's
+// hasStart/hasUpdate/hasPhysicsUpdate-gated overrides.
+void callStaticHook(ScriptContext* ctx, const std::shared_ptr<ScriptObject>& obj,
+                    const std::string& method, std::vector<Value> args) {
+    if (!obj)
+        return;
+    if (obj->cls) {
+        Interpreter(ctx, obj).call(method, std::move(args)); // unchanged: resumable
+        return;
+    }
+    if (obj->nativePtr && obj->compiledInfo) {
+        const CompiledClassInfo* ci = obj->compiledInfo;
+        for (size_t i = 0; i < ci->methodCount; ++i)
+            if (ci->methods[i].name == method) {
+                ci->methods[i].invoke(obj->nativePtr, ctx, std::move(args));
+                return;
+            }
+        // not declared -- silent no-op, matching the interpreted path
+    }
+}
+} // namespace
+
 void ScriptSystem::startStatics() {
     resetStatics();
     for (auto& [name, obj] : statics_) {
         try {
-            Interpreter(&ctx_, obj).call("start");
+            callStaticHook(&ctx_, obj, "start", {});
         } catch (const std::exception& ex) {
             CR_ERROR("script", name + ".start (static): " + ex.what());
         }
@@ -295,7 +347,7 @@ void ScriptSystem::startStatics() {
 void ScriptSystem::tickStatics(float dt) {
     for (auto& [name, obj] : statics_) {
         try {
-            Interpreter(&ctx_, obj).call("update", {Value::Float(dt)});
+            callStaticHook(&ctx_, obj, "update", {Value::Float(dt)});
         } catch (const std::exception& ex) {
             CR_ERROR("script", name + ".update (static): " + ex.what());
         }
@@ -305,7 +357,7 @@ void ScriptSystem::tickStatics(float dt) {
 void ScriptSystem::physicsStatics(float dt) {
     for (auto& [name, obj] : statics_) {
         try {
-            Interpreter(&ctx_, obj).call("physics_update", {Value::Float(dt)});
+            callStaticHook(&ctx_, obj, "physics_update", {Value::Float(dt)});
         } catch (const std::exception&) {
         }
     }

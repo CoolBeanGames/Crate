@@ -2054,18 +2054,36 @@ void EditorApp::setPlaying(bool playing) {
         scene_ = std::move(playBackup_);
         playBackup_ = Scene("");
         scene_.select(nullptr);
+        (void)selName;
+        // scene_ has now been fully replaced -- every native COMPONENT
+        // instance from the just-ended Play session is gone (the
+        // moved-from playBackup_ that WAS scene_ is destroyed on
+        // reassignment above). Only now is it safe to unload the native
+        // modules those instances' code lived in -- see transpiration.txt's
+        // Phase 4 ordering-hazard note: never unload a namespace's DLL
+        // while a live instance of it still exists anywhere. unloadAll()
+        // also restores every affected class's interpreted registration,
+        // so Add-Component keeps offering them.
+        //
+        // unloadAll() MUST run BEFORE this explicit resetStatics() call
+        // (Phase 9e), not after: a `static class` singleton's instance is
+        // owned by ScriptSystem itself (statics_/nativeStatics_), NOT by
+        // the scene tree, so it survives the scene_ reassignment above
+        // completely untouched -- if resetStatics() ran first (as it did
+        // before Phase 9e, when no static could ever be native), it would
+        // find the about-to-be-unloaded namespace's native export STILL
+        // registered and rebuild NATIVELY right before unloadAll() yanked
+        // that DLL out from under it, leaving a dangling native pointer (a
+        // REAL crash caught by static_class_parity_tests.cpp's cleanup
+        // path -- see NativeClassRegistry::unloadNamespace(), which now
+        // ALSO calls resetStatics() itself, internally, before freeing
+        // each namespace's DLL -- this explicit call is now belt-and-
+        // braces, guaranteeing every static (not just ones tied to a
+        // namespace that happened to unload) gets a truly fresh instance
+        // on every Stop).
+        script::NativeClassRegistry::get().unloadAll();
         script::ScriptSystem::get().resetStatics();
         script::ScriptSystem::get().resetInput();
-        (void)selName;
-        // scene_ has now been fully replaced -- every native component from
-        // the just-ended Play session is gone (the moved-from playBackup_
-        // that WAS scene_ is destroyed on reassignment above). Only now is
-        // it safe to unload the native modules those instances' code lived
-        // in -- see transpiration.txt's Phase 4 ordering-hazard note: never
-        // unload a namespace's DLL while a live instance of it still
-        // exists anywhere. unloadAll() also restores every affected class's
-        // interpreted registration, so Add-Component keeps offering them.
-        script::NativeClassRegistry::get().unloadAll();
         scriptEditor_.setPlaying(false);
         playing_ = false;
         CR_GAME("play", "--- Play stopped ---");

@@ -748,18 +748,20 @@ std::string Gen::expr(const Expr& e, FnCtx& fc) {
             if (!ok())
                 return "";
             // General receiver: dispatch generically via getValueMember
-            // (Phase 9b/9c), which mirrors Interpreter::evalMember's own
+            // (Phase 9b/9c/9e), which mirrors Interpreter::evalMember's own
             // post-special-case fallback over Object (fields/actor/signal/
             // bound-method)/Actor (position/rotation/scale/forward/right/
-            // up/name)/Array (.length)/Camera.main receivers -- this also
-            // subsumes the old narrow `.x/.y/.z`-via-vfield special case
-            // (vfield() silently returns 0.0 for a non-vector or missing
-            // field, whereas the interpreter always throws for a missing
-            // member on a general Object receiver -- getValueMember matches
-            // the interpreter, not the old shortcut). `owner_` is passed
-            // through for Camera.main's own use (see ObjectDispatch.h) --
-            // harmless for every other receiver kind, which ignores it.
-            return "crate::script::getValueMember((" + objText + "), " + cppStringLiteral(name) +
+            // up/name)/Array (.length)/TypeRef (Camera.main, or any
+            // `static class`'s field via ctx_->getStatic) receivers -- this
+            // also subsumes the old narrow `.x/.y/.z`-via-vfield special
+            // case (vfield() silently returns 0.0 for a non-vector or
+            // missing field, whereas the interpreter always throws for a
+            // missing member on a general Object receiver -- getValueMember
+            // matches the interpreter, not the old shortcut). `owner_` is
+            // passed through for Camera.main's own use (see
+            // ObjectDispatch.h) -- harmless for every other receiver kind,
+            // which ignores it.
+            return "crate::script::getValueMember(ctx_, (" + objText + "), " + cppStringLiteral(name) +
                    ", " + std::to_string(e.line) + ", owner_)";
         }
 
@@ -854,22 +856,24 @@ bool Gen::assignTo(const Expr& target, const std::string& valueExpr, FnCtx& fc, 
         }
 
         // General receiver: dispatch generically via trySetValueMember
-        // (Phase 9b), which mirrors Interpreter::assign()'s own
+        // (Phase 9b/9e), which mirrors Interpreter::assign()'s own
         // post-special-case fallback -- Object (nativePtr live-view write-
         // back, or a plain fields-map write, which also covers `.x/.y/.z`
-        // on a Vector) and Actor (position/rotation/scale, replacing both
-        // this block's old isTransformOrActorIdent-only fast path AND the
-        // old vfieldSet-based `.x/.y/.z` shortcut -- vfieldSet/vfield
+        // on a Vector), Actor (position/rotation/scale, replacing both this
+        // block's old isTransformOrActorIdent-only fast path AND the old
+        // vfieldSet-based `.x/.y/.z` shortcut -- vfieldSet/vfield
         // dereference `.obj` unconditionally, which is undefined behavior
         // for a non-Object Value; trySetValueMember/getObjectMember guard
-        // every receiver kind properly, exactly like the interpreter does).
+        // every receiver kind properly, exactly like the interpreter does),
+        // and TypeRef (Camera.main, or any `static class`'s field via
+        // ctx_->getStatic).
         std::string objText = expr(objExpr, fc);
         if (!ok())
             return false;
         std::string tmp = freshTemp("wrecv");
         out << ind(indent) << "{\n";
         out << ind(indent + 1) << "crate::script::Value " << tmp << " = (" << objText << ");\n";
-        out << ind(indent + 1) << "if (!crate::script::trySetValueMember(" << tmp << ", "
+        out << ind(indent + 1) << "if (!crate::script::trySetValueMember(ctx_, " << tmp << ", "
             << cppStringLiteral(target.strVal) << ", (" << valueExpr << ")))\n";
         out << ind(indent + 2) << "throw crate::script::RuntimeError(\"cannot assign member '"
             << target.strVal << "' on \" + std::string(" << tmp << ".typeName()), " << line << ");\n";
@@ -1269,16 +1273,18 @@ CodeGenResult generateClass(const ClassDecl& decl,
                             const std::unordered_set<std::string>& knownClassNames) {
     CodeGenResult r;
 
-    if (decl.isStatic) {
-        r.error = "static classes are not supported yet (Phase 4/5 / ScriptSystem statics registry)";
-        return r;
-    }
     if (decl.isAbstract) {
         r.error = "abstract classes are not compiled to native code (they are never instantiated "
                   "directly)";
         return r;
     }
-    if (decl.base != "Actor" && decl.base != "Actor2D" && decl.base != "Actor3D") {
+    // A static class's `base` is vestigial (defaults to "Actor" even
+    // though a static singleton is never instantiated as any kind of
+    // Actor at all -- Interpreter::instantiate(ctx, cls, owner=nullptr)
+    // never consults it) -- skip the base check entirely for one (Phase
+    // 9e); only a Component-shaped class needs a real Actor/Actor2D/
+    // Actor3D base.
+    if (!decl.isStatic && decl.base != "Actor" && decl.base != "Actor2D" && decl.base != "Actor3D") {
         r.error = "class '" + decl.name + "' has base '" + decl.base +
                   "' -- only a direct Actor/Actor2D/Actor3D base is supported yet (script-to-script "
                   "inheritance needs Phase 4/5's cross-class registry)";
@@ -1307,12 +1313,33 @@ CodeGenResult generateClass(const ClassDecl& decl,
     // declares it -- otherwise Component's own default no-op virtual
     // (Component.h: `virtual void start() {}` etc.) is inherited as-is,
     // exactly mirroring ScriptComponent::runHook()'s "missing hook is a
-    // silent no-op, not an error" behavior.
+    // silent no-op, not an error" behavior. A static class has no such
+    // virtual dispatch at all (see below) -- ScriptSystem's native-aware
+    // startStatics/tickStatics/physicsStatics call fn_start/fn_update/
+    // fn_physics_update directly, by name, through the SAME reflection
+    // table every other method goes through, silently skipping a hook
+    // that isn't in kMethods_<suffix> at all -- so hasStart/hasUpdate/
+    // hasPhysicsUpdate only matter for the Component-shaped lifecycle
+    // OVERRIDE declarations below, not for whether the hook works.
     const bool hasStart = gen.isOwnFunc("start");
     const bool hasUpdate = gen.isOwnFunc("update");
     const bool hasPhysicsUpdate = gen.isOwnFunc("physics_update");
 
     // ---- header ----
+    // A static class's generated type does NOT inherit crate::Component at
+    // all (Phase 9e) -- it's never instantiated as, or attached to, an
+    // Actor; ScriptSystem's statics_ map ticks it directly by name via the
+    // reflection table, exactly like the interpreted path already does via
+    // Interpreter::instantiate(ctx, cls, owner=nullptr) + Interpreter::
+    // call("start"/"update"/"physics_update"). `owner_` is still declared
+    // (always nullptr, never assigned from a constructor parameter) purely
+    // so every existing owner_-referencing codegen path (transform/actor
+    // bare identifiers, this.actor, get_component, Camera.main) works
+    // completely UNCHANGED for a static class too, with zero extra
+    // special-casing anywhere else in this file -- exactly matching the
+    // interpreter's own leniency (self_->owner is null for a static, and
+    // reading e.g. `this.actor` there is a valid, if useless, Value, not
+    // an error).
     std::ostringstream h;
     h << "#pragma once\n";
     h << "#include \"script/Runtime.h\"\n";
@@ -1322,20 +1349,26 @@ CodeGenResult generateClass(const ClassDecl& decl,
     h << "#include \"core/Math.h\"\n\n";
     h << "#include <memory>\n#include <string>\n#include <unordered_map>\n#include <vector>\n\n";
     h << "namespace crate::script::generated {\n\n";
-    h << "class " << cls << " : public crate::Component {\n";
-    h << "public:\n";
-    h << "    " << cls << "(crate::script::ScriptContext* ctx, crate::Actor* owner);\n\n";
-    h << "    const char* typeName() const override { return " << cppStringLiteral(decl.name)
-      << "; }\n";
-    if (hasStart)
-        h << "    void start() override;\n";
-    if (hasUpdate)
-        h << "    void update(float dt) override;\n";
-    if (hasPhysicsUpdate)
-        h << "    void physicsUpdate(float dt) override;\n";
-    h << "    std::unique_ptr<crate::Component> clone() const override {\n";
-    h << "        return std::make_unique<" << cls << ">(ctx_, owner_);\n";
-    h << "    }\n\n";
+    if (decl.isStatic) {
+        h << "class " << cls << " {\n";
+        h << "public:\n";
+        h << "    explicit " << cls << "(crate::script::ScriptContext* ctx);\n\n";
+    } else {
+        h << "class " << cls << " : public crate::Component {\n";
+        h << "public:\n";
+        h << "    " << cls << "(crate::script::ScriptContext* ctx, crate::Actor* owner);\n\n";
+        h << "    const char* typeName() const override { return " << cppStringLiteral(decl.name)
+          << "; }\n";
+        if (hasStart)
+            h << "    void start() override;\n";
+        if (hasUpdate)
+            h << "    void update(float dt) override;\n";
+        if (hasPhysicsUpdate)
+            h << "    void physicsUpdate(float dt) override;\n";
+        h << "    std::unique_ptr<crate::Component> clone() const override {\n";
+        h << "        return std::make_unique<" << cls << ">(ctx_, owner_);\n";
+        h << "    }\n\n";
+    }
     for (const auto& fn : decl.functions)
         h << "    crate::script::Value " << methodName(fn.name)
           << "(std::vector<crate::script::Value> args);\n";
@@ -1357,7 +1390,7 @@ CodeGenResult generateClass(const ClassDecl& decl,
     h << "    std::shared_ptr<crate::script::ScriptObject> selfView_;\n\n";
     h << "private:\n";
     h << "    crate::script::ScriptContext* ctx_;\n";
-    h << "    crate::Actor* owner_;\n";
+    h << "    crate::Actor* owner_ = nullptr;\n";
     h << "};\n\n";
     h << "} // namespace crate::script::generated\n";
     r.header = h.str();
@@ -1436,12 +1469,17 @@ CodeGenResult generateClass(const ClassDecl& decl,
     c << "} // namespace\n\n";
 
     c << "namespace crate::script::generated {\n\n";
-    c << cls << "::" << cls << "(crate::script::ScriptContext* ctx, crate::Actor* owner)\n";
-    c << "    : ctx_(ctx), owner_(owner) {\n";
+    if (decl.isStatic) {
+        c << cls << "::" << cls << "(crate::script::ScriptContext* ctx)\n";
+        c << "    : ctx_(ctx) {\n";
+    } else {
+        c << cls << "::" << cls << "(crate::script::ScriptContext* ctx, crate::Actor* owner)\n";
+        c << "    : ctx_(ctx), owner_(owner) {\n";
+    }
     c << "    selfView_ = std::make_shared<crate::script::ScriptObject>();\n";
     c << "    selfView_->nativePtr = this;\n";
     c << "    selfView_->compiledInfo = &kClassInfo_" << exportSuffix << ";\n";
-    c << "    selfView_->owner = owner;\n";
+    c << "    selfView_->owner = owner_;\n";
     {
         FnCtx fieldScope;
         fieldScope.push();
@@ -1492,50 +1530,76 @@ CodeGenResult generateClass(const ClassDecl& decl,
         c << "}\n\n";
     }
 
-    // Lifecycle overrides: each forwards to its own fn_<hook>() and swallows
-    // any RuntimeError/exception (reporting via ctx_->warn) rather than
-    // letting it escape into engine frame-loop code -- mirroring
-    // ScriptComponent::runHook()'s try/catch, which exists specifically so
-    // one broken script can't crash the whole engine. Unlike runHook(), this
-    // does not latch a persistent error state that suppresses future calls
-    // (that richer UX is Phase 5's NativeScriptComponent's job); every frame
-    // gets a fresh attempt.
-    auto emitHook = [&](const char* cppName, const char* scriptMethod, bool hasDt) {
-        c << "void " << cls << "::" << cppName << "(" << (hasDt ? "float dt" : "") << ") {\n";
-        c << "    try {\n";
-        c << "        " << methodName(scriptMethod) << "(std::vector<crate::script::Value>{";
-        if (hasDt)
-            c << "crate::script::Value::Float((double)dt)";
-        c << "});\n";
-        c << "    } catch (const std::exception& ex) {\n";
-        c << "        if (ctx_ && ctx_->warn) ctx_->warn(std::string(" << cppStringLiteral(decl.name)
-          << ") + \".\" + " << cppStringLiteral(scriptMethod) << " + \": \" + ex.what());\n";
-        c << "    }\n";
-        c << "}\n\n";
-    };
-    if (hasStart)
-        emitHook("start", "start", false);
-    if (hasUpdate)
-        emitHook("update", "update", true);
-    if (hasPhysicsUpdate)
-        emitHook("physicsUpdate", "physics_update", true);
+    // Lifecycle overrides (Component-shaped classes only): each forwards to
+    // its own fn_<hook>() and swallows any RuntimeError/exception
+    // (reporting via ctx_->warn) rather than letting it escape into engine
+    // frame-loop code -- mirroring ScriptComponent::runHook()'s try/catch,
+    // which exists specifically so one broken script can't crash the whole
+    // engine. Unlike runHook(), this does not latch a persistent error
+    // state that suppresses future calls (that richer UX is Phase 5's
+    // NativeScriptComponent's job); every frame gets a fresh attempt. A
+    // static class has no Component to override virtuals on at all -- its
+    // start/update/physics_update (if declared) are just ordinary fn_<hook>
+    // methods already emitted above, reached by ScriptSystem's native-aware
+    // statics ticking through the SAME kMethods_<suffix> reflection table
+    // every other method uses (with ITS OWN try/catch around the call,
+    // mirroring the interpreted statics path's existing try/catch --
+    // see ScriptSystem.cpp).
+    if (!decl.isStatic) {
+        auto emitHook = [&](const char* cppName, const char* scriptMethod, bool hasDt) {
+            c << "void " << cls << "::" << cppName << "(" << (hasDt ? "float dt" : "") << ") {\n";
+            c << "    try {\n";
+            c << "        " << methodName(scriptMethod) << "(std::vector<crate::script::Value>{";
+            if (hasDt)
+                c << "crate::script::Value::Float((double)dt)";
+            c << "});\n";
+            c << "    } catch (const std::exception& ex) {\n";
+            c << "        if (ctx_ && ctx_->warn) ctx_->warn(std::string(" << cppStringLiteral(decl.name)
+              << ") + \".\" + " << cppStringLiteral(scriptMethod) << " + \": \" + ex.what());\n";
+            c << "    }\n";
+            c << "}\n\n";
+        };
+        if (hasStart)
+            emitHook("start", "start", false);
+        if (hasUpdate)
+            emitHook("update", "update", true);
+        if (hasPhysicsUpdate)
+            emitHook("physicsUpdate", "physics_update", true);
+    }
 
     c << "} // namespace crate::script::generated\n\n";
 
-    // ---- extern "C" factory ABI (transpiration.txt Phase 4/5) ----
+    // ---- extern "C" factory ABI (transpiration.txt Phase 4/5, static
+    // variant added Phase 9e) ----
     // The reflection table itself was moved above the constructor (Phase
-    // 9d) -- these three functions can stay here at the end regardless,
-    // since they only need crate::script::generated::<cls>'s DECLARATION
-    // (from the header) and kClassInfo_<suffix>'s definition (above both),
-    // not any particular emission order relative to the method bodies.
-    c << "extern \"C\" __declspec(dllexport) crate::Component* CreateInstance_" << exportSuffix
-      << "(crate::script::ScriptContext* ctx, crate::Actor* owner) {\n";
-    c << "    return new crate::script::generated::" << cls << "(ctx, owner);\n";
-    c << "}\n\n";
-    c << "extern \"C\" __declspec(dllexport) void DestroyInstance_" << exportSuffix
-      << "(crate::Component* instance) {\n";
-    c << "    delete instance;\n";
-    c << "}\n\n";
+    // 9d) -- these functions can stay here at the end regardless, since
+    // they only need crate::script::generated::<cls>'s DECLARATION (from
+    // the header) and kClassInfo_<suffix>'s definition (above both), not
+    // any particular emission order relative to the method bodies. A
+    // static class exports CreateStatic_<suffix>/DestroyStatic_<suffix>
+    // (returning/taking a bare void*, no Actor* -- there is none) instead
+    // of CreateInstance_<suffix>/DestroyInstance_<suffix>, so a class can
+    // never be accidentally instantiated the wrong way; NativeModule.cpp
+    // resolves whichever pair is present.
+    if (decl.isStatic) {
+        c << "extern \"C\" __declspec(dllexport) void* CreateStatic_" << exportSuffix
+          << "(crate::script::ScriptContext* ctx) {\n";
+        c << "    return new crate::script::generated::" << cls << "(ctx);\n";
+        c << "}\n\n";
+        c << "extern \"C\" __declspec(dllexport) void DestroyStatic_" << exportSuffix
+          << "(void* instance) {\n";
+        c << "    delete static_cast<crate::script::generated::" << cls << "*>(instance);\n";
+        c << "}\n\n";
+    } else {
+        c << "extern \"C\" __declspec(dllexport) crate::Component* CreateInstance_" << exportSuffix
+          << "(crate::script::ScriptContext* ctx, crate::Actor* owner) {\n";
+        c << "    return new crate::script::generated::" << cls << "(ctx, owner);\n";
+        c << "}\n\n";
+        c << "extern \"C\" __declspec(dllexport) void DestroyInstance_" << exportSuffix
+          << "(crate::Component* instance) {\n";
+        c << "    delete instance;\n";
+        c << "}\n\n";
+    }
     c << "extern \"C\" __declspec(dllexport) const crate::script::CompiledClassInfo* GetClassInfo_"
       << exportSuffix << "() {\n";
     c << "    return &kClassInfo_" << exportSuffix << ";\n";

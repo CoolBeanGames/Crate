@@ -375,11 +375,13 @@ Value Interpreter::evalMember(const Expr& e) {
         return Value::Obj(o);
     }
     if (obj.t == Value::T::TypeRef && ctx_->getStatic) {
-        if (auto so = ctx_->getStatic(obj.s)) {
-            auto it = so->fields.find(name);
-            if (it != so->fields.end())
-                return it->second;
-        }
+        // Kind-agnostic (Phase 9e): a static's singleton may now be a
+        // COMPILED instance (Kind 3), whose data lives behind its
+        // CompiledClassInfo accessor table, never in `fields` at all --
+        // the old direct `so->fields.find(name)` only ever worked for an
+        // interpreted static, silently missing every read on a native one.
+        if (auto so = ctx_->getStatic(obj.s))
+            return crate::script::getObjectMember(so, name, e.line);
     }
 
     throw RuntimeError("cannot read '." + name + "' on " + obj.typeName(), e.line);
@@ -468,10 +470,14 @@ Value Interpreter::evalCall(const Expr& e) {
         if (obj.t == Value::T::Callable && (method == "call" || method == "emit"))
             return invokeCallable(obj, std::move(args), e.line);
 
-        // StaticClass.method(...)  -> call on the static singleton
+        // StaticClass.method(...)  -> call on the static singleton.
+        // Kind-agnostic (Phase 9e) via callObjectMethod -- the old direct
+        // callMethodOn() only ever worked for an interpreted static (it
+        // throws immediately for a Kind-3 object, whose `cls` is always
+        // null).
         if (obj.t == Value::T::TypeRef && ctx_->getStatic) {
             if (auto so = ctx_->getStatic(obj.s))
-                return callMethodOn(so, method, std::move(args), e.line, false);
+                return crate::script::callObjectMethod(ctx_, so, method, std::move(args), e.line);
         }
 
         if (obj.t == Value::T::Object && obj.obj &&
@@ -672,8 +678,11 @@ void Interpreter::assign(const Expr& target, Value v) {
             return;
         }
         if (obj.t == Value::T::TypeRef && ctx_->getStatic) {
+            // Kind-agnostic (Phase 9e): the old direct `so->fields[...] =
+            // v` only ever worked for an interpreted static -- a native
+            // one's `fields` map is never read/written at all.
             if (auto so = ctx_->getStatic(obj.s)) {
-                so->fields[target.strVal] = std::move(v);
+                crate::script::trySetObjectMember(so, target.strVal, v);
                 return;
             }
         }

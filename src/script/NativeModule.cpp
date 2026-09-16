@@ -27,14 +27,24 @@ NativeModule NativeModule::load(const std::string& dllPath, const std::vector<st
     for (const auto& name : classNames) {
         NativeClassExport e;
         e.className = name;
+        e.classInfo = reinterpret_cast<GetClassInfoFn>(GetProcAddress(h, ("GetClassInfo_" + name).c_str()));
+        // A class is EITHER Component-shaped (CreateInstance_X/
+        // DestroyInstance_X) OR static (CreateStatic_X/DestroyStatic_X),
+        // never both -- try both pairs and use whichever CodeGen actually
+        // emitted for this class (Phase 9e), so this loader needs no
+        // separate "is this one static" input from the caller at all.
         e.create = reinterpret_cast<CreateInstanceFn>(GetProcAddress(h, ("CreateInstance_" + name).c_str()));
         e.destroy = reinterpret_cast<DestroyInstanceFn>(GetProcAddress(h, ("DestroyInstance_" + name).c_str()));
-        e.classInfo = reinterpret_cast<GetClassInfoFn>(GetProcAddress(h, ("GetClassInfo_" + name).c_str()));
-        if (!e.create || !e.destroy || !e.classInfo) {
-            mod.error_ = "missing export(s) for class '" + name + "' in '" + dllPath + "'";
+        e.createStatic = reinterpret_cast<CreateStaticFn>(GetProcAddress(h, ("CreateStatic_" + name).c_str()));
+        e.destroyStatic = reinterpret_cast<DestroyStaticFn>(GetProcAddress(h, ("DestroyStatic_" + name).c_str()));
+        const bool hasInstancePair = e.create && e.destroy;
+        const bool hasStaticPair = e.createStatic && e.destroyStatic;
+        if (!e.classInfo || !(hasInstancePair || hasStaticPair) || (hasInstancePair && hasStaticPair)) {
+            mod.error_ = "missing (or ambiguous) export(s) for class '" + name + "' in '" + dllPath + "'";
             FreeLibrary(h);
             return mod;
         }
+        e.isStatic = hasStaticPair;
         exports.push_back(e);
     }
 

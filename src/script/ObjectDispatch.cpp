@@ -264,7 +264,8 @@ void emitSignal(ScriptContext* ctx, const std::shared_ptr<ScriptObject>& owner, 
         invokeCallable(ctx, h, args, line);
 }
 
-Value getValueMember(const Value& v, const std::string& name, int line, crate::Actor* callerOwner) {
+Value getValueMember(ScriptContext* ctx, const Value& v, const std::string& name, int line,
+                     crate::Actor* callerOwner) {
     if (v.t == Value::T::Object && v.obj)
         return getObjectMember(v.obj, name, line);
     if (v.t == Value::T::Actor)
@@ -286,10 +287,20 @@ Value getValueMember(const Value& v, const std::string& name, int line, crate::A
         o->owner = cc->actor();
         return Value::Obj(o);
     }
+    // StaticClassName.field (Phase 9e): resolves ctx->getStatic's singleton
+    // (interpreted or native, Kind-agnostically) then dispatches through
+    // getObjectMember -- NOT the old direct `so->fields.find(name)` this
+    // mirrored before 9e, which only ever worked for an INTERPRETED static
+    // (a native one's data lives behind its CompiledClassInfo accessor
+    // table, never in `fields` at all).
+    if (v.t == Value::T::TypeRef && ctx && ctx->getStatic) {
+        if (auto so = ctx->getStatic(v.s))
+            return getObjectMember(so, name, line);
+    }
     throw RuntimeError("cannot read '." + name + "' on " + v.typeName(), line);
 }
 
-bool trySetValueMember(const Value& v, const std::string& name, const Value& val) {
+bool trySetValueMember(ScriptContext* ctx, const Value& v, const std::string& name, const Value& val) {
     if (v.t == Value::T::Object && v.obj)
         return trySetObjectMember(v.obj, name, val);
     // General Actor-typed receiver write-back: position/rotation/scale,
@@ -325,6 +336,15 @@ bool trySetValueMember(const Value& v, const std::string& name, const Value& val
         activateMainCamera(val.obj->owner, *static_cast<CameraComponent*>(val.obj->nativePtr));
         return true;
     }
+    // StaticClassName.field = v (Phase 9e): same Kind-agnostic fix as the
+    // read side -- routes through trySetObjectMember instead of the old
+    // direct `so->fields[name] = v`, which silently did nothing useful for
+    // a native static.
+    if (v.t == Value::T::TypeRef && ctx && ctx->getStatic) {
+        if (auto so = ctx->getStatic(v.s))
+            return trySetObjectMember(so, name, val);
+        return false;
+    }
     return false;
 }
 
@@ -356,6 +376,14 @@ Value callValueMethod(ScriptContext* ctx, const Value& v, const std::string& met
             return Value::Null_();
         if (method == "length" && v.arr)
             return arrayLength(v);
+    }
+    // StaticClassName.method(...) (Phase 9e): call on the static singleton,
+    // Kind-agnostically via callObjectMethod -- the old direct callMethodOn
+    // only worked on an INTERPRETED static (it throws immediately for a
+    // Kind-3 object, whose `cls` is always null).
+    if (v.t == Value::T::TypeRef && ctx && ctx->getStatic) {
+        if (auto so = ctx->getStatic(v.s))
+            return callObjectMethod(ctx, so, method, std::move(args), line);
     }
     if (method == "str")
         return Value::Str(v.str());

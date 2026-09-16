@@ -14,18 +14,29 @@ namespace crate::script {
 struct ScriptContext;
 
 // Function-pointer types matching the extern "C" ABI CodeGen.cpp emits per
-// class (see transpiration.txt, "Transplation" Phase 4):
-//   CreateInstance_<Class>(ScriptContext*, Actor*) -> Component*
+// class (see transpiration.txt, "Transplation" Phase 4, static variant
+// Phase 9e):
+//   CreateInstance_<Class>(ScriptContext*, Actor*) -> Component*   (Component-shaped)
 //   DestroyInstance_<Class>(Component*) -> void
-//   GetClassInfo_<Class>() -> const CompiledClassInfo*
+//   CreateStatic_<Class>(ScriptContext*) -> void*                 (static class)
+//   DestroyStatic_<Class>(void*) -> void
+//   GetClassInfo_<Class>() -> const CompiledClassInfo*             (either kind)
 using CreateInstanceFn = crate::Component* (*)(ScriptContext*, crate::Actor*);
 using DestroyInstanceFn = void (*)(crate::Component*);
+using CreateStaticFn = void* (*)(ScriptContext*);
+using DestroyStaticFn = void (*)(void*);
 using GetClassInfoFn = const CompiledClassInfo* (*)();
 
 struct NativeClassExport {
     std::string className;
+    bool isStatic = false; // which pair below is populated
+    // Component-shaped exports (isStatic == false):
     CreateInstanceFn create = nullptr;
     DestroyInstanceFn destroy = nullptr;
+    // Static-class exports (isStatic == true):
+    CreateStaticFn createStatic = nullptr;
+    DestroyStaticFn destroyStatic = nullptr;
+    // Populated for either kind.
     GetClassInfoFn classInfo = nullptr;
 };
 

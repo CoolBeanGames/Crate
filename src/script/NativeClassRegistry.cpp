@@ -47,6 +47,17 @@ bool NativeClassRegistry::loadNamespace(const std::string& namespaceName, const 
     auto owned = std::make_unique<NativeModule>(std::move(mod));
     for (const auto& exp : owned->exports()) {
         namespaceOfClass_[exp.className] = namespaceName;
+        // A static class (Phase 9e) is never a crate::Component and can
+        // never be added to an Actor -- ScriptSystem owns its lifecycle
+        // (statics_/nativeStatics_), not ComponentRegistry. ScriptSystem::
+        // startStatics()'s resetStatics() call (which always runs shortly
+        // after this, later in the SAME Play-press sequence -- see
+        // EditorApp.cpp) picks up this now-registered export via
+        // NativeClassRegistry::find() and rebuilds the static natively;
+        // nothing needs to happen here beyond the namespaceOfClass_
+        // bookkeeping above.
+        if (exp.isStatic)
+            continue;
         NativeClassExport captured = exp; // by-value capture: stable across further loads/unloads
         // The interpreted ClassInfo* for this same class name always exists
         // -- ScriptSystem::compile() runs for every loaded script
@@ -78,9 +89,25 @@ void NativeClassRegistry::unloadNamespace(const std::string& namespaceName) {
     if (it == modulesByNamespace_.end())
         return;
     for (const auto& exp : it->second->exports()) {
-        restoreInterpretedRegistration(exp.className);
+        // A static class has no ComponentRegistry entry to restore at all
+        // (Phase 9e).
+        if (!exp.isStatic)
+            restoreInterpretedRegistration(exp.className);
         namespaceOfClass_.erase(exp.className);
     }
+    // MUST run BEFORE modulesByNamespace_.erase() frees the DLL below --
+    // NOT after, and NOT deferred to a later, separate resetStatics() call
+    // by the caller (a real crash was caught here, Phase 9e): a native
+    // static's destroy-function-pointer (ScriptSystem's nativeStatics_)
+    // resolves into THIS module's own code, so it is only valid to call
+    // while the module is still loaded. resetStatics() destroys every
+    // static's OLD instance (native or not) and reconstructs it fresh; by
+    // now namespaceOfClass_ no longer resolves any of THIS namespace's
+    // classes (erased just above), so exactly those correctly fall back to
+    // interpreted -- exactly mirroring restoreInterpretedRegistration's
+    // role for a Component-shaped class, just one level up (ScriptSystem
+    // owns statics_, NativeClassRegistry doesn't reach into it directly).
+    ScriptSystem::get().resetStatics();
     modulesByNamespace_.erase(it); // ~NativeModule() FreeLibrary()s here
 }
 

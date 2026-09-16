@@ -2616,3 +2616,189 @@ entries above.
   Next step: commit + push sub-phase 9d, then continue to 9e (static
   classes compiled natively).
 ===========================================================================
+
+2026-09-16 — SUB-PHASE 9e COMPLETE AND VERIFIED (static classes compiled
+  natively).
+  DESIGN: a static class's generated type does NOT inherit crate::Component
+  at all (bare class, no Actor ever) -- but DELIBERATELY keeps a private
+  `crate::Actor* owner_ = nullptr;` member anyway (never assigned from a
+  constructor parameter) purely so every EXISTING owner_-referencing
+  codegen path (bare transform/actor identifiers, this.actor,
+  get_component, Camera.main's callerOwner passthrough) works completely
+  UNCHANGED for a static class too, with ZERO extra special-casing
+  anywhere else in Gen::expr()/assignTo() -- exactly matching the
+  interpreter's own leniency (self_->owner is null for an interpreted
+  static, and reading e.g. this.actor there is a valid, if useless, Value,
+  not an error). This traded a formally-unused member for avoiding a much
+  larger branch-everywhere refactor, and kept the change surgical.
+  Lifecycle hooks need NO Component-style virtual overrides at all: a
+  static's start/update/physics_update (if declared) are just ordinary
+  fn_<hook> methods, already in kMethods_<suffix> like any other method,
+  reached by ScriptSystem's native-aware statics ticking through that SAME
+  reflection table (with ITS OWN try/catch around the call, mirroring the
+  interpreted statics path's pre-existing try/catch) -- this eliminated an
+  entire category of codegen (the emitHook lambda + Component-override
+  declarations) for the static case.
+  extern "C" ABI: CreateStatic_<suffix>(ScriptContext*) -> void* /
+  DestroyStatic_<suffix>(void*) instead of CreateInstance_<suffix>(ctx,
+  owner) -> Component* / DestroyInstance_<suffix>(Component*) -- distinct
+  names so a class can never be accidentally instantiated the wrong way.
+  NativeModule.cpp auto-detects which pair a class actually exports (tries
+  both, uses whichever resolved, errors if neither or both do) rather than
+  requiring the CALLER to know in advance which classes are static -- kept
+  the loadNamespace()/NativeModule::load() call-site signature (just a
+  vector<string> of class names) UNCHANGED across all 8+ existing call
+  sites (EditorApp.cpp + 7 test files), avoiding an invasive signature
+  change throughout the codebase for this.
+  NativeClassRegistry.cpp: loadNamespace()'s per-export loop skips
+  ComponentRegistry::add() entirely for a static export (statics are never
+  Components); unloadNamespace()'s loop skips restoreInterpretedRegistration
+  (nothing to restore in ComponentRegistry) but still erases
+  namespaceOfClass_, and -- critically, see the crash writeup below -- now
+  also calls ScriptSystem::get().resetStatics() itself, BEFORE
+  modulesByNamespace_.erase() frees the DLL.
+  ScriptSystem.h/.cpp: new private nativeStatics_ map (className ->
+  {raw instance pointer, DestroyStaticFn}) -- statics_ itself only ever
+  holds the canonical ScriptObject wrapper (selfView_ for a native one,
+  matching Phase 9d's identity requirement), never the underlying
+  instance, so something has to own destruction; ScriptSystem does,
+  paralleling how NativeScriptComponent owns a Component-shaped instance's
+  lifetime. rebuildStatic() now: destroys any existing native instance
+  first (unconditionally, via a new destroyNativeStaticIfAny() helper),
+  then checks NativeClassRegistry::get().find(className) -- if a loaded
+  namespace exports a STATIC build for this class, constructs natively
+  (createStatic + classInfo->selfView) and records the raw instance +
+  destroy pointer in nativeStatics_; otherwise (nothing loaded, or the
+  class isn't static) falls back to the ORIGINAL Interpreter::instantiate
+  path, completely unchanged from before Phase 9e.
+  REAL PRE-EXISTING BUG FOUND AND FIXED (same class as dispatchInput()'s
+  in 9d and Interpreter's TypeRef+getStatic bugs below -- found while
+  implementing THIS sub-phase's own explicitly-demanded test, not by
+  review): ScriptSystem::startStatics()/tickStatics()/physicsStatics() ALL
+  called `Interpreter(&ctx_, obj).call(...)` unconditionally for every
+  static -- which silently no-ops (self_->cls == nullptr) for ANY native
+  static, meaning a native static's start/update/physics_update would
+  NEVER have run at all. Fixed with a new callStaticHook() free function
+  (ScriptSystem.cpp) that branches on obj->cls (interpreted, resumable,
+  unchanged) vs obj->nativePtr && obj->compiledInfo (native: looks up the
+  hook by name in the reflection table and invokes it directly if
+  present, else a silent no-op -- matching Interpreter::call()'s own
+  required=false default and CodeGen's hasStart/hasUpdate/
+  hasPhysicsUpdate-gated override pattern).
+  ANOTHER REAL PRE-EXISTING BUG, ALSO NEWLY EXPOSED BY THIS SUB-PHASE (a
+  native static object literally could not exist before now, so this was
+  always latent): Interpreter.cpp's THREE separate TypeRef+ctx_->getStatic
+  branches (evalMember's field read, evalCall's method call, assign()'s
+  field write) all bypassed generic dispatch entirely -- evalMember/
+  assign() read/wrote `so->fields` DIRECTLY (a Kind-3 native static's data
+  lives behind its CompiledClassInfo accessor table, `fields` is never
+  used at all -- every read would silently miss, every write would
+  silently go nowhere useful), and evalCall's method-call branch called
+  the OLD callMethodOn() directly (which throws immediately for
+  obj->cls==nullptr, i.e. ANY native static). Fixed all three to route
+  through crate::script::getObjectMember/trySetObjectMember/
+  callObjectMethod respectively -- the SAME Kind-agnostic dispatchers used
+  everywhere else since Phase 9a, closing the loop so a static's
+  interpreted-vs-native-ness is now invisible to ANY caller, exactly like
+  every other script-accessible object in the language.
+  CodeGen.cpp: getValueMember/trySetValueMember (ObjectDispatch.h/.cpp)
+  both grew a REQUIRED ScriptContext* ctx parameter (their single CodeGen
+  call site updated to pass ctx_) specifically for a general TypeRef
+  receiver that isn't Camera.main -- tries ctx->getStatic(v.s) and
+  dispatches through the same getObjectMember/trySetObjectMember Kind-3-
+  safe functions the Interpreter.cpp fix above now also uses.
+  callValueMethod (already had ctx) gained the matching branch. This is
+  what makes `StaticClassName.field` / `StaticClassName.field = v` /
+  `StaticClassName.method(...)` compile from generated code at all --
+  previously entirely unreachable (CodeGen had no TypeRef-as-static-access
+  concept whatsoever before this sub-phase).
+  A SERIOUS CRASH FOUND AND FIXED DURING THIS SUB-PHASE'S OWN TEST WRITING
+  (caught by the very first run of static_class_parity_tests.cpp -- a
+  segfault during process exit, zero output even with 34/34 checks having
+  actually passed first, diagnosed by forcing unbuffered stdout via
+  setvbuf to see progress up to the crash point): the test's own Cleanup
+  destructor called `NativeClassRegistry::get().unloadAll();
+  sys->resetStatics();` in THAT order -- mirroring what seemed like the
+  right fix for EditorApp.cpp's ORIGINAL Stop-sequence bug (resetStatics()
+  running BEFORE unloadAll(), which would rebuild a static NATIVELY right
+  before its DLL gets unloaded out from under it) -- but this reordering
+  alone was NOT suffient: NativeStaticHandle's destroy function pointer
+  (captured back when the native instance was created) resolves into the
+  DLL's own code section, so it is invalid to call through it AFTER
+  FreeLibrary has already run, REGARDLESS OF WALL-CLOCK ORDERING relative
+  to anything else -- calling resetStatics() "after" unloadAll() doesn't
+  help if unloadAll() itself already freed the DLL before resetStatics()
+  gets a chance to destroy the OLD native instance still referencing it.
+  The actual fix: NativeClassRegistry::unloadNamespace() now calls
+  ScriptSystem::get().resetStatics() ITSELF, internally, sandwiched
+  between erasing namespaceOfClass_ (so the rebuild correctly falls back
+  to interpreted) and modulesByNamespace_.erase() (which is what actually
+  calls FreeLibrary) -- guaranteeing the destroy-function-pointer is used
+  while the module that contains it is still mapped into memory, no
+  matter which caller (Stop, or a mid-Play namespace rebuild) triggers the
+  unload. EditorApp.cpp's own unloadAll()-before-resetStatics() reordering
+  was KEPT anyway (now redundant but harmless belt-and-braces, guaranteeing
+  every static gets a fresh instance on every Stop, not just ones tied to
+  an unloading namespace) with an updated comment explaining both layers.
+  This is a genuinely subtle lesson worth remembering for any FUTURE
+  native-instance-owning subsystem this project adds: a captured function
+  pointer into a DLL must be exercised (called OR simply dropped after
+  being called) strictly before that DLL's FreeLibrary, never merely
+  "eventually" or "in the right order relative to some OTHER unrelated
+  event" -- the DLL unload itself is the hard deadline, not any particular
+  call sequencing around it.
+  New tests:
+  - tests/codegen_tests.cpp: 3 new must-compile scenarios (a full static
+    class with fields/methods/start/update/do_async/signals; get_component/
+    this.actor/bare transform on a static's null owner; cross-script
+    StaticClassName.field read+write + .method() from a Component-shaped
+    caller). codegen_tests.cpp now at 123 checks (was 120) -- also replaced
+    the now-obsolete "static classes are refused" expectRefused case.
+  - tests/static_class_parity_tests.cpp (NEW, per 9e's own plan text): (1)
+    start/update ticking parity -- interpreted vs native, 5 frames ->
+    counter=5 for both (this is the exact test that would have caught the
+    startStatics/tickStatics/physicsStatics silent-no-op bug directly had
+    it not already been caught by inspection while writing the fix). (2)
+    cross-script access via bare class name, ALL 4 caller-native x
+    target-native combinations, asserting identical (score=6, result=6)
+    results -- this is the test that caught the destroy-function-pointer
+    crash above, via its own Play->Stop-equivalent cleanup path (unloadAll
+    + resetStatics), proving the fix works under the EXACT ordering
+    EditorApp.cpp's real Stop sequence now uses. 34 checks. Registered in
+    CMakeLists.txt.
+  Verification performed: `powershell -ExecutionPolicy Bypass -File
+  scripts\build.ps1 Debug` built clean; ran all 21 test executables
+  directly -- all passed, zero regressions; re-ran
+  static_class_parity_tests.cpp 3 additional times (4 total) specifically
+  given the severity of the crash bug just fixed there -- consistent,
+  clean exit every time.
+  Files touched this sub-phase: src/script/CodeGen.cpp (modified: isStatic
+  branching throughout generateClass() -- header/constructor/lifecycle-
+  hooks/extern-C ABI; base-class check skipped for statics;
+  getValueMember/trySetValueMember call sites pass ctx_), src/script/
+  CompiledClassInfo.h (unchanged this sub-phase -- selfView from 9d
+  already sufficient), src/script/NativeModule.h/.cpp (modified:
+  CreateStaticFn/DestroyStaticFn types + NativeClassExport::isStatic;
+  auto-detecting export-pair resolution), src/script/NativeClassRegistry.cpp
+  (modified: skip ComponentRegistry for static exports; unloadNamespace()
+  calls resetStatics() before freeing the DLL), src/script/ScriptSystem.h/
+  .cpp (modified: nativeStatics_ map, destroyNativeStaticIfAny(),
+  Kind-aware rebuildStatic(), callStaticHook() fixing the silent-no-op
+  bug), src/script/ObjectDispatch.h/.cpp (modified: getValueMember/
+  trySetValueMember gain a ctx parameter + TypeRef-static branch;
+  callValueMethod gains the matching branch), src/script/Interpreter.cpp
+  (modified: all 3 TypeRef+getStatic branches now Kind-agnostic),
+  src/editor/EditorApp.cpp (modified: Stop-sequence reordering +
+  explanatory comment), tests/codegen_tests.cpp (modified: 3 new
+  scenarios, 1 obsolete refusal replaced), tests/
+  static_class_parity_tests.cpp (new), CMakeLists.txt (modified: new
+  static_class_parity_tests target).
+  NOT YET COMMITTED to git as of writing this entry -- see next action.
+  Next step: commit + push sub-phase 9e, then continue to 9f (this.base.
+  method() + real script-to-script inheritance -- HARDEST, HIGHEST-RISK
+  sub-phase, done LAST per the plan's own explicit sequencing so a real
+  setback there doesn't block everything already working. Re-read the 9f
+  plan section above IN FULL, including its "CHOSEN APPROACH" note about
+  real C++ inheritance vs a composition fallback, before starting any
+  code).
+===========================================================================

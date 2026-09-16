@@ -577,11 +577,49 @@ int main() {
         }
     )", "base")) return 1;
 
-    if (expectRefused("static classes are refused", R"(
-        static class GenStatic : Actor {
-            func update(float delta) {}
+    // ---- Phase 9e: static classes compiled natively, now real (not
+    // refused) --------------------------------------------------------
+
+    if (expectCompiles("static class: fields, methods, start/update, do_async, signals", R"(
+        static class GenStatic {
+            signal scoreChanged(newScore);
+            var score = 0;
+            func addScore(int amount) {
+                score = score + amount;
+                emit_signal("scoreChanged", score);
+                return score;
+            }
+            func start() {
+                score = 0;
+            }
+            func update(float delta) {
+                do_async (score < 3) {
+                    score = score + 1;
+                }
+            }
         }
-    )", "static")) return 1;
+    )", vcvars, scratchDir)) return 1;
+
+    if (expectCompiles("static class: get_component on a null owner (no Actor at all)", R"(
+        static class GenStaticGetComponent {
+            func check() {
+                var c = this.get_component(type_of(Fog));
+                var a = this.actor;
+                var t = transform;
+            }
+        }
+    )", vcvars, scratchDir)) return 1;
+
+    if (expectCompiles("cross-script static access: StaticClassName.field read/write + "
+                      "StaticClassName.method(...)", R"(
+        class GenStaticCaller : Actor {
+            func update(float delta) {
+                var v = GenOtherKnownClass.score;
+                GenOtherKnownClass.score = v + 1;
+                var r = GenOtherKnownClass.addScore(5);
+            }
+        }
+    )", vcvars, scratchDir, {"GenOtherKnownClass"})) return 1;
 
     if (expectRefused("abstract classes are refused", R"(
         abstract class GenAbstract : Actor {

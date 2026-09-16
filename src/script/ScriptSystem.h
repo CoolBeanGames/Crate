@@ -1,6 +1,7 @@
 #pragma once
 #include "script/ClassInfo.h"
 #include "script/Interpreter.h"
+#include "script/NativeModule.h"
 
 #include <memory>
 #include <string>
@@ -99,7 +100,16 @@ private:
     void resolveBases();
     void rebuildTypeDocs();
     void registerComponent(const std::string& className);
+    // Destroys/reconstructs statics_[className]'s instance: NATIVE (via
+    // NativeClassRegistry::find(className), Phase 9e) if a currently-
+    // loaded namespace exports a static-class build for it, else
+    // INTERPRETED (Interpreter::instantiate), exactly as before Phase 9e.
+    // Always destroys any existing native instance for this class name
+    // first (via destroyNativeStaticIfAny), so calling this again after a
+    // namespace unloads correctly reverts to interpreted rather than
+    // leaving a dangling native pointer.
     void rebuildStatic(const std::string& className);
+    void destroyNativeStaticIfAny(const std::string& className);
     void loadNamespaces(); // reads <dir_>/.scriptmeta into namespaces_
     void saveNamespaces() const;
 
@@ -111,6 +121,17 @@ private:
     // don't dangle. Not listed / addable.
     std::vector<std::unique_ptr<ClassInfo>> retired_;
     std::unordered_map<std::string, std::shared_ptr<ScriptObject>> statics_;
+    // Owns the raw native instance (Phase 9e) backing a NATIVE static's
+    // statics_[className] entry -- statics_ itself only holds the
+    // canonical ScriptObject wrapper (selfView_), never the underlying
+    // instance, so something has to own destruction; ScriptSystem does,
+    // exactly paralleling how NativeScriptComponent owns a Component-
+    // shaped instance's lifetime. Empty for an interpreted static.
+    struct NativeStaticHandle {
+        void* instance = nullptr;
+        DestroyStaticFn destroy = nullptr;
+    };
+    std::unordered_map<std::string, NativeStaticHandle> nativeStatics_;
     std::unordered_map<std::string, std::shared_ptr<ScriptObject>> inputButtons_;
     std::vector<ScriptFile> files_;
     std::vector<TypeDoc> typeDocs_;
