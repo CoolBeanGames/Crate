@@ -72,6 +72,7 @@ add_library(crate_core STATIC
     src/script/Lexer.cpp
     src/script/Parser.cpp
     src/script/Interpreter.cpp
+    src/script/CodeGen.cpp
     src/script/Format.cpp
     src/script/ScriptComponent.cpp
     src/script/ScriptSystem.cpp
@@ -169,3 +170,9 @@ target_link_libraries(script_metadata_tests PRIVATE crate_core)
 target_compile_definitions(script_metadata_tests PRIVATE
     CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
 add_test(NAME script_metadata_tests COMMAND script_metadata_tests)
+
+add_executable(codegen_tests tests/codegen_tests.cpp)
+target_link_libraries(codegen_tests PRIVATE crate_core)
+target_compile_definitions(codegen_tests PRIVATE
+    CRATE_REPO_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+add_test(NAME codegen_tests COMMAND codegen_tests)

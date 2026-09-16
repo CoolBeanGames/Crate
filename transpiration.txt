@@ -837,3 +837,128 @@ entries — this is a running history, not a status snapshot.)
   Next step: git commit Phase 1, then continue to Phase 2 (cScript AST ->
   C++ codegen, text emission only) since the user has already said to keep
   going without waiting for review between phases.
+
+2026-09-16 — Small Phase 0 EXTENSION, done as a prerequisite for Phase 2
+  (committed separately, commit "Extend shared script runtime: comparisons,
+  negate, arrays, Math.*"): moved Interpreter's unary negate, the four
+  ordering comparisons plus (in)equality, array .length/.add, and the WHOLE
+  Math.* dispatch (mathCall -- it never touched self_/ctx_/scopes_ either)
+  into Runtime.h/.cpp as small free functions taking operands by const
+  reference. This was necessary before writing CodeGen: a code generator
+  emitting each operand's C++ text needs to embed a possibly side-effecting
+  subexpression EXACTLY ONCE, and the interpreter's original ternary-heavy
+  inline logic (e.g. `a.isNumeric() && b.isNumeric() ? ... : ...`) would
+  have forced duplicating that text. Interpreter.cpp's own methods became
+  thin wrappers, same pattern as arith()/coerce(). 69 new explicit checks in
+  runtime_tests.cpp (now 287 total); zero regressions.
+
+2026-09-16 — PHASE 2 COMPLETE AND VERIFIED. New src/script/CodeGen.h/.cpp:
+  generateClass(const ClassDecl&) -> CodeGenResult{ok, className, header,
+  source, error}. Translates a single ClassDecl into a standalone
+  <Name>_Native.gen.h/.gen.cpp pair as real C++ control flow calling
+  Runtime.h helpers -- not a re-interpreted AST.
+  EXACT SCOPE BOUNDARY SHIPPED (see CodeGen.h's own doc comment for the
+  authoritative version): supports literals, arithmetic/comparisons/logic,
+  Vector2/Vector3 (construct, component read/write, arithmetic -- via
+  Runtime::makeVector/vfield/vfieldSet, so aliasing is automatically
+  preserved per the user's decision, for free, with zero extra code), local
+  variables (real typed Value locals, not a hashmap), if/switch/do(-async)
+  (do_async compiles as an ordinary synchronous while-loop for now --
+  frame-stepped top-level resumption is Phase 6), break/continue/return,
+  the class's own declared fields (real struct members, in declaration
+  order, base-then-derived N/A since Phase 2 only accepts a direct
+  Actor/Actor2D/Actor3D base) and methods (uniform `fn_<name>
+  (std::vector<Value>) -> Value` signature for every declared function, no
+  special-casing start/update/physics_update -- Phase 4's ABI wrappers call
+  whichever by name), undeclared-field auto-vivification (a dynamic
+  `overflow_` map read/written at RUNTIME, exactly mirroring
+  Interpreter::lvalue()'s implicit field creation -- CodeGen cannot prove
+  statically whether a given identifier was already auto-vivified, so an
+  unresolved bare identifier compiles to an overflow_ lookup that throws
+  "unknown identifier" only if truly never assigned, matching the
+  interpreter's own runtime-only check), transform/actor magic identifiers
+  (position/rotation/scale read+write, including the single-component
+  transform.position.y-style write-back that script_bug_tests.cpp's tasks
+  45/46 exist for, plus forward/right/up), array literals/index/.length/
+  .add, Math.*, Input.* (via the held ScriptContext*, same as the
+  interpreter), and print()/type_of()/str(). REFUSED with a clear
+  CodeGenResult::error (never silently wrong): static classes, abstract
+  classes, any base other than Actor/Actor2D/Actor3D (script-to-script
+  inheritance), signal declarations, get_component(...), this.base.
+  <method>(...), emit_signal(...)/connect/disconnect/is_connected, `this`
+  or a bare own-method name used as a first-class value instead of an
+  immediate call, and member/method access on a general expression beyond
+  the fixed set above (arbitrary cross-object field access needs Phase 5's
+  reflection table). All of these are genuinely deferred to later phases,
+  not abandoned.
+  TWO REAL BUGS FOUND -- ONLY because Phase 2's test harness actually
+  invokes cl.exe on the generated text rather than just checking CodeGen
+  returned *some* string:
+    1. Switch codegen initially built an if/else-if CHAIN, emitting each
+       case-value temporary's `crate::script::Value __caseN = (...);`
+       declaration as a statement sitting BETWEEN one case's `if (...) {}`
+       and the next case's `else if (...) {}` -- illegal C++ (C2181 "illegal
+       else without matching if"; a statement cannot appear between an if
+       and its else). Fixed by restructuring switch as a SEQUENCE of
+       independent `{ temp; if (cond) { body; break; } }` blocks (no `else`
+       at all) inside the enclosing `do { } while(false)`, relying on the
+       first matching case's trailing `break;` to skip every later case --
+       still exactly "first match wins, no fallthrough," now legal C++.
+    2. The Identifier resolution fallback originally REFUSED any bare name
+       that wasn't a local/declared-field/transform-actor/known-type-name --
+       which incorrectly rejected the auto-vivification pattern itself
+       (`made_up_field = 42; made_up_field = made_up_field + 1;` -- the
+       SECOND statement's READ of `made_up_field` isn't a local or a
+       declared field, so it hit the refusal, even though the interpreter
+       handles this fine since the first statement already created a real
+       entry). Fixed by making any otherwise-unmatched identifier compile to
+       a runtime `overflow_` lookup (throwing "unknown identifier" only if
+       genuinely absent at runtime) instead of a blanket codegen-time
+       refusal -- except a bare reference to the class's OWN declared method
+       name, which IS still refused at codegen time (a definitively-always-
+       wrong case CodeGen can prove statically, so a compile-time refusal is
+       strictly better than deferring to a guaranteed runtime crash).
+  New test: tests/codegen_tests.cpp -- 27 scenarios (23 must-compile, 4
+  must-be-refused-with-a-specific-message-substring), 84 explicit checks.
+  Every "must compile" case is verified by ACTUALLY invoking `cl.exe /c`
+  (via minimal test-local toolchain discovery through vswhere.exe -- skips
+  gracefully, printing a note instead of failing, on a machine with no
+  discoverable MSVC toolchain; Phase 3 will build the real, cached
+  ScriptBuild::ToolchainEnv version of this) on the emitted .gen.cpp and
+  asserting a .obj was actually produced -- not just that generateClass()
+  returned ok=true. This is exactly what caught both bugs above; a harness
+  that only checked the returned strings looked non-empty would have missed
+  both.
+  Verification performed: `powershell -ExecutionPolicy Bypass -File
+  scripts\build.ps1 Debug` built clean; ran all 12 test executables directly
+  (codegen_tests included) -- all passed, zero regressions:
+    codegen_tests: ok 84 checks passed (27/27 scenarios correct)
+    runtime_tests: ok 287 checks passed
+    script_metadata_tests: ok 28 checks passed
+    script_tests: ok 52 checks passed
+    script_bug_tests / script_integration_tests / actor_tests (60) /
+    mesh_tests / lighting_bake_tests / asset_db_tests / image_tests (11) /
+    fbx_tests: all ok, unchanged.
+  Files touched this phase: src/script/CodeGen.h (new), src/script/
+  CodeGen.cpp (new), tests/codegen_tests.cpp (new), CMakeLists.txt (modified:
+  CodeGen.cpp added to crate_core's sources, new codegen_tests target with a
+  CRATE_REPO_DIR compile definition).
+  NOTE FOR PHASE 3: generated headers currently `#include "script/
+  Interpreter.h"` purely to get the ScriptContext struct (which lives there,
+  not in Runtime.h) -- harmless today since Interpreter.h has no out-of-line
+  members beyond the Interpreter class itself, which generated code never
+  references, but it's a slightly impure DLL-boundary dependency worth
+  reconsidering when Phase 3 actually builds the script-DLL link step (moving
+  ScriptContext into Runtime.h at that point, mirroring how RuntimeError was
+  already relocated in Phase 0, would be a clean small fix -- not done now to
+  avoid touching Interpreter.h a third time in one sitting for a cost that
+  only matters once Phase 3's DLL linking is real).
+  NOT YET COMMITTED to git as of writing this entry -- see next action.
+  Next step: git commit Phase 2, then continue to Phase 3 (DLL build
+  pipeline: dirty tracking, dependency graph, toolchain invocation,
+  versioned output) since the user has said to keep going without waiting
+  for review between phases. Remember Phase 3's own prefix step from the
+  Phase 0 entry above: move AssetDatabase::newUuid()'s implementation out of
+  AssetDatabase.cpp (crate_core-only) into something crate_script_runtime
+  also builds, before script DLLs actually try to link only
+  crate_script_runtime.lib.
