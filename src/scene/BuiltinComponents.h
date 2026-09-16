@@ -81,6 +81,24 @@ public:
     float heightRange = 0.0f; // 0 = disabled (no height falloff)
 };
 
+// Global light-reactive fog: unlike Fog above (a simple distance/height
+// colour fade), this fills the whole world as a translucent participating
+// medium that reacts to scene lights. The renderer looks for the first
+// enabled VolumetricFogComponent anywhere in the scene tree -- like Fog, its
+// owning actor's transform is irrelevant, only its presence and settings
+// matter.
+class VolumetricFogComponent : public Component {
+public:
+    const char* typeName() const override { return "Volumetric Fog"; }
+    void drawInspector() override;
+    std::unique_ptr<Component> clone() const override {
+        return std::make_unique<VolumetricFogComponent>(*this);
+    }
+
+    float color[3] = {0.6f, 0.6f, 0.65f};
+    float density = 0.35f; // 0 = invisible, 1 = fully opaque
+};
+
 // A fixed sample point for baked static lighting. Dynamic (moving) actors with
 // no bake of their own borrow the nearest probe's baked colour as extra
 // ambient each frame, so they still read as lit by static-only lights.

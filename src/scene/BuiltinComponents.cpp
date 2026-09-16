@@ -63,6 +63,13 @@ void FogComponent::drawInspector() {
     ImGui::TextDisabled("Only the first Fog found in the scene is used.");
 }
 
+void VolumetricFogComponent::drawInspector() {
+    ImGui::ColorEdit3("Color", color);
+    ImGui::DragFloat("Density", &density, 0.01f, 0.0f, 1.0f);
+    ImGui::TextDisabled("Applies to the whole world; this actor's transform is unused.");
+    ImGui::TextDisabled("Only the first Volumetric Fog found in the scene is used.");
+}
+
 void LightProbeComponent::drawInspector() {
     ImGui::TextDisabled(bakedValid ? "baked" : "not baked yet - Object > Bake Lightmaps");
     ImGui::ColorButton("##baked", ImVec4(bakedLight[0], bakedLight[1], bakedLight[2], 1.0f));

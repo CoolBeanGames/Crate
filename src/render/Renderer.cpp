@@ -51,6 +51,10 @@ struct CBData {
     float fogHeight[4]; // x=base height y=falloff range (0 = disabled)
     float shadow[4];    // x=enabled y=receive z=1/mapSize w=bias
     float dither[4];    // x=enabled y=levels
+    float cameraPos[4];    // xyz = world-space camera position (volume fill only)
+    float volumeCenter[4]; // xyz = world-space volume center, w = shape (0 cube, 1 sphere)
+    float volumeExtent[4]; // xyz = world-space per-axis half-size
+    float depthUnproject[4]; // x=camera near y=camera far (volume fill only)
     GpuLight lights[kMaxLights];
 };
 
@@ -70,16 +74,22 @@ cbuffer CB : register(b0)
     float4   uFogHeight;
     float4   uShadow;
     float4   uDither;
+    float4   uCameraPos;    // xyz = world-space camera position
+    float4   uVolumeCenter; // xyz = world-space volume center, w = shape (0 cube, 1 sphere)
+    float4   uVolumeExtent; // xyz = world-space per-axis half-size
+    float4   uDepthUnproject; // x = camera near, y = camera far
     Light    uLights[MAX_LIGHTS];
 };
 Texture2D             uTex : register(t0);
 SamplerState          uSamp : register(s0);
 Texture2D             uShadowMap : register(t1);
 SamplerComparisonState uShadowSamp : register(s1);
+Texture2D             uDepthTex : register(t2); // scene depth; volume fill pass only
 
 struct VSIn  { float3 pos : POSITION; float3 nrm : NORMAL; float2 uv : TEXCOORD0; };
 struct VSOut { float4 pos : SV_POSITION; float2 uv : TEXCOORD0;
-               float3 light : COLOR0; float fog : TEXCOORD1; float4 lpos : TEXCOORD2; };
+               float3 light : COLOR0; float fog : TEXCOORD1; float4 lpos : TEXCOORD2;
+               float3 wpos : TEXCOORD3; float viewZ : TEXCOORD4; };
 
 // Depth-only pass from the shadow light's point of view.
 float4 VSShadow(VSIn i) : SV_POSITION
@@ -124,9 +134,14 @@ VSOut VSMain(VSIn i)
 {
     VSOut o;
     o.pos = mul(uMVP, float4(i.pos, 1.0));
+    o.viewZ = o.pos.w; // linear view-space Z, captured before the perspective
+                       // divide -- SV_POSITION.w in the pixel shader is not
+                       // this (it's a 1/w used for interpolation), so it has
+                       // to travel as its own varying for PSVolume.
     float3 wpos = mul(uModel, float4(i.pos, 1.0)).xyz;
     float3 N = normalize(mul((float3x3)uModel, i.nrm));
     o.uv = i.uv;
+    o.wpos = wpos;
     o.light = (uParams.z > 0.5) ? float3(1,1,1) : shadeVertex(wpos, N);
     float distFog = (uFogParams.z > 0.5)
               ? saturate((uFogParams.y - o.pos.w) / max(uFogParams.y - uFogParams.x, 1e-4))
@@ -191,6 +206,87 @@ float4 PSMain(VSOut i) : SV_TARGET
     col = lerp(uFogColor.rgb, col, saturate(i.fog));
     return float4(col, uBaseColor.a);
 }
+
+// Fills a convex fog volume (cube or sphere) with a density that reacts to
+// distance travelled *through* the shape, not just its surface -- rendered
+// back-face-only (see drawVolumeFogs), so i.wpos is always the far/exit
+// point of the view ray for this pixel, whether the camera is outside the
+// shape (looking through both walls) or inside it (looking at just the far
+// wall). The near/entry point isn't known from rasterization alone, so it's
+// solved analytically in the shape's local space instead: an axis-aligned
+// box slab test or a sphere quadratic, ignoring the volume's rotation (a
+// deliberate simplification -- treats the shape as always axis-aligned for
+// this fill test even if its mesh is drawn rotated).
+float4 PSVolume(VSOut i) : SV_TARGET
+{
+    float3 toFrag = i.wpos - uCameraPos.xyz;
+    float3 ext = max(abs(uVolumeExtent.xyz), 1e-4);
+    float3 localCam = (uCameraPos.xyz - uVolumeCenter.xyz) / ext;
+    float3 localDir = toFrag / ext;
+
+    float tNear;
+    if (uVolumeCenter.w < 0.5)
+    {
+        // Box, half-extent 1 in local space. Relies on IEEE-754 signed
+        // infinity for an axis-aligned ray (localDir component == 0): the
+        // 1e-6 epsilon this used to clamp to *lost the sign* of a small but
+        // legitimately negative direction, silently flipping that axis'
+        // slab bounds and corrupting tNear for any view angle near
+        // axis-aligned. 1.0/0.0 already safely produces a correctly-signed
+        // +-inf in HLSL, which min/max handle correctly with no epsilon
+        // needed at all.
+        float3 invD = 1.0 / localDir;
+        float3 t0 = (-1.0 - localCam) * invD;
+        float3 t1 = (1.0 - localCam) * invD;
+        float3 tmn = min(t0, t1);
+        tNear = max(max(tmn.x, tmn.y), tmn.z);
+    }
+    else
+    {
+        // Sphere, radius 1 in local space.
+        float a = max(dot(localDir, localDir), 1e-8);
+        float b = 2.0 * dot(localCam, localDir);
+        float c = dot(localCam, localCam) - 1.0;
+        float disc = b * b - 4.0 * a * c;
+        tNear = (disc > 0.0) ? (-b - sqrt(disc)) / (2.0 * a) : 1.0;
+    }
+    tNear = saturate(tNear); // camera inside the shape -> entry at t = 0
+
+    // Clamp the far end to whatever opaque surface is already at this pixel
+    // (e.g. an object sitting inside the volume, or a wall poking through
+    // it) instead of always reaching the shape's own back wall -- otherwise
+    // fog would only ever show up where nothing solid interrupts it.
+    // i.viewZ is this ray's linear view-space depth at t = 1 (the rasterized
+    // back-face point); view-space Z is an affine function of t along any
+    // ray from the camera, and it's 0 at the camera (t = 0), so viewZ(t) =
+    // t * i.viewZ -- letting the scene's own linear depth be inverted
+    // straight back to a t value on this same ray without any matrix work.
+    float sceneDevice = uDepthTex.Load(int3((int2)i.pos.xy, 0)).r;
+    float sceneViewZ = (uDepthUnproject.x * uDepthUnproject.y) /
+                       max(uDepthUnproject.y - sceneDevice * (uDepthUnproject.y - uDepthUnproject.x), 1e-4);
+    float tFar = (i.viewZ > 1e-4) ? saturate(sceneViewZ / i.viewZ) : 1.0;
+
+    float thickness = length(toFrag) * max(tFar - tNear, 0.0);
+    // uBaseColor.a is density (0..1 from the inspector). The old *2.0 factor
+    // made even a modest thickness (a handful of world units through a
+    // scaled-up volume) saturate alpha to ~0.95+, so the volume read as a
+    // flat, nearly opaque blob -- any lighting variation in `lit` below all
+    // but disappears once alpha is that close to 1, since the blended
+    // result is then almost entirely `col` with barely any of the scene
+    // showing through. No multiplier lets density read closer to its literal
+    // 0..1 meaning (density 1.0 needs ~4-5 units of thickness to fully
+    // saturate instead of ~1.5).
+    float alpha = saturate(1.0 - exp(-uBaseColor.a * thickness));
+
+    // No real surface normal inside a volume; sample lighting at the visible
+    // segment's midpoint with a fixed up-facing normal so it still visibly
+    // brightens/tints near lights (task 75: "reacts to light") without
+    // needing a full participating-media scatter model.
+    float3 midPoint = uCameraPos.xyz + toFrag * ((tNear + tFar) * 0.5);
+    float3 lit = uAmbient.rgb + shadeVertex(midPoint, float3(0, 1, 0));
+    float3 col = uBaseColor.rgb * lit;
+    return float4(col, alpha);
+}
 )";
 
 Renderer::~Renderer() { shutdown(); }
@@ -225,11 +321,37 @@ bool Renderer::init(ID3D11Device* device, ID3D11DeviceContext* context) {
     rd.DepthClipEnable = TRUE;
     device_->CreateRasterizerState(&rd, &raster_);
 
+    // Volume fill pass: draw only back-facing triangles (see drawVolumeFogs).
+    D3D11_RASTERIZER_DESC rdCullFront = rd;
+    rdCullFront.CullMode = D3D11_CULL_FRONT;
+    device_->CreateRasterizerState(&rdCullFront, &rasterCullFront_);
+
     D3D11_DEPTH_STENCIL_DESC dsd = {};
     dsd.DepthEnable = TRUE;
     dsd.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
     dsd.DepthFunc = D3D11_COMPARISON_LESS;
     device_->CreateDepthStencilState(&dsd, &depthState_);
+
+    // Volumetric fog pass: no depth-stencil view is bound at all during this
+    // pass (see drawVolumeFogs), so the fixed-function test is disabled --
+    // PSVolume samples scene depth as a texture instead and does the
+    // occlusion clamp itself, including full occlusion (thickness clamps to
+    // 0), not just the partial case a hardware test alone couldn't express.
+    D3D11_DEPTH_STENCIL_DESC dsdNoWrite = dsd;
+    dsdNoWrite.DepthEnable = FALSE;
+    dsdNoWrite.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+    device_->CreateDepthStencilState(&dsdNoWrite, &depthNoWrite_);
+
+    D3D11_BLEND_DESC bd = {};
+    bd.RenderTarget[0].BlendEnable = TRUE;
+    bd.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+    bd.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+    bd.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+    bd.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+    bd.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+    bd.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+    bd.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+    device_->CreateBlendState(&bd, &blendAlpha_);
 
     // Shadow map: comparison sampler (clamp, white outside), depth-bias raster.
     D3D11_SAMPLER_DESC ssd = {};
@@ -297,12 +419,16 @@ void Renderer::shutdown() {
     safeRelease(checkerSrv_);
     safeRelease(vs_);
     safeRelease(ps_);
+    safeRelease(psVolume_);
     safeRelease(vsShadow_);
     safeRelease(layout_);
     safeRelease(cb_);
     safeRelease(sampler_);
     safeRelease(raster_);
     safeRelease(depthState_);
+    safeRelease(blendAlpha_);
+    safeRelease(depthNoWrite_);
+    safeRelease(rasterCullFront_);
     safeRelease(shadowTex_);
     safeRelease(shadowDsv_);
     safeRelease(shadowSrv_);
@@ -339,6 +465,19 @@ bool Renderer::compileShaders() {
     device_->CreateVertexShader(vsb->GetBufferPointer(), vsb->GetBufferSize(), nullptr, &vs_);
     device_->CreatePixelShader(psb->GetBufferPointer(), psb->GetBufferSize(), nullptr, &ps_);
 
+    ID3DBlob* pvb = nullptr;
+    if (SUCCEEDED(D3DCompile(kShaderSrc, std::strlen(kShaderSrc), "crate.hlsl", nullptr, nullptr,
+                             "PSVolume", "ps_4_0", flags, 0, &pvb, &err))) {
+        device_->CreatePixelShader(pvb->GetBufferPointer(), pvb->GetBufferSize(), nullptr,
+                                   &psVolume_);
+        safeRelease(pvb);
+    } else {
+        if (err)
+            CR_ERROR("render",
+                     std::string("PSVolume: ") + static_cast<const char*>(err->GetBufferPointer()));
+        safeRelease(err);
+    }
+
     ID3DBlob* svsb = nullptr;
     if (SUCCEEDED(D3DCompile(kShaderSrc, std::strlen(kShaderSrc), "crate.hlsl", nullptr, nullptr,
                              "VSShadow", "vs_4_0", flags, 0, &svsb, &err))) {
@@ -368,6 +507,7 @@ void Renderer::releaseTargets() {
     safeRelease(colorRtv_);
     safeRelease(colorTex_);
     safeRelease(depthDsv_);
+    safeRelease(depthSrv_);
     safeRelease(depthTex_);
     rtWidth_ = rtHeight_ = 0;
 }
@@ -393,12 +533,24 @@ bool Renderer::ensureTargets(int w, int h) {
     device_->CreateRenderTargetView(colorTex_, nullptr, &colorRtv_);
     device_->CreateShaderResourceView(colorTex_, nullptr, &colorSrv_);
 
+    // Typeless + shader-resource bindable so the volume fog pass can sample
+    // it (see drawVolumeFogs) -- no stencil test is actually used anywhere,
+    // so a plain 32-bit float depth (matching the shadow map's own format)
+    // covers it.
     D3D11_TEXTURE2D_DESC dd = td;
-    dd.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-    dd.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+    dd.Format = DXGI_FORMAT_R32_TYPELESS;
+    dd.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
     if (FAILED(device_->CreateTexture2D(&dd, nullptr, &depthTex_)))
         return false;
-    device_->CreateDepthStencilView(depthTex_, nullptr, &depthDsv_);
+    D3D11_DEPTH_STENCIL_VIEW_DESC dvd = {};
+    dvd.Format = DXGI_FORMAT_D32_FLOAT;
+    dvd.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+    device_->CreateDepthStencilView(depthTex_, &dvd, &depthDsv_);
+    D3D11_SHADER_RESOURCE_VIEW_DESC dsrvd = {};
+    dsrvd.Format = DXGI_FORMAT_R32_FLOAT;
+    dsrvd.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+    dsrvd.Texture2D.MipLevels = 1;
+    device_->CreateShaderResourceView(depthTex_, &dsrvd, &depthSrv_);
 
     rtWidth_ = w;
     rtHeight_ = h;
@@ -852,6 +1004,111 @@ void Renderer::collectFog(Actor& actor) {
         collectFog(*child);
 }
 
+// Like collectFog(): only the first enabled VolumetricFogComponent anywhere
+// in the tree matters, and its actor's transform is irrelevant (task 75,
+// redesigned to be global fog rather than a bounded shape).
+void Renderer::collectVolumeFog(Actor& actor) {
+    if (volumeFogSample_.found)
+        return;
+    if (auto* vf = actor.getComponent<VolumetricFogComponent>()) {
+        if (vf->enabled) {
+            volumeFogSample_.found = true;
+            volumeFogSample_.color = Vec3{vf->color[0], vf->color[1], vf->color[2]};
+            volumeFogSample_.density = vf->density;
+            return;
+        }
+    }
+    for (const auto& child : actor.children())
+        collectVolumeFog(*child);
+}
+
+// Fills the whole world with fog that reacts to light (task 75). There's no
+// user-placed shape any more: this draws one enormous cube centered on the
+// camera (half-extent well inside the far clip plane, so its own back wall
+// never gets clipped) and reuses the existing back-face-only volume fill
+// technique -- with the camera always deep inside a cube that large, PSVolume
+// always resolves tNear to 0 and lets the scene's own depth buffer (sampled
+// via depthSrv_) clamp tFar at whatever opaque surface is actually visible,
+// which is exactly "fog everywhere, reacting to light, up to the first solid
+// thing in the way".
+void Renderer::drawVolumeFogs(const Mat4& viewProj, const Vec3& cameraPos, float nearZ,
+                              float farZ, const Options& opt) {
+    if (!volumeFogSample_.found || !psVolume_ || !depthSrv_)
+        return;
+    // No depth-stencil view bound (a resource can't be a depth target and a
+    // shader resource at once): a hardware test here would compare against
+    // the *volume's own* back-face depth, so it would reject the fragment
+    // outright whenever anything -- including an object meant to be
+    // partially fogged -- is nearer than that back wall, before PSVolume's
+    // partial-thickness clamp ever got to run. The two aren't a
+    // coarse-then-fine pair; they directly contradict each other, and the
+    // manual depth-sample clamp below already covers full occlusion too
+    // (tFar ends up <= tNear, thickness 0).
+    ctx_->OMSetRenderTargets(1, &colorRtv_, nullptr);
+    ctx_->RSSetState(rasterCullFront_);
+    ctx_->OMSetDepthStencilState(depthNoWrite_, 0);
+    ctx_->OMSetBlendState(blendAlpha_, nullptr, 0xFFFFFFFF);
+    ctx_->PSSetShader(psVolume_, nullptr, 0);
+    ID3D11ShaderResourceView* whiteSrv = whiteSrv_;
+    ctx_->PSSetShaderResources(0, 1, &whiteSrv);
+    ctx_->PSSetShaderResources(2, 1, &depthSrv_);
+
+    CBData cb = {};
+    int lightCount = 0;
+    for (const auto& s : lights_) {
+        if (s.isStatic || lightCount >= kMaxLights)
+            continue;
+        GpuLight& g = cb.lights[lightCount];
+        g.pos[0] = s.pos.x; g.pos[1] = s.pos.y; g.pos[2] = s.pos.z;
+        g.dir[0] = s.dir.x; g.dir[1] = s.dir.y; g.dir[2] = s.dir.z;
+        g.color[0] = s.color.x; g.color[1] = s.color.y; g.color[2] = s.color.z;
+        g.color[3] = static_cast<float>(s.type);
+        g.params[0] = s.range; g.params[1] = s.cosInner; g.params[2] = s.cosOuter;
+        ++lightCount;
+    }
+    cb.params[3] = static_cast<float>(lightCount);
+    cb.ambient[0] = opt.ambient.x; cb.ambient[1] = opt.ambient.y; cb.ambient[2] = opt.ambient.z;
+    cb.cameraPos[0] = cameraPos.x; cb.cameraPos[1] = cameraPos.y; cb.cameraPos[2] = cameraPos.z;
+    cb.depthUnproject[0] = nearZ; cb.depthUnproject[1] = farZ;
+
+    // Half-extent kept well under farZ: a cube's corners are up to sqrt(3)
+    // times farther from its center than its faces are, and it's the corner
+    // directions (view-space Z, not full 3D distance) that must stay inside
+    // the projection's far clip or that part of the back wall is clipped
+    // away and leaves an unfogged hole. 0.5 gives a large safety margin.
+    float half = farZ * 0.5f;
+    Mat4 model = Mat4::scale(Vec3{half * 2.0f, half * 2.0f, half * 2.0f}) *
+                Mat4::translation(cameraPos);
+    Mat4 mvp = model * viewProj;
+    std::memcpy(cb.mvp, mvp.m, sizeof(cb.mvp));
+    std::memcpy(cb.model, model.m, sizeof(cb.model));
+    cb.baseColor[0] = volumeFogSample_.color.x; cb.baseColor[1] = volumeFogSample_.color.y;
+    cb.baseColor[2] = volumeFogSample_.color.z; cb.baseColor[3] = volumeFogSample_.density;
+    cb.volumeCenter[0] = cameraPos.x; cb.volumeCenter[1] = cameraPos.y;
+    cb.volumeCenter[2] = cameraPos.z; cb.volumeCenter[3] = 0.0f; // always the cube branch
+    cb.volumeExtent[0] = half; cb.volumeExtent[1] = half; cb.volumeExtent[2] = half;
+
+    D3D11_MAPPED_SUBRESOURCE ms;
+    if (SUCCEEDED(ctx_->Map(cb_, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms))) {
+        std::memcpy(ms.pData, &cb, sizeof(cb));
+        ctx_->Unmap(cb_, 0);
+    }
+
+    const GpuMesh& gm = meshFor("", "Cube");
+    UINT stride = sizeof(Vertex), offset = 0;
+    ctx_->IASetVertexBuffers(0, 1, &gm.vb, &stride, &offset);
+    ctx_->IASetIndexBuffer(gm.ib, DXGI_FORMAT_R32_UINT, 0);
+    ctx_->DrawIndexed(gm.indexCount, 0, 0);
+
+    ID3D11ShaderResourceView* noSrv = nullptr;
+    ctx_->PSSetShaderResources(2, 1, &noSrv); // free depthSrv_'s resource for DSV use again
+    ctx_->PSSetShader(ps_, nullptr, 0);
+    ctx_->RSSetState(raster_);
+    ctx_->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
+    ctx_->OMSetDepthStencilState(depthState_, 0);
+    ctx_->OMSetRenderTargets(1, &colorRtv_, depthDsv_);
+}
+
 void* Renderer::render(Scene& scene, const OrbitCamera& cam, int width, int height,
                        const Options& opt) {
     if (!ready() || !ensureTargets(width, height))
@@ -860,9 +1117,11 @@ void* Renderer::render(Scene& scene, const OrbitCamera& cam, int width, int heig
     lights_.clear();
     probes_.clear();
     fogSample_ = FogSample{};
+    volumeFogSample_ = VolumeFogSample{};
     for (const auto& child : scene.root().children()) {
         collectLights(*child);
         collectFog(*child);
+        collectVolumeFog(*child);
     }
     // A FogComponent in the scene wins over the editor's manual fog toggle.
     Options resolved = opt;
@@ -907,7 +1166,7 @@ void* Renderer::render(Scene& scene, const OrbitCamera& cam, int width, int heig
     ctx_->OMSetRenderTargets(1, &colorRtv_, depthDsv_);
     const float clear[4] = {resolved.clear.x, resolved.clear.y, resolved.clear.z, 1.0f};
     ctx_->ClearRenderTargetView(colorRtv_, clear);
-    ctx_->ClearDepthStencilView(depthDsv_, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+    ctx_->ClearDepthStencilView(depthDsv_, D3D11_CLEAR_DEPTH, 1.0f, 0);
     ctx_->VSSetShader(vs_, nullptr, 0);
     ctx_->PSSetShader(ps_, nullptr, 0);
     ctx_->PSSetSamplers(0, 1, &sampler_);
@@ -920,6 +1179,7 @@ void* Renderer::render(Scene& scene, const OrbitCamera& cam, int width, int heig
     Mat4 viewProj = cam.view() * cam.proj(aspect);
     for (const auto& child : scene.root().children())
         drawActor(*child, viewProj, resolved, /*shadowPass=*/false);
+    drawVolumeFogs(viewProj, cam.eye(), cam.nearZ, cam.farZ, resolved);
 
     // Unbind so the colour SRV (and shadow SRV) can be re-bound next frame.
     ID3D11RenderTargetView* nullRtv = nullptr;
