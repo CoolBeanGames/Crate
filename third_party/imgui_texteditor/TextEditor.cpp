@@ -1128,6 +1128,14 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder)
 	if (!mIgnoreImGuiChild)
 		ImGui::BeginChild(aTitle, aSize, aBorder, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_AlwaysHorizontalScrollbar | ImGuiWindowFlags_NoMove);
 
+	// Captured here (inside the child window, i.e. via ImGui::IsWindowFocused())
+	// rather than left for the caller to derive from ImGui::IsItemFocused() on
+	// the item that follows Render(): this editor has no real ImGui widgets in
+	// its text area (it's all direct ImDrawList calls), so g.NavId never ends
+	// up matching the child window's own item id and IsItemFocused() would
+	// always read false regardless of actual focus.
+	mFocused = ImGui::IsWindowFocused();
+
 	if (mHandleKeyboardInputs)
 	{
 		HandleKeyboardInputs();

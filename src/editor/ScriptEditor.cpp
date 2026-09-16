@@ -200,6 +200,12 @@ void ScriptEditor::drawCode() {
         ImGui::TextDisabled("Ctrl+S to save   |   Ctrl+Space for completions");
     }
 
+    // Snapshot input *before* Render(): TextEditor's own keyboard handling
+    // (which runs inside Render() when acOpen_ is false) drains
+    // io.InputQueueCharacters, so updateAutocomplete() below couldn't tell
+    // what was just typed if it looked at the live queue afterward.
+    typedChars_.assign(ImGui::GetIO().InputQueueCharacters.begin(),
+                       ImGui::GetIO().InputQueueCharacters.end());
     editor_.SetHandleKeyboardInputs(!acOpen_);
     editor_.Render("##code", ImVec2(0, 0), true);
     applyElectricIndent();
@@ -236,7 +242,7 @@ static char lastCodeChar(const std::string& line) {
 }
 
 void ScriptEditor::applyElectricIndent() {
-    if (!ImGui::IsItemFocused() || acOpen_)
+    if (!editor_.IsFocused() || acOpen_)
         return;
 
     auto cur = editor_.GetCursorPosition();
@@ -282,12 +288,15 @@ void ScriptEditor::applyElectricIndent() {
 // --- autocomplete -------------------------------------------------------
 void ScriptEditor::updateAutocomplete() {
     ImGuiIO& io = ImGui::GetIO();
-    const bool editorFocused = ImGui::IsItemFocused() || acOpen_;
+    const bool editorFocused = editor_.IsFocused() || acOpen_;
 
-    // current line text up to the caret
+    // current line text up to the caret. cur.mColumn is a visual (tab
+    // expanded) column, not a raw index into `line` -- convert first, or
+    // this misreads the prefix on any indented line except when the caret
+    // happens to sit at the very end of it.
     TextEditor::Coordinates cur = editor_.GetCursorPosition();
     std::string line = editor_.GetCurrentLineText();
-    int col = std::min<int>(cur.mColumn, (int)line.size());
+    int col = std::min<int>(editor_.GetCharacterIndex(cur), (int)line.size());
     std::string upToCaret = line.substr(0, col);
 
     // word being typed + whether it's a member access (preceded by '.')
@@ -297,12 +306,16 @@ void ScriptEditor::updateAutocomplete() {
     std::string word = upToCaret.substr(w);
     bool afterDot = w > 0 && upToCaret[w - 1] == '.';
 
-    // Open on Ctrl+Space or automatically right after typing '.'
+    // Open on Ctrl+Space, right after typing '.', or as soon as an
+    // identifier character is typed -- autocomplete should be live, not
+    // something you have to remember to summon.
     if (editorFocused && !acOpen_) {
         bool ctrlSpace = io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Space);
-        bool justDot = !io.InputQueueCharacters.empty() &&
-                       io.InputQueueCharacters.back() == '.';
-        if (ctrlSpace || justDot) {
+        bool justTypedWordChar = false;
+        for (ImWchar tc : typedChars_)
+            if (tc == '.' || std::isalnum((int)tc) || tc == '_')
+                justTypedWordChar = true;
+        if (ctrlSpace || (justTypedWordChar && (afterDot || !word.empty()))) {
             acOpen_ = true;
             acIndex_ = 0;
         }
@@ -364,10 +377,20 @@ void ScriptEditor::updateAutocomplete() {
     // forward typed characters so the word keeps growing
     for (int i = 0; i < io.InputQueueCharacters.Size; ++i) {
         ImWchar c = io.InputQueueCharacters[i];
+        // Tab/Enter land in the character queue too (as '\t'/'\r'/'\n'), not
+        // just IsKeyPressed above -- skip them here so accepting a completion
+        // doesn't also insert a literal tab/newline right before it.
+        if (c == '\t' || c == '\n' || c == '\r')
+            continue;
         if (std::isalnum((int)c) || c == '_') {
             editor_.InsertText(std::string(1, (char)c));
         } else {
-            acOpen_ = false; // any other char closes the popup
+            // Any other char closes the popup, but it was still meant to be
+            // typed (e.g. the '(' right after an accepted/abandoned function
+            // name) -- forward it instead of silently dropping it.
+            if (c != 0)
+                editor_.InsertText(std::string(1, (char)c));
+            acOpen_ = false;
         }
     }
     io.InputQueueCharacters.resize(0);

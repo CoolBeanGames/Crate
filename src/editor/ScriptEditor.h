@@ -53,6 +53,12 @@ private:
     std::string acPrefix_;
     std::vector<std::string> acItems_;
     int acIndex_ = 0;
+
+    // Per-frame input snapshot, captured *before* editor_.Render() (which
+    // drains ImGui's character queue when it handles keyboard input itself),
+    // so updateAutocomplete() can still see what was actually typed this
+    // frame when deciding whether to open the popup.
+    std::vector<ImWchar> typedChars_;
 };
 
 } // namespace crate
