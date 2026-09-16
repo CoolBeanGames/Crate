@@ -163,3 +163,9 @@ target_link_libraries(script_integration_tests PRIVATE crate_core)
 target_compile_definitions(script_integration_tests PRIVATE
     CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
 add_test(NAME script_integration_tests COMMAND script_integration_tests)
+
+add_executable(script_metadata_tests tests/script_metadata_tests.cpp)
+target_link_libraries(script_metadata_tests PRIVATE crate_core)
+target_compile_definitions(script_metadata_tests PRIVATE
+    CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
+add_test(NAME script_metadata_tests COMMAND script_metadata_tests)

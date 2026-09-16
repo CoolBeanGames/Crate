@@ -139,6 +139,7 @@ private:
     std::vector<std::string> importedAssets_; // keys of imported models/textures
     std::string selectedMaterial_;            // asset selection (inspector shows it)
     std::string selectedAsset_;               // selected imported model/texture path
+    std::string selectedScript_;              // selected script asset (class name)
 
     // Asset-browser folder navigation.
     std::string assetCwd_; // current sub-folder relative to assetDir_ ("" = root)

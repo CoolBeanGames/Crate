@@ -190,6 +190,7 @@ void EditorApp::onFrame() {
         // Delete is unambiguous).
         selectedMaterial_.clear();
         selectedAsset_.clear();
+        selectedScript_.clear();
     }
 
     // Play mode: tick components (frame update + fixed-step physics).
@@ -699,6 +700,38 @@ void EditorApp::drawInspector() {
                                              renameBuf + "'");
                         selectedMaterial_ = renameBuf;
                     }
+                }
+                ImGui::End();
+                return;
+            }
+        }
+
+        // A script asset is selected in the Asset Browser: edit its
+        // namespace here (task 88 -- scripts sharing a namespace will later
+        // compile together into one native module).
+        if (!a && !selectedScript_.empty()) {
+            auto& sys = script::ScriptSystem::get();
+            script::ScriptSystem::ScriptFile* sf = sys.file(selectedScript_);
+            if (!sf) {
+                selectedScript_.clear();
+            } else {
+                ImGui::TextDisabled("SCRIPT");
+                ImGui::SeparatorText(sf->name.c_str());
+                if (!sf->error.empty())
+                    ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Parse error: %s",
+                                       sf->error.c_str());
+
+                std::string ns = sys.namespaceOf(sf->name);
+                if (ImGui::InputText("Namespace", &ns))
+                    sys.setNamespace(sf->name, ns);
+                ImGui::TextWrapped(
+                    "Scripts sharing a namespace will compile into the same native "
+                    "module once script compilation lands.");
+
+                ImGui::Spacing();
+                if (ImGui::Button("Open in Script Editor")) {
+                    openScriptsTab_ = true;
+                    scriptEditor_.openScript(sf->name);
                 }
                 ImGui::End();
                 return;
@@ -1646,9 +1679,24 @@ void EditorApp::drawAssetFolders() {
                           : isMap     ? IM_COL32(90, 130, 200, 255)
                           : isScript  ? IM_COL32(56, 109, 154, 255)
                                       : IM_COL32(90, 94, 104, 255);
+        // Resolve which registered script class (if any) this file currently
+        // holds, once per frame, for both the tile's "selected" highlight
+        // and click handling below. Compared as fs::path, not raw strings:
+        // ScriptSystem stores paths with native (backslash-on-Windows)
+        // separators while `path` above is a forward-slash generic_string(),
+        // so a plain string == would never match. Matched by resolved class
+        // name rather than file stem because a script can be renamed (via
+        // the Script Editor) without its backing file being renamed too.
+        std::string scriptClassName;
+        if (isScript)
+            for (const auto& f2 : script::ScriptSystem::get().files())
+                if (fs::path(f2.path) == fs::path(path)) { scriptClassName = f2.name; break; }
+
         bool dbl = false;
-        bool clicked = assetIconTile(path.c_str(), kind, col, name, false, &dbl,
-                                     isImg ? path : std::string());
+        bool clicked = assetIconTile(
+            path.c_str(), kind, col, name,
+            isScript && !scriptClassName.empty() && selectedScript_ == scriptClassName, &dbl,
+            isImg ? path : std::string());
         if (clicked) {
             if (isMap) {
                 if (dbl) {
@@ -1656,6 +1704,24 @@ void EditorApp::drawAssetFolders() {
                     inputMap_.load(path);
                     Input::get().setMap(&inputMap_);
                     inputMapOpen_ = true;
+                }
+            } else if (isScript) {
+                // Select it in the Inspector (namespace editing, etc.)
+                // without touching disk or recompiling anything; a second
+                // click within the double-click window additionally opens
+                // it in the full Script Editor. Previously ANY click here
+                // fell through to ingestDroppedFile(), which re-copied the
+                // file onto itself and reloaded every script in the project
+                // on every single click.
+                if (!scriptClassName.empty()) {
+                    selectedScript_ = scriptClassName;
+                    selectedMaterial_.clear();
+                    selectedAsset_.clear();
+                    scene_.select(nullptr);
+                    if (dbl) {
+                        openScriptsTab_ = true;
+                        scriptEditor_.openScript(scriptClassName);
+                    }
                 }
             } else {
                 ingestDroppedFile(f.path().string());
@@ -1826,6 +1892,7 @@ void EditorApp::drawBottomPanel() {
                               IM_COL32(180, 130, 220, 255), mn, selectedMaterial_ == mn)) {
                 selectedMaterial_ = mn;
                 selectedAsset_.clear();
+                selectedScript_.clear();
                 scene_.select(nullptr);
             }
             if (ImGui::BeginDragDropSource()) {
@@ -1848,6 +1915,7 @@ void EditorApp::drawBottomPanel() {
                               name, selectedAsset_ == a, nullptr, isImg ? a : std::string())) {
                 selectedAsset_ = a;
                 selectedMaterial_.clear();
+                selectedScript_.clear();
                 if (isImg) {
                     if (auto* mr = scene_.selected() ? scene_.selected()->getComponent<MeshRenderer>()
                                                      : nullptr) {

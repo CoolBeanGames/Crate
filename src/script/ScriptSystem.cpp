@@ -19,6 +19,10 @@
 namespace crate::script {
 namespace fs = std::filesystem;
 
+namespace {
+const std::string kDefaultNamespace = "Global";
+}
+
 ScriptSystem& ScriptSystem::get() {
     static ScriptSystem instance;
     return instance;
@@ -173,6 +177,8 @@ void ScriptSystem::reload() {
             }
             statics_.erase(name);
             ComponentRegistry::get().remove(name);
+            if (namespaces_.erase(name) > 0)
+                saveNamespaces();
             it = files_.erase(it);
         } else {
             ++it;
@@ -260,8 +266,60 @@ void ScriptSystem::physicsStatics(float dt) {
     }
 }
 
+const std::string& ScriptSystem::namespaceOf(const std::string& className) const {
+    auto it = namespaces_.find(className);
+    return it == namespaces_.end() ? kDefaultNamespace : it->second;
+}
+
+void ScriptSystem::setNamespace(const std::string& className, std::string ns) {
+    // Storing an explicit "Global" entry would just duplicate the default,
+    // so treat empty/"Global" as "no override" and drop any existing entry
+    // instead -- keeps the sidecar file minimal, same spirit as
+    // AssetDatabase only persisting what it actually needs to.
+    if (ns.empty() || ns == kDefaultNamespace)
+        namespaces_.erase(className);
+    else
+        namespaces_[className] = std::move(ns);
+    saveNamespaces();
+}
+
+void ScriptSystem::loadNamespaces() {
+    namespaces_.clear();
+    if (dir_.empty())
+        return;
+    std::ifstream in(dir_ + "/.scriptmeta", std::ios::binary);
+    if (!in)
+        return;
+    std::string line;
+    while (std::getline(in, line)) {
+        if (!line.empty() && line.back() == '\r')
+            line.pop_back();
+        auto tab = line.find('\t');
+        if (tab == std::string::npos)
+            continue;
+        std::string cname = line.substr(0, tab);
+        std::string ns = line.substr(tab + 1);
+        if (cname.empty() || ns.empty())
+            continue;
+        namespaces_[cname] = ns;
+    }
+}
+
+void ScriptSystem::saveNamespaces() const {
+    if (dir_.empty())
+        return;
+    std::ofstream out(dir_ + "/.scriptmeta", std::ios::binary | std::ios::trunc);
+    if (!out) {
+        CR_ERROR("script", "Could not write script metadata: " + dir_ + "/.scriptmeta");
+        return;
+    }
+    for (const auto& [cname, ns] : namespaces_)
+        out << cname << '\t' << ns << '\n';
+}
+
 void ScriptSystem::loadFolder(const std::string& dir) {
     dir_ = dir;
+    loadNamespaces();
     std::error_code ec;
     if (!fs::exists(dir, ec))
         return;
@@ -399,6 +457,12 @@ std::string ScriptSystem::setSource(const std::string& name, std::string source)
             }
             statics_.erase(oldName);
             ComponentRegistry::get().remove(oldName);
+            // Carry an explicit namespace override across the rename too.
+            if (auto nsIt = namespaces_.find(oldName); nsIt != namespaces_.end()) {
+                namespaces_[newName] = std::move(nsIt->second);
+                namespaces_.erase(nsIt);
+                saveNamespaces();
+            }
             resolveBases();
             rebuildTypeDocs();
             CR_LOG("script", "Script renamed " + oldName + " -> " + newName);

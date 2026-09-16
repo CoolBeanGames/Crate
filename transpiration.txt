@@ -753,3 +753,87 @@ entries — this is a running history, not a status snapshot.)
   starting Phase 1 (namespace metadata + Inspector UI), per the task's own
   "stop... so I can check everything" note and the phased-review intent of
   this whole plan.
+
+2026-09-16 — User said to continue without waiting for further review
+  ("theres nothing here for me to test atm"). Also gave a standing
+  instruction that applies to every remaining phase, added to the TESTING
+  MANDATE section above: write exhaustive tests for every function and every
+  value-conversion path, not representative samples.
+
+2026-09-16 — PHASE 1 COMPLETE AND VERIFIED. ScriptSystem gained
+  namespaceOf()/setNamespace(), backed by namespaces_ (className ->
+  namespace) persisted to <scripts dir>/.scriptmeta (tab-separated, mirrors
+  AssetDatabase's .assetdb convention exactly). Defaults to "Global";
+  setNamespace("Global") or "" erases the override instead of storing a
+  redundant explicit default, keeping the sidecar minimal. Hooked into
+  loadFolder() (loads namespaces_ fresh every call, including reload()'s
+  internal call), setSource()'s rename-cleanup block (carries an override
+  across a class rename), and reload()'s deleted-file cleanup block (drops
+  the override when its script is deleted). Added EditorApp::selectedScript_
+  and a new Inspector branch (modeled on the existing material-selection
+  branch) showing the script's class name, an editable Namespace field, and
+  an "Open in Script Editor" button; selectedScript_ is cleared everywhere
+  selectedMaterial_/selectedAsset_ already are, for the same "exclusive
+  selection" reasoning.
+  BUG FOUND AND FIXED DURING UI VERIFICATION (not just written, but caught
+  by actually launching the editor and clicking through it): the Asset
+  Browser's script-tile click handler resolved which ScriptSystem::ScriptFile
+  a click landed on by comparing raw path strings -- but ScriptSystem stores
+  paths with native (backslash-on-Windows) separators while the Asset
+  Browser tile computes a forward-slash generic_string(), so the comparison
+  silently never matched and clicking a script tile did nothing at all. Fixed
+  by comparing as fs::path (see EditorApp.cpp's drawAssetFolders(), the
+  isScript branch) instead of raw strings. Also fixed the pre-existing bug
+  this phase's plan flagged: previously ANY click (not just intentional
+  drops) on a .cscript tile fell through to ingestDroppedFile(), which
+  re-copied the file onto itself and reloaded every script in the project on
+  every single click; now a single click only selects (no disk I/O, no
+  recompile), and a second click within the double-click window opens it in
+  the Script Editor. Also wired up a persistent "selected" tile highlight
+  for scripts (matching the material/imported-asset convention), resolved by
+  registered class name rather than file stem so it stays correct even after
+  a script has been renamed without its backing file being renamed.
+  New test: tests/script_metadata_tests.cpp -- 28 checks covering default
+  namespace, set/get round-trip, disk persistence across a fresh
+  loadFolder(), the exact on-disk tab-separated format, independence between
+  scripts' overrides, "Global"/"" erasing rather than shadowing, surviving a
+  class rename, and cleanup on delete. Uses the real assets/scripts/
+  directory via CRATE_SCRIPTS_DIR (same convention as
+  script_integration_tests.cpp) with temp .cscript files removed via
+  reload() afterward, and every namespace override it creates explicitly
+  reset to "Global" before exiting so a real developer's existing
+  .scriptmeta entries for unrelated scripts are never disturbed.
+  UI verification performed (this phase touches ImGui rendering code with
+  zero unit-test coverage, so this was necessary, not optional): launched
+  the real editor via scripts/ac_ctl.ps1 (Start-Process, not the --script
+  launch flag, to reach the normal Asset Browser + Inspector layout),
+  drove it with synthetic mouse clicks, and visually confirmed via
+  screenshots: (1) the Asset Browser's scripts folder lists all four shipped
+  .cscript files; (2) a single click selects a script and shows the new
+  SCRIPT/<name>/Namespace/Open-in-Script-Editor panel in the Inspector, with
+  NO console spam and NO folder reload; (3) typing in the Namespace field
+  (verified with "Gameplay") immediately persists to
+  assets/scripts/.scriptmeta on disk; (4) the clicked tile shows a
+  persistent selected highlight; (5) "Open in Script Editor" correctly
+  switches the Viewport to the Scripts tab with that script loaded and
+  selected in its own sidebar; (6) selecting an actor in the Hierarchy
+  correctly clears the script selection and Inspector reverts to the normal
+  actor panel (Crate's Mesh Renderer etc.), confirming mutual exclusivity.
+  This UI pass is exactly what caught the path-separator bug above -- the
+  unit tests alone (which call ScriptSystem's API directly, never through
+  the Asset Browser's click path) would not have caught it. Cleaned up the
+  manual test's "Gameplay" override (deleted the stray .scriptmeta) and
+  closed the editor afterward; working tree left clean.
+  Verification performed: `powershell -ExecutionPolicy Bypass -File
+  scripts\build.ps1 Debug` built clean; ran all 11 test executables directly
+  (script_metadata_tests included) -- all passed, zero regressions. Plus the
+  manual UI pass described above.
+  Files touched this phase: src/script/ScriptSystem.h (modified),
+  src/script/ScriptSystem.cpp (modified), src/editor/EditorApp.h (modified),
+  src/editor/EditorApp.cpp (modified), .gitignore (modified: added
+  /assets/scripts/.scriptmeta), tests/script_metadata_tests.cpp (new),
+  CMakeLists.txt (modified: new script_metadata_tests target).
+  NOT YET COMMITTED to git as of writing this entry -- see next action.
+  Next step: git commit Phase 1, then continue to Phase 2 (cScript AST ->
+  C++ codegen, text emission only) since the user has already said to keep
+  going without waiting for review between phases.

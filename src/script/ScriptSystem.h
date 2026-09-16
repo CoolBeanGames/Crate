@@ -70,6 +70,16 @@ public:
         return types_;
     }
 
+    // Per-script "namespace": a grouping set on the script asset itself (via
+    // the Inspector, not a cScript language construct) that will later
+    // decide which compiled DLL a script's native code ends up in -- all
+    // scripts sharing a namespace compile together (see transpiration.txt,
+    // Phase 1 / Phase 3). Defaults to "Global" when never explicitly set.
+    // Persisted to <scripts dir>/.scriptmeta, tab-separated (className<TAB>
+    // namespace), mirroring AssetDatabase's own .assetdb convention.
+    const std::string& namespaceOf(const std::string& className) const;
+    void setNamespace(const std::string& className, std::string ns);
+
     // Input signal layer: a persistent signal-carrying object per input button,
     // and per-frame dispatch of just_pressed / just_released / pressed to
     // connected callables (call after crate::Input::poll()).
@@ -90,10 +100,13 @@ private:
     void rebuildTypeDocs();
     void registerComponent(const std::string& className);
     void rebuildStatic(const std::string& className);
+    void loadNamespaces(); // reads <dir_>/.scriptmeta into namespaces_
+    void saveNamespaces() const;
 
     ScriptContext ctx_;
     std::string dir_; // last folder passed to loadFolder
     std::unordered_map<std::string, std::unique_ptr<ClassInfo>> types_;
+    std::unordered_map<std::string, std::string> namespaces_; // className -> namespace
     // ClassInfos for deleted scripts, kept alive so still-attached components
     // don't dangle. Not listed / addable.
     std::vector<std::unique_ptr<ClassInfo>> retired_;
