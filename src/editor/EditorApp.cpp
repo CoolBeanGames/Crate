@@ -511,7 +511,14 @@ void EditorApp::drawHierarchyNode(Actor& actor) {
     if (dimmed)
         ImGui::PopStyleColor();
 
-    if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
+    // IsItemClicked() fires on mouse-DOWN, before any drag has a chance to
+    // register -- selecting here would swap out whatever the Inspector was
+    // showing (e.g. a script field you meant to drag this row onto) the
+    // instant you pressed the mouse button, not just on an actual click.
+    // Select on release-while-still-hovered instead, which a completed drag
+    // (released over some other drop target) never satisfies.
+    if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left) &&
+        !ImGui::IsItemToggledOpen())
         scene_.select(&actor);
 
     // Drag source: carries the actor id, shows a ghost label ("where it was").

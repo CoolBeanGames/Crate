@@ -33,6 +33,10 @@ public:
 private:
     void ensureObject();
     void runHook(const char* hook, bool passDt, float dt);
+    // A field declared as an actor/component type (see isPlainValueType in
+    // the .cpp): drawn as a picker button + drag-drop target for a hierarchy
+    // row, instead of the generic read-only str() label other fields get.
+    void drawRefField(const std::string& label, const std::string& declType, Value& val);
 
     ScriptContext* ctx_ = nullptr;
     const ClassInfo* cls_ = nullptr;

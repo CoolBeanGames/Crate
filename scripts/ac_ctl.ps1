@@ -2,12 +2,14 @@
 # Each invocation is a fresh PowerShell process, so state (the target PID)
 # is persisted to a small file between calls. Not part of the normal build.
 param(
-    [Parameter(Mandatory=$true)][ValidateSet("launch","click","dblclick","rclick","type","slowtype","key","shot","close","wheel")]
+    [Parameter(Mandatory=$true)][ValidateSet("launch","click","dblclick","rclick","type","slowtype","key","shot","close","wheel","drag")]
     [string]$Action,
     [string]$Exe = "build\Crate.exe",
     [int]$WaitSeconds = 4,
     [int]$X = 0,
     [int]$Y = 0,
+    [int]$X2 = 0,
+    [int]$Y2 = 0,
     [string]$Text = "",
     [string]$Name = "shot",
     [int]$Delta = -3
@@ -106,6 +108,27 @@ switch ($Action) {
     "wheel" {
         DoWheel -X $X -Y $Y -Delta $Delta
         Write-Output "wheeled"
+    }
+    "drag" {
+        $h = GetTargetHandle
+        Foreground($h)
+        $r = New-Object AcWin2+RECT
+        [AcWin2]::GetWindowRect($h, [ref]$r) | Out-Null
+        [AcWin2]::SetCursorPos($r.L + $X, $r.T + $Y) | Out-Null
+        Start-Sleep -Milliseconds 100
+        [AcWin2]::mouse_event(0x0002, 0, 0, 0, [UIntPtr]::Zero) # left down
+        Start-Sleep -Milliseconds 80
+        $steps = 12
+        for ($i = 1; $i -le $steps; $i++) {
+            $fx = $X + ($X2 - $X) * $i / $steps
+            $fy = $Y + ($Y2 - $Y) * $i / $steps
+            [AcWin2]::SetCursorPos($r.L + [int]$fx, $r.T + [int]$fy) | Out-Null
+            Start-Sleep -Milliseconds 40
+        }
+        Start-Sleep -Milliseconds 100
+        [AcWin2]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero) # left up
+        Start-Sleep -Milliseconds 200
+        Write-Output "dragged $X,$Y -> $X2,$Y2"
     }
     "dblclick" {
         $h = GetTargetHandle
