@@ -171,51 +171,7 @@
       "isCollapsed": false,
       "isSystem": false,
       "isLocked": false,
-      "tasks": [
-        {
-          "id": "2fa907fcc1324eb9b70af26a9f60659c",
-          "index": 79,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Actor/Camera references unusable in Inspector",
-          "task": "There is no way to reference actors or components (e.g. a Camera) from a script field in the scene. Dragging a hierarchy item onto a reference field doesn\u0027t work because clicking the item to start a drag immediately re-selects it in the Inspector, so the drag target is gone before you can drop it anywhere. Clicking directly on the variable field also does nothing -- no picker opens.",
-          "tags": [
-            "bug"
-          ],
-          "files": [],
-          "customTypeId": null,
-          "customValues": {},
-          "requirements": [
-            {
-              "id": "337f052d359e46608bc02d216a0388d6",
-              "index": 1,
-              "text": "clicking an actor/component-typed field in the Inspector opens a picker to choose an actor from the scene",
-              "isDone": false
-            },
-            {
-              "id": "3fa3818e70f24a4790281fca9831d4be",
-              "index": 2,
-              "text": "dragging a hierarchy row onto a reference field works -- selecting it in the Inspector does not cancel/hijack the drag",
-              "isDone": false
-            }
-          ],
-          "notes": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": true,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-16T03:53:56.2044765+00:00",
-          "updatedAt": "2026-09-16T03:53:56.2046437+00:00"
-        }
-      ]
+      "tasks": []
     },
     {
       "id": "2b668c739ffe45aaa32fa229a7aff5ed",
@@ -799,6 +755,49 @@
           "isCollapsed": false,
           "createdAt": "2026-09-16T04:16:42.0878824+00:00",
           "updatedAt": "2026-09-16T04:26:27.2100351+00:00"
+        },
+        {
+          "id": "2fa907fcc1324eb9b70af26a9f60659c",
+          "index": 79,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Actor/Camera references unusable in Inspector",
+          "task": "There is no way to reference actors or components (e.g. a Camera) from a script field in the scene. Dragging a hierarchy item onto a reference field doesn\u0027t work because clicking the item to start a drag immediately re-selects it in the Inspector, so the drag target is gone before you can drop it anywhere. Clicking directly on the variable field also does nothing -- no picker opens.",
+          "tags": [
+            "bug"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [
+            {
+              "id": "337f052d359e46608bc02d216a0388d6",
+              "index": 1,
+              "text": "clicking an actor/component-typed field in the Inspector opens a picker to choose an actor from the scene",
+              "isDone": true
+            },
+            {
+              "id": "3fa3818e70f24a4790281fca9831d4be",
+              "index": 2,
+              "text": "dragging a hierarchy row onto a reference field works -- selecting it in the Inspector does not cancel/hijack the drag",
+              "isDone": true
+            }
+          ],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-16T03:53:56.2044765+00:00",
+          "updatedAt": "2026-09-16T04:48:48.4871001+00:00"
         },
         {
           "id": "c9d4482b33c94eeda497726091ff6dbf",
