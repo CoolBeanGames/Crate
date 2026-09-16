@@ -1,0 +1,755 @@
+CRATE — "TRANSPLATION" HANDOFF / PROGRESS DOCUMENT
+====================================================
+Zen task: id 613adb44f6ec4217836690ab93326525, index 88, title "Transplation",
+branch: main. Custom "Job" card. Task notes on the card itself (read via
+`zen-operator task 613adb44f6ec4217836690ab93326525` if zen-operator's write
+commands are healthy again — they were broken by a tool bug as of the start of
+this work, reads still worked): "make sure everything works exactly as it does
+now" / "Do not close this task until i tell you to, leave it open to test.
+Stop after this task so I can check everything before moving on to the next
+task" / "only move on to the next task when i approve this one".
+
+PURPOSE OF THIS FILE
+---------------------
+This is a durable, in-repo handoff document for this one task, written so that
+if the implementing agent/session runs out of usage mid-way, a **new agent with
+zero prior conversation context** can read this file alone and correctly
+resume exactly where work left off. Update the PROGRESS LOG at the bottom of
+this file after completing each meaningful step — do not wait until a whole
+phase is done. If you are a fresh agent picking this up: read this entire file
+first, then check the PROGRESS LOG to see what's already done and verified,
+then continue from the first unchecked item. Do not re-do completed steps. Do
+not assume anything is done that isn't logged below as done.
+
+THE GOAL
+--------
+Crate has a custom scripting language "cScript" for gameplay logic, currently
+executed by a hand-rolled tree-walking interpreter (src/script/Interpreter.cpp)
+over an AST from a hand-rolled lexer + recursive-descent parser
+(src/script/Lexer.*, src/script/Parser.*, src/script/Ast.h). Users will keep
+writing cScript exactly as today. The change: at some point scripts get
+compiled to real native C++, and that compiled code — not the interpreter —
+executes during Play mode / at runtime. The interpreter itself is NOT being
+removed: it stays exactly as-is and continues to power everything that happens
+while Play is stopped (Script Editor, autocomplete, Inspector default-value
+editing). Only actual gameplay hook execution (start/update/physicsUpdate)
+switches to compiled native code, and only while Play is running.
+
+Hard requirement from the user: "make sure everything works exactly as it does
+now." Treat any behavior change as something that needs explicit, separate
+sign-off — do not casually "fix" things you notice along the way.
+
+TESTING MANDATE (explicit, additional user instruction — applies to every
+phase below, not just the "new test" bullet listed per phase): write tests
+for EVERYTHING as you go. Every new function gets direct unit coverage, not
+just end-to-end coverage of the feature it's part of. Every value-conversion
+path (every Runtime::coerce() case, every arith() operand-type combination,
+every Value::T pairing, every FieldAccessor get/set, every codegen'd
+expression kind) gets its own explicit test case, not just one representative
+example. Err heavily on the side of more, smaller, more specific test
+functions/cases over fewer broad ones — the user's own words: "make a
+bajillion tests." Do not treat the per-phase "New test" bullets below as the
+ceiling of what to write; treat them as the minimum. When in doubt about
+whether a code path needs its own test, write the test.
+
+DECISIONS ALREADY MADE — DO NOT RE-LITIGATE THESE
+---------------------------------------------------
+1. Namespace = a property set ON THE SCRIPT ASSET ITSELF, editable via the
+   Inspector when a script asset is selected in the Asset Browser. It is NOT a
+   cScript language keyword and NOT inferred from folder structure. Defaults
+   to "Global" when unset. All scripts sharing the same namespace value
+   compile together into one `<namespace>.dll`.
+
+2. Compilation happens ONLY when the user presses Play. Never per-keystroke,
+   never per-individual-save. Exact required flow:
+   - On Play press: force-save all unsaved scripts (reuse the existing
+     ScriptEditor::saveAll()).
+   - Compute which namespaces are dirty (source changed since last successful
+     build) and rebuild them (see Phase 3 for the dependency-graph nuance).
+   - If ANY namespace fails to compile: Play does not start at all. Log which
+     script/namespace failed and the compiler's diagnostic text via the
+     EXISTING Engine Console (src/editor/Console.h — use
+     `Console::get().error(Console::Channel::Engine, "<message>")` or the
+     `CR_ERROR("script", "<message>")` macro from src/core/Log.h, which
+     already routes to the same place). Do NOT build a new console UI — one
+     already exists and is wired into an "Engine Console" panel.
+   - While Play IS running: the Script Editor must refuse to save or trigger
+     any recompilation at all (block saveCurrent()/saveAll()/pushToSystem()
+     while playing; grey out the Save button / show a status message).
+
+3. The Inspector must keep showing AND letting you edit a running script's
+   live field values while Play is active, exactly as it does today, even
+   though the code executing is now compiled native code instead of
+   interpreted. The user explicitly chose this over the cheaper alternative
+   (read-only/hidden fields during Play), accepting that it requires the code
+   generator to also emit a per-class reflection/accessor table.
+
+4. Vector2/Vector3 aliasing is PRESERVED exactly as today. Today they are
+   reference-counted ScriptObjects (shared_ptr), so `var b = a;` between two
+   vectors aliases them (mutating b.x also mutates a.x) — this is arguably an
+   unintentional quirk, but no script or test relies on fixing it, and the
+   user explicitly chose to preserve it as-is for this task. Do NOT change
+   vector semantics to true value types as part of this work. That is
+   explicitly deferred to a separate, future task if ever revisited.
+
+ARCHITECTURE, ONE PARAGRAPH
+----------------------------
+Keep the entire existing interpreter stack (Interpreter, ScriptSystem,
+ScriptComponent, Value/ScriptObject) completely UNCHANGED as the edit-time
+engine. Add a second, parallel execution backend that only takes over
+start()/update(dt)/physicsUpdate(dt) while Play is active: cScript's AST is
+translated to real C++ (reusing the interpreter's own helper semantics,
+extracted into a stateless shared Runtime library so behavior transfers
+mechanically instead of being independently re-derived), compiled+linked
+per-namespace into a versioned DLL via the same MSVC toolchain
+scripts/build.ps1 already uses, and loaded via a narrow extern "C" factory
+ABI. A generated per-class reflection table (field get/set function pointers,
+method invoke, an overflow map for dynamically-created fields) serves THREE
+needs at once with one mechanism: Inspector-during-Play sync, the
+get_component/signals/this.base dynamic-dispatch surface, and cScript's
+undeclared-field auto-creation behavior (`some_undeclared_name = 5;` silently
+creating a new field — see Interpreter.cpp's lvalue(), ~line 931-954).
+
+KEY FACTS DISCOVERED DURING INVESTIGATION (verified against the actual repo,
+not assumed — re-verify line numbers if files have moved since this was written)
+--------------------------------------------------------------------------------
+- crate_core is a single STATIC library (CMakeLists.txt) linked into Crate.exe
+  and all eight *_tests.exe targets. There is ZERO existing DLL / plugin /
+  LoadLibrary / subprocess-compiler infrastructure anywhere in this codebase.
+  A DLL boundary must be built from scratch. Crate.exe cannot patch its own
+  already-loaded static code, so the DLL boundary is mandatory, not optional.
+- scripts/build.ps1 is the canonical build entry point:
+  `powershell -ExecutionPolicy Bypass -File scripts\build.ps1 [Debug|Release]`
+  It locates VS via `vswhere.exe -latest -property installationPath`, then
+  runs everything as ONE `cmd.exe /c "<vcvars64.bat> && <cmake config> && <cmake --build>"`
+  invocation, because vcvars64.bat's INCLUDE/LIB/PATH env vars don't survive
+  across separate process launches. Debug builds into build/, other configs
+  into build-<Config>/ (e.g. build-Release/).
+- Compiler flags actually in use (read directly from build/build.ninja and
+  build-Release/build.ninja, do not assume):
+    Debug:   /DWIN32 /D_WINDOWS /EHsc /Zi /Ob0 /Od /RTC1 -std:c++17 -MDd
+    Release: /DWIN32 /D_WINDOWS /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD
+    crate_core additionally uses /W4 /permissive-
+    Include dirs: -I<repo>\src -I<repo>\third_party
+  CRT linkage (/MDd vs /MD) MUST match between the running host exe and every
+  generated script DLL, or you get heap-mismatch crashes the instant a
+  std::string/shared_ptr/std::function crosses the DLL boundary. There is no
+  CMAKE_MSVC_RUNTIME_LIBRARY override in CMakeLists.txt — it's whatever CMake's
+  per-config MSVC default is for Debug vs Release.
+- The Inspector's script reflection today (src/script/ScriptComponent.cpp,
+  drawInspector() ~line 180-224): iterates `obj_->fields` (an
+  unordered_map<string, Value> on ScriptObject, src/script/Value.h ~line 80-98)
+  and cross-references cls_->decl->fields (the AST's FieldDecl list,
+  src/script/Ast.h ~line 96-100) purely for the declared-type string. Editing
+  an Int/Float/Bool widget mutates the live Value in place by reference — no
+  setter/dispatch layer. drawRefField() (ScriptComponent.cpp ~115-178, added
+  for the actor/component reference picker feature) generalizes this further
+  for Actor/component-typed fields via ctx_->getComponent(actor, declType),
+  which is itself generic over any type name (works for native components
+  like Camera/Fog and for other script classes uniformly).
+- ScriptSystem::compile() (ScriptSystem.cpp ~84-142) is the whole "compile"
+  story today: lex -> parse -> if the class name already exists in types_,
+  REUSE the same ClassInfo* and just swap its ->decl (new AST) and bump
+  ->generation. ClassInfo* pointer identity is stable across edits forever —
+  this is why hot-reload today is instant and pointer-safe. ScriptComponent::
+  ensureObject() (ScriptComponent.cpp ~49-63) checks cls_->generation !=
+  objGen_ and, if changed, drops obj_ entirely and rebuilds it fresh from
+  Interpreter::instantiate() (re-runs field initializers from scratch — no
+  attempt to migrate old field values across a recompile, today or planned).
+- KNOWN EXISTING GAP (do not accidentally fix or worsen without flagging it):
+  editing a BASE class's source does NOT bump a DERIVED class's own
+  ClassInfo::generation (ScriptSystem.cpp ~118 only bumps the recompiled
+  class's own slot) — so a live derived-class ScriptComponent today silently
+  keeps running on stale base-class behavior until something else touches it.
+  This existing bug becomes a much more dangerous ABI/layout mismatch once
+  compiled — see Phase 3's cross-namespace dependency graph, which exists
+  specifically to prevent this failure mode from becoming a hard crash.
+- get_component(type_of(X)), ClassInfo::isA (string-name comparison up the
+  base chain, ClassInfo.h ~64-71), this.base.method(), and Callables (signals'
+  .connect/.emit) are ALL resolved BY NAME at runtime today, in
+  Interpreter.cpp's evalCall and friends — deliberately, because which
+  concrete script classes are attached to which Actor is only known at
+  scene-authoring/runtime. This dynamic-dispatch requirement does not
+  disappear just because the code becomes compiled native C++; the plan's
+  reflection table (Phase 5) is what replaces the by-name lookup for compiled
+  classes.
+- do_async (Interpreter.cpp's runFunction, ~113-184) frame-steps by re-walking
+  a function's TOP-LEVEL statement list every call and skipping to the Nth
+  top-level do_async, running one loop iteration, then returning; resume state
+  lives on ScriptObject::asyncResumeFn/asyncResumeIndex (Value.h ~96-97) — only
+  ONE function's suspension survives per object at a time. Critically: a
+  do_async NESTED inside an if/switch/another loop is NOT frame-stepped — it
+  runs synchronously to completion in one call via the generic execStmt
+  dispatch (same as a plain do-while), guarded by a 1,000,000-iteration cap.
+  Native codegen must reproduce BOTH behaviors exactly (top-level = state
+  machine, nested = synchronous loop) — this nested-vs-top-level distinction
+  is easy to miss and is not covered by any existing test, so Phase 6 adds a
+  new test specifically for it.
+- No scene serialization exists anywhere in this codebase yet (grepped,
+  confirmed absent) — script field values are never persisted to disk beyond
+  the .cscript source text itself. This means there is no on-disk format this
+  work needs to stay compatible with, only the in-memory Inspector contract.
+- AssetDatabase (src/assets/AssetDatabase.h/.cpp) is ONLY a path<->UUID map —
+  it has no field for arbitrary per-asset metadata. Recommendation (Phase 1):
+  do not extend it; add a new small sidecar file mirroring its own tab-
+  separated, project-root, gitignored convention instead, keyed by class name
+  (not path) since ScriptSystem already thinks in terms of class names.
+
+PHASE PLAN
+----------
+Work through these in order. Each phase should end with its own new test(s)
+passing AND the full existing test suite still green before moving on. Per
+the task's own notes, pause for the user's review at natural checkpoints
+rather than pushing through unattended — this is a big, high-risk change.
+
+PHASE 0 — Extract a stateless shared script runtime (pure refactor, ZERO
+behavior change; correctness is validated entirely by the EXISTING test
+suite, no new tests needed for this phase beyond "still green").
+  New files:
+    src/script/Runtime.h / Runtime.cpp
+  Move out of Interpreter.cpp verbatim (no logic changes), and make them free
+  functions taking whatever context they need as parameters instead of
+  reading Interpreter member state:
+    - coerce()              (Interpreter.cpp ~50-64)
+    - arith()                (currently a private Interpreter method; extract
+                               the non-self_-dependent parts)
+    - makeVector()           (declared Interpreter.h ~121)
+    - isVec() / vfield()     (Interpreter.cpp ~24-31)
+    - getNativeField/setNativeField/getNativeMethod (Interpreter.cpp
+      ~455-471, ~524-553) — rewrite these to consult a small reflection
+      table instead of hardcoded `if (o.builtin == "Fog")` chains. Make Fog
+      and Camera the first two table entries — this proves the exact
+      mechanism Phase 5 will reuse for compiled script classes, on already-
+      working, already-tested native components, before any generated code
+      depends on it.
+  Modified files:
+    src/script/Interpreter.cpp — replace moved code with calls into
+      Runtime.h; Interpreter's own arith() becomes a thin wrapper.
+    CMakeLists.txt — add a new STATIC target `crate_script_runtime`
+      containing src/script/Value.cpp, src/script/Runtime.cpp,
+      src/scene/Actor.cpp. Remove those same three .cpp files from
+      crate_core's own source list (they'd otherwise be compiled twice and
+      collide when something links both). crate_core links
+      crate_script_runtime PUBLIC, so Crate.exe and every test target still
+      gets them transitively exactly as before — zero behavior change to the
+      shipped build.
+  IMPORTANT: crate_script_runtime must NEVER pull in anything that touches
+  Console::get()/ComponentRegistry::get()/ScriptSystem::get()/AssetDatabase::
+  get() directly (those are function-local-static singletons inside
+  crate_core; statically linking crate_core a second time into a future
+  script DLL would create a SECOND, disconnected copy of every one of them —
+  log messages would vanish, registry entries would be invisible to the
+  editor). None of Value.cpp/Runtime.cpp/Actor.cpp touch those singleton
+  ACCESSORS — verified directly, not assumed.
+  CAVEAT DISCOVERED DURING IMPLEMENTATION (matters for Phase 3, not Phase 0):
+  Actor.cpp's constructor calls `AssetDatabase::newUuid()` (Actor.cpp ~line
+  12) to mint each Actor's AUUID. newUuid() is a stateless static helper — it
+  does NOT touch the AssetDatabase::get() singleton's instance state (no
+  pathToId_/idToPath_/dbFile_ access), so Actor.cpp calling it does not
+  violate the rule above. BUT newUuid()'s *definition* lives in
+  src/assets/AssetDatabase.cpp, which stays in crate_core, NOT in
+  crate_script_runtime. That's harmless for today's build (Crate.exe and
+  every test link crate_core, which still contains AssetDatabase.cpp, so the
+  symbol resolves fine) — but Phase 3's plan to link a generated script DLL
+  against ONLY crate_script_runtime.lib (deliberately excluding
+  crate_core.lib) will hit an unresolved external symbol for
+  AssetDatabase::newUuid the moment Actor.cpp's code is reachable from that
+  DLL. When you get to Phase 3, resolve this by moving just newUuid()'s
+  implementation out of AssetDatabase.cpp into a tiny stateless-utility file
+  crate_script_runtime also builds (it doesn't touch the singleton, so it
+  belongs there logically anyway) — do this as a small prefix step of Phase
+  3, not by reopening Phase 0.
+  Verification: full existing test suite passes unchanged.
+
+PHASE 1 — Namespace metadata + Inspector UI (no codegen yet).
+  New/modified files:
+    src/script/ScriptSystem.h/.cpp — add:
+      - `std::unordered_map<std::string, std::string> namespaces_;`
+      - `const std::string& namespaceOf(const std::string& className) const;`
+        (returns "Global" when unset)
+      - `void setNamespace(const std::string& className, std::string ns);`
+        (persists immediately)
+      - Persist to `<projectDir>/.scriptmeta` (tab-separated
+        `className<TAB>namespace`), loaded in ScriptSystem's constructor /
+        loadFolder(), saved on every setNamespace() call — mirror
+        AssetDatabase::load()/save()'s existing style exactly.
+      - In setSource()'s rename-cleanup block (ScriptSystem.cpp ~392-405,
+        where it already retires the old ClassInfo and removes the old
+        ComponentRegistry entry on class rename), ALSO rename the
+        namespaces_ key from old name to new name.
+      - In reload()'s deleted-file cleanup block (ScriptSystem.cpp ~166-180),
+        ALSO erase the metadata entry for a deleted script's class name.
+    src/editor/EditorApp.h — add `std::string selectedScript_;`
+    src/editor/EditorApp.cpp:
+      - drawInspector() (~647-845): add a branch modeled directly on the
+        existing material-selection branch (~652-706): when
+        `!a && !selectedScript_.empty()`, show the class name, an
+        InputText("Namespace", ...) bound to ScriptSystem::namespaceOf/
+        setNamespace, and an "Open in Script Editor" button (reuse the exact
+        mechanism the "New Script" flow already uses at ~1402-1403:
+        `openScriptsTab_ = true; scriptEditor_.openScript(name);`).
+      - Clear selectedScript_ everywhere selectedMaterial_/selectedAsset_
+        are already cleared (~191-192, ~1827-1828, ~1849-1850) to keep
+        selection mutually exclusive.
+      - FIX (small, contained, uncovered during investigation): the Asset
+        Browser's script tile click handler in drawAssetFolders() (~1630-
+        1683) currently calls ingestDroppedFile() on EVERY click (single or
+        double — assetIconTile's `clicked` fires on any click, ~1568-1572;
+        unlike the adjacent isMap branch there is no double-click gate for
+        scripts), which re-copies the file onto itself and reloads ALL
+        scripts on every single click, and there is currently no "select a
+        script asset to inspect it" concept at all. Change so: single click
+        sets selectedScript_ (resolve the class name from `path` via
+        ScriptSystem::files()) without reloading anything; double click opens
+        it in the Script Editor (same as the New Script flow).
+    .gitignore — add `/.scriptmeta` next to the existing `/assets/.assetdb`.
+  New test: tests/script_metadata_tests.cpp (namespace defaults to "Global",
+    persists across a fresh ScriptSystem load, follows a class rename).
+    Register it in CMakeLists.txt following the exact pattern every other
+    test target already uses.
+  Verification: new test passes; full existing suite still green.
+
+PHASE 2 — cScript AST -> C++ codegen (TEXT EMISSION ONLY, nothing wired up
+yet — this phase's own test harness just checks the emitted text compiles
+standalone, e.g. via `cl.exe /c` or CMake try_compile).
+  New files:
+    src/script/CodeGen.h/.cpp
+  Given a ClassDecl (src/script/Ast.h ~107-115), emit:
+    - A header per class: a C++ class (inheriting from a generated base or
+      directly from crate::Component depending on whether the cScript base
+      is Actor/Actor2D/Actor3D or another script class), Value-typed member
+      per declared field (in declaration order — real struct offsets, not a
+      hash map), an `std::unordered_map<std::string, Value> overflow_;`
+      escape hatch (see Phase 5), one method per declared function, and the
+      do_async resume-state pair (see Phase 6).
+    - A .cpp whose method bodies mirror Interpreter::execStmt/eval's cases
+      (Interpreter.cpp: execStmt/execBlock ~186-265, eval ~276-347, evalCall
+      ~626-755, arith ~377-424, lvalue ~931-954) NODE-FOR-NODE as real
+      emitted C++ control flow (if/switch/while/return/break/continue),
+      calling into Runtime.h helpers (Phase 0) for anything the interpreter
+      itself calls a helper for. This is the key correctness strategy: don't
+      re-derive semantics independently, mechanically transcribe the AST
+      walk the interpreter already does (and which is already covered by
+      tests/script_tests.cpp) into equivalent native control flow.
+    - `this.method()` / `this.field` on the class's OWN declared members
+      compile to a direct C++ call/member access (fast path). Only cross-
+      class/by-name access (this.base.method(), get_component, signals,
+      Callables, Inspector sync) goes through the Phase 5 reflection table.
+  New test: tests/codegen_tests.cpp — for an escalating battery of small
+    .cscript sources (field + arithmetic in update(); if/switch/do; a class
+    with a base), run Lexer -> Parser -> CodeGen, write the emitted text to
+    the build/scratch dir, invoke cl.exe /c and assert zero compile errors.
+  Verification: codegen_tests passes; full existing suite still green
+    (nothing before this phase's test touches the shipped interpreter path).
+
+PHASE 3 — DLL build pipeline (dirty tracking, dependency graph, toolchain
+invocation, versioned output).
+  New files:
+    src/editor/ScriptBuild.h/.cpp:
+      - ToolchainEnv: runs vcvars64.bat ONCE per editor session (cached),
+        captures resulting INCLUDE/LIB/PATH, then every subsequent cl.exe/
+        link.exe spawn applies that captured environment directly — avoids
+        re-running vcvars64.bat (itself non-trivially slow) on every Play
+        press.
+      - computeDirtyNamespaces(): group ScriptSystem::files()/types() by
+        ScriptSystem::namespaceOf(className) (Phase 1), fingerprint each
+        namespace (hash of sorted (className, source text) pairs), compare
+        against a persisted manifest at `<projectDir>/.crate_build/
+        manifest.tsv` (namespace<TAB>generation<TAB>fingerprint), return the
+        set changed or never-built.
+      - computeRebuildSet(): build a directed namespace->namespace graph — an
+        edge A->B exists if some class in namespace A has ClassInfo::base
+        resolving to a class in namespace B (ClassInfo::baseClass,
+        ClassInfo.h ~23), A != B. Take the transitive closure of
+        computeDirtyNamespaces() over this graph (a namespace depending, even
+        indirectly, on a dirty namespace ALSO becomes dirty — this is what
+        prevents the base-class-ABI-mismatch crash described above), then
+        topologically sort (bases before derived) so a derived namespace's
+        compile step can see its base namespace's freshly generated header
+        and freshly built import lib.
+      - buildNamespace(name, classes, config): emit each class's .gen.h/.cpp
+        (Phase 2), compile each with cl.exe /nologo /c using the config-
+        matched flags listed above plus -I<repo>\src -I<repo>\third_party
+        and -I for any dependency namespace's generated-header dir; link with
+        link.exe /nologo /DLL against the compiled .obj's,
+        crate_script_runtime.lib (Phase 0 — NEVER crate_core.lib), and any
+        dependency namespace's .lib; on success, update the manifest.
+      - VERSIONED, SHADOW-COPIED output: `<projectDir>\.crate_build\bin\
+        <Namespace>_v<generation>.dll/.pdb/.lib`. Windows will not let you
+        overwrite a loaded DLL's backing file, and FreeLibrary's lock
+        release isn't guaranteed-instant (AV scanning, debugger attach), so
+        every successful build gets a brand-new filename. Best-effort delete
+        stale generations (try once immediately; otherwise sweep at next
+        engine startup before anything is loaded).
+  Modified files:
+    CMakeLists.txt — add a `CRATE_ENGINE_BUILD_DIR="${CMAKE_BINARY_DIR}"`
+      compile definition on the Crate target (mirror the existing
+      CRATE_SCRIPTS_DIR/CRATE_TEST_DATA pattern) so ScriptBuild.cpp has an
+      authoritative path to the already-built crate_script_runtime.lib for
+      the exact running config.
+    .gitignore — add `/.crate_build/` and `*.dll` (nothing currently
+      generates .dll's; every other build-artifact extension is already
+      covered).
+  ALTERNATIVE CONSIDERED, NOT the default (only reconsider if the dependency-
+  tracked cross-namespace inheritance rebuild proves too fragile in
+  practice): have every generated native class inherit ONLY from
+  crate::Component directly, and resolve this.base.* purely through the
+  Phase 5 reflection table by class-name string (composition instead of real
+  C++ inheritance) — eliminates the ABI-layout risk entirely, at the cost of
+  this.base calls always going through a name lookup (no slower than what the
+  interpreter already does today, so this is a safe fallback, not a
+  regression, if you end up needing it).
+  New test: tests/script_build_tests.cpp — two namespaces, one deriving
+    across namespaces; verify dirty-tracking rebuilds only what changed,
+    verify the transitive-dependency case forces both to rebuild, verify
+    versioned filenames never collide. Guard with a runtime check that skips
+    gracefully if vswhere.exe / the MSVC toolchain isn't discoverable (so
+    machines without VS don't fail this test).
+  Verification: script_build_tests passes; full existing suite still green.
+
+PHASE 4 — Runtime DLL loading + extern "C" factory ABI + registry
+integration.
+  ABI (keep it minimal, avoid by-value STL types crossing the boundary):
+    extern "C" __declspec(dllexport) crate::Component*
+      CreateInstance_<ClassName>(crate::script::ScriptContext* ctx,
+                                  crate::Actor* owner);
+    extern "C" __declspec(dllexport) void
+      DestroyInstance_<ClassName>(crate::Component* instance);
+    extern "C" __declspec(dllexport) const crate::script::CompiledClassInfo*
+      GetClassInfo_<ClassName>();
+  DestroyInstance exists (rather than a bare `delete` from the caller side)
+  because Component::~Component() is virtual and defined `= default` inline
+  in the header — routing destruction through an explicit exported function
+  keeps the deleting-destructor code running inside the DLL's own CRT,
+  explicitly and reviewably, rather than relying on virtual-dispatch
+  subtlety across the boundary.
+  New files:
+    src/script/NativeModule.h/.cpp — LoadLibraryW/GetProcAddress/FreeLibrary
+      wrapper; NativeModule::load(dllPath) resolves every CreateInstance_*/
+      DestroyInstance_*/GetClassInfo_* triplet a namespace's manifest says it
+      exports (Phase 3 records the exported class list per namespace
+      alongside the manifest).
+    src/script/NativeClassRegistry.h/.cpp — a small registry paralleling
+      ComponentRegistry (src/scene/ComponentRegistry.h ~15-19, .cpp ~11-22)
+      but keyed by class name -> {CompiledClassInfo*, create, destroy}. On
+      successful load of a namespace's DLL, register every class it exports;
+      on Stop (or before a rebuild), unregister and FreeLibrary.
+  Modified files:
+    src/scene/ComponentRegistry.h/.cpp — reuse its EXISTING `replace=true`
+      factory-registration path (already there, already commented "used when
+      a script recompiles" — ComponentRegistry.h ~24-27) UNCHANGED: for each
+      native class, `ComponentRegistry::get().add(className, "Scripts",
+      [ctx, nativeEntry]{ return std::make_unique<NativeScriptComponent>(ctx,
+      nativeEntry); }, /*replace=*/true);` — meaning the Add-Component menu
+      and everything that already calls ComponentRegistry::create(name)
+      (EditorApp.cpp ~829, tests/script_bug_tests.cpp ~31, tests/
+      script_integration_tests.cpp ~37) needs ZERO changes.
+  New test: tests/native_module_tests.cpp — build a trivial one-class
+    namespace via Phase 3's pipeline, load it, CreateInstance, call update()
+    through the Component* interface, verify field values, DestroyInstance,
+    FreeLibrary, confirm no crash on teardown.
+  Verification: native_module_tests passes; full existing suite still green.
+
+PHASE 5 — Reflection/accessor table (THE MOST IMPORTANT PHASE for behavior
+parity — this is what makes decisions #3 and #4 above actually work).
+  New files:
+    src/script/CompiledClassInfo.h:
+      struct FieldAccessor {
+          const char* name;
+          const char* declaredType;   // "" for var, else "int"/"Vector3"/a
+                                        // class name -- same strings
+                                        // ClassInfo::decl->fields carries
+          crate::script::Value (*get)(void* instance);
+          void (*set)(void* instance, const crate::script::Value&);
+      };
+      struct MethodAccessor {
+          const char* name;
+          crate::script::Value (*invoke)(void* instance,
+              crate::script::ScriptContext*,
+              std::vector<crate::script::Value>);
+      };
+      struct CompiledClassInfo {
+          const char* className;
+          const char* baseClassName;  // "" if native base (Actor/Actor2D/Actor3D)
+          const FieldAccessor* fields; size_t fieldCount;
+          const MethodAccessor* methods; size_t methodCount;
+          std::unordered_map<std::string, crate::script::Value>&
+              (*overflow)(void*);      // Phase 4's decision-#4 escape hatch
+          bool isA(const std::string& typeName) const; // walks baseClassName
+              // via NativeClassRegistry, mirrors ClassInfo::isA exactly
+              // (ClassInfo.h ~64-71)
+      };
+    Generated per class by Phase 2's CodeGen.cpp as a `static constexpr`
+    array + one CompiledClassInfo instance, exported via GetClassInfo_
+    <ClassName>() (Phase 4's ABI).
+    src/script/NativeScriptComponent.h/.cpp — sibling to ScriptComponent
+    (does NOT replace it). Owns BOTH representations:
+      - obj_ : shared_ptr<ScriptObject>, built via Interpreter::instantiate
+        exactly as ScriptComponent does today — purely so drawInspector()
+        (copy-paste UNCHANGED from ScriptComponent::drawInspector(),
+        ScriptComponent.cpp ~180-224) keeps working verbatim, with zero
+        modification to that function.
+      - a native instance pointer + its CompiledClassInfo* (resolved via
+        NativeClassRegistry).
+    NativeScriptComponent::runHook(hook, dt) does exactly three things:
+      1. push obj_->fields -> native instance via fields[].set() (so an
+         Inspector edit made during Play reaches the running native code).
+      2. invoke the native hook (recommend exposing start/update/
+         physicsUpdate as their OWN always-present exported function
+         pointers on the registry entry, rather than round-tripping every
+         frame through the generic by-name methods[] table, since they're
+         the hot path).
+      3. pull native instance -> obj_->fields via fields[].get() (so the
+         Inspector reflects what the native code just did).
+    ScriptComponent itself (interpreter-backed) is constructed and used
+    while Play is stopped, exactly as today, completely untouched.
+  Modified files:
+    src/script/Value.h — add `const CompiledClassInfo* compiledInfo =
+      nullptr;` to ScriptObject (alongside the existing nativePtr; forward-
+      declare CompiledClassInfo). This generalizes the exact "live view onto
+      a native pointer" pattern already used for Fog/Camera (Value.h ~88-93)
+      to also cover compiled script classes.
+    src/script/Runtime.cpp (Phase 0's generalized getNativeField/
+      setNativeField/method dispatch) — when a ScriptObject has
+      compiledInfo set, consult its fields[]/methods[] tables by name
+      instead of the old `if (builtin == "Fog")` chains.
+  New test: tests/native_reflection_tests.cpp — compile a class with a
+    declared field AND an undeclared runtime-created field, drive it through
+    NativeScriptComponent, and verify obj_->fields matches BIT-FOR-BIT what
+    the interpreter produces for the identical script. THIS is the strongest
+    regression guarantee the whole feature has for "everything works exactly
+    as it does now" — port essentially every case from tests/script_tests.cpp
+    (511 lines) and tests/script_bug_tests.cpp through this side-by-side
+    parity harness rather than writing independent native-only assertions.
+  Verification: native_reflection_tests passes (parity confirmed); full
+    existing suite still green.
+
+PHASE 6 — do_async codegen.
+  Reconfirmed exact interpreter semantics (Interpreter.cpp ~113-184 and
+  execStmt's DoAsync case ~218-234) — reproduce ALL of these exactly:
+    - Only TOP-LEVEL do_async statements in a function's own body get frame-
+      stepped, one-iteration-per-call treatment.
+    - A do_async NESTED inside an if/switch/another loop runs synchronously
+      to completion in a single call via the generic execStmt dispatch
+      (identical to a plain do-while), guarded by the same 1,000,000-
+      iteration cap. This is exactly what ships today — not a hypothetical
+      edge case to design around later.
+    - Only ONE function's suspension survives per object at a time
+      (asyncResumeFn/asyncResumeIndex on ScriptObject) — calling a different
+      hook while one is suspended discards the other's resume point.
+    - Statements strictly BEFORE the target top-level do_async are NOT re-
+      executed on a resumed call — only object fields survive a yield, not
+      locals declared before the do_async.
+  Codegen strategy (hand-rolled `switch`-based resume-point state machine,
+  computed STATICALLY at codegen time since the generator already knows
+  exactly which statement index each top-level do_async sits at):
+    Value ClassName_Native::call_update(std::vector<Value> args) {
+        float dt = ...;
+        int resumeAt = (asyncResumeFn_ == "update") ? asyncResumeIndex_ : -1;
+        switch (resumeAt < 0 ? 0 : <case for resumeAt>) {
+        case 0:
+            /* statements before the first top-level do_async */
+            [[fallthrough]];
+        case <N>:
+            if (Runtime::truthy(eval_cond_0())) {
+                bool broke = run_body_0_once(); // break/continue map to
+                    // plain C++ break/continue inside body_0's own emitted
+                    // loop-guard block
+                if (!broke) {
+                    asyncResumeFn_ = "update"; asyncResumeIndex_ = <N>;
+                    return Value::Null_();
+                }
+            }
+            [[fallthrough]];
+        /* ... one case per top-level do_async ... */
+        }
+        if (asyncResumeFn_ == "update") {
+            asyncResumeFn_.clear(); asyncResumeIndex_ = -1;
+        }
+        return Value::Null_();
+    }
+  Chosen over C++20 coroutines specifically because coroutines' own suspend/
+  resume/lifetime rules are a differently-specified feature that risks
+  subtly diverging from the interpreter's exact, already-tested behavior —
+  the hand-rolled switch gives full, auditable control over matching it
+  precisely.
+  Modified files: src/script/CodeGen.h/.cpp — the statement-emission pass
+    needs to detect a function's own top-level do_async positions and emit
+    the switch/fallthrough shape there; everywhere else, ordinary recursive
+    emission (including a do_async nested inside a conditional, which
+    lowers to an ordinary synchronous do-while with the same iteration cap).
+  New test: tests/do_async_native_tests.cpp — port the existing test from
+    tests/script_tests.cpp (~477-498) verbatim into the native path and
+    assert byte-identical field values frame-by-frame against the
+    interpreter, PLUS a NEW test for a do_async nested inside an if,
+    asserting it runs to completion synchronously in both the interpreter
+    and the compiled path (this exact case is not covered by any existing
+    test today and is exactly the kind of divergence this phase risks
+    introducing if missed).
+  Verification: do_async_native_tests passes; full existing suite still
+    green.
+
+PHASE 7 — EditorApp::setPlaying() integration.
+  Current implementation (EditorApp.cpp ~1922-1948): sets playing_ = playing
+  unconditionally up front, then (if entering Play) calls
+  scriptEditor_.saveAll(), clones the scene into playBackup_, etc.
+  Modified files:
+    src/editor/EditorApp.cpp — restructure so playing_ is only set TRUE
+      after the compile gate succeeds (it must stay false if the gate
+      fails, so Play never visibly starts):
+      void EditorApp::setPlaying(bool playing) {
+          if (playing_ == playing) return;
+          if (playing) {
+              scriptEditor_.saveAll();                        // exists today
+              auto dirty = ScriptBuild::computeRebuildSet();   // Phase 3
+              for (auto& ns : dirty) {
+                  std::string err;
+                  if (!ScriptBuild::buildNamespace(ns, &err)) {
+                      CR_ERROR("script", ns + " failed to compile: " + err);
+                      return; // abort: playing_ stays false
+                  }
+              }
+              NativeModule::loadAll(dirty);                    // Phase 4
+              playing_ = true;
+              playBackup_ = scene_.clone();
+              ... // unchanged from here down
+          } else {
+              ... // unchanged
+          }
+      }
+      CR_ERROR (src/core/Log.h ~28-29) already routes to
+      Console::get().log(Channel::Engine, Level::Error, cat, msg) — this
+      satisfies the console-reporting requirement with ZERO new plumbing.
+    src/editor/ScriptEditor.h — add `void setPlaying(bool p) { playing_ =
+      p; }` and a `bool playing_ = false;` member.
+    src/editor/ScriptEditor.cpp — saveCurrent()/saveAll()/pushToSystem()
+      (~78-107) no-op (return false / do nothing) while playing_ is true;
+      grey out the Save button and show a status message (e.g. "Play is
+      running — editing disabled") in the toolbar (~184-202); EditorApp
+      calls scriptEditor_.setPlaying(...) at the top of its own
+      setPlaying().
+  Verification: manual smoke test (this phase is almost entirely UI glue;
+    there's no existing precedent in this codebase for driving EditorApp
+    headlessly, so cover the underlying logic via Phase 3's tests and treat
+    this phase's own verification as a manual checklist item — see Phase 8).
+
+PHASE 8 — Test strategy summary (informational — the actual new test files
+are listed per-phase above; this phase is just the checklist for final
+sign-off).
+  - Existing interpreter tests (script_tests, script_bug_tests,
+    script_integration_tests) are NEVER modified. The interpreter isn't
+    going away.
+  - All new test targets follow the exact existing CMakeLists.txt pattern:
+    add_executable(x_tests tests/x_tests.cpp); target_link_libraries(x_tests
+    PRIVATE crate_core); register it the same way every other test target is
+    registered.
+  - Manual checklist for Phase 7 (no automated driver exists for EditorApp):
+    (a) edit a script, press Play, confirm it runs compiled and Inspector
+    shows/edits live values; (b) introduce a deliberate compile error in a
+    script, press Play, confirm Play does NOT start and the Engine Console
+    shows the failing script + diagnostic; (c) while Play is running, try to
+    edit and save a script, confirm it's blocked; (d) Stop, confirm the
+    Script Editor is editable again and the scene reverts via the existing
+    playBackup_ mechanism exactly as before this feature existed.
+
+VERIFICATION EXPECTED AFTER EVERY PHASE
+-----------------------------------------
+0. Exhaustive coverage per the TESTING MANDATE above: every new function has
+   its own direct test case(s); every value-conversion/coercion path has an
+   explicit case per input-type combination, not one representative sample.
+   Favor many small, specifically-named test cases over few broad ones.
+1. That phase's own new test target passes.
+2. The FULL existing test suite still passes with zero regressions:
+   script_tests, script_bug_tests, script_integration_tests, actor_tests,
+   mesh_tests, lighting_bake_tests, asset_db_tests, image_tests, fbx_tests.
+   Build via `powershell -ExecutionPolicy Bypass -File scripts\build.ps1
+   Debug` from the repo root, then run each `build/<name>.exe`.
+3. Commit the phase's changes with a clear message before moving to the next
+   phase, so there's always a clean rollback point.
+4. Update the PROGRESS LOG below with what was completed and verified.
+5. Per the task's own notes ("stop after this task so I can check
+   everything... only move on... when i approve"), pause at natural
+   checkpoints for the user's review rather than pushing through all 8
+   phases unattended in one sitting.
+
+KNOWN OPEN ITEMS / THINGS TO DOUBLE CHECK IF YOU'RE PICKING THIS UP FRESH
+---------------------------------------------------------------------------
+- zen-operator.exe's WRITE commands (archive, tag add, progress start, etc.)
+  were broken at the start of this work — every mutating command failed with
+  a spurious "error: Task '--id' was not found." regardless of arguments,
+  while READ commands (project, task, tasks) worked fine. This is a bug in
+  the user's own separate "Zen" tool (a different project at
+  C:\Users\haptic\Documents\git\zen), not something to fix from the Crate
+  repo. If it's still broken when you pick this up, do NOT hand-edit
+  zen.tasks.json (explicitly forbidden by the tool's own instructions) —
+  just note the blocker to the user same as this file does.
+- Confirm the exact current git branch/commit this work is happening on
+  before making changes — check `git log --oneline -5` and `git status`.
+- Re-verify every file:line citation above against the current state of the
+  files before relying on it — this document reflects a point-in-time
+  investigation and the repo may have moved since.
+
+PROGRESS LOG
+============
+(Append one dated entry per completed step. Do not remove or rewrite prior
+entries — this is a running history, not a status snapshot.)
+
+2026-09-16 — Plan approved by user. This handoff document created before any
+  code changes, per the user's explicit request. No implementation work has
+  started yet. Next step: begin Phase 0 (extract Runtime.h/.cpp).
+
+2026-09-16 — PHASE 0 COMPLETE AND VERIFIED. Created src/script/Runtime.h and
+  Runtime.cpp: moved RuntimeError, coerce(), makeVector(), isVec(), vfield(),
+  and arith() out of Interpreter.cpp/.h verbatim (behavior unchanged); moved
+  getNativeField()/setNativeField() out and rewrote them as a small static
+  table (kFogFields/kCameraFields in an anonymous namespace in Runtime.cpp)
+  instead of hardcoded if-chains, with function-pointer get/set per field --
+  proves the exact mechanism Phase 5 will reuse for compiled script classes;
+  moved the Camera.main helpers (mainCameraFrom, activateMainCamera, plus
+  the internal-only findCameraComp/disableOtherCameraComps/sceneRootOf) out
+  the same way. Interpreter.h now includes Runtime.h instead of defining
+  RuntimeError/makeVector itself; Interpreter::arith() is now a one-line
+  thin wrapper calling crate::script::arith(). Added CMakeLists.txt target
+  `crate_script_runtime` (Value.cpp, Runtime.cpp, Actor.cpp), linked PUBLIC
+  by crate_core; removed those three .cpp files from crate_core's own source
+  list to avoid double-compilation. Discovered and documented (see CAVEAT
+  above, under Phase 0's own section) that Actor.cpp's call to
+  AssetDatabase::newUuid() is a Phase-3-relevant loose end, not a Phase 0
+  problem -- flagged for resolution as a small prefix step of Phase 3, not
+  fixed now (out of Phase 0's scope).
+  New test: tests/runtime_tests.cpp, registered in CMakeLists.txt -- 210
+  explicit checks covering every function in Runtime.h with dedicated cases
+  per value-conversion path (every coerce() source-type x target-type
+  combination actually exercised, not sampled; every arith() operator x
+  type-combination branch including the Plus/string-concat/Char quirk,
+  vector broadcast from both operand positions, Vector2/Vector3 kind
+  promotion, every division/modulo-by-zero throw path; both Fog and Camera
+  native-field get/set including the "active=false with null owner does
+  nothing" and "set color with a non-Object value is a no-op but still
+  reports handled" edge cases; mainCameraFrom/activateMainCamera including
+  the null-root early-return that must NOT mutate the target camera).
+  Verification performed: `powershell -ExecutionPolicy Bypass -File
+  scripts\build.ps1 Debug` built clean with zero errors/warnings-as-changed;
+  ran all 10 test executables directly (runtime_tests included) -- all
+  passed, zero regressions:
+    runtime_tests: ok 210 checks passed
+    script_tests: ok 52 checks passed
+    script_bug_tests: ok
+    script_integration_tests: ok (all 5 sub-checks, live-recompile identity
+      contract still holds)
+    actor_tests: ok 60 checks passed
+    mesh_tests: ok
+    lighting_bake_tests: ok
+    asset_db_tests: ok
+    image_tests: ok 11 checks passed
+    fbx_tests: ok
+  Files touched this phase: src/script/Runtime.h (new), src/script/
+  Runtime.cpp (new), src/script/Interpreter.h (modified), src/script/
+  Interpreter.cpp (modified), CMakeLists.txt (modified: new
+  crate_script_runtime target + crate_core source-list/link changes + new
+  runtime_tests target), tests/runtime_tests.cpp (new).
+  NOT YET COMMITTED to git as of writing this entry -- see next action.
+  Next step: git commit Phase 0, then pause for the user's review before
+  starting Phase 1 (namespace metadata + Inspector UI), per the task's own
+  "stop... so I can check everything" note and the phased-review intent of
+  this whole plan.

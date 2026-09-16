@@ -47,16 +47,30 @@ if(MSVC)
     target_compile_options(ufbx PRIVATE /w) # vendored code, silence warnings
 endif()
 
+# --- Shared, stateless script runtime ---------------------------------------
+# Deliberately excludes anything that reaches an engine singleton
+# (Console::get(), ComponentRegistry::get(), ScriptSystem::get(),
+# AssetDatabase::get()) so it is safe to statically link into a future
+# natively-compiled script DLL without creating a second, disconnected copy
+# of those singletons (see transpiration.txt, "Transplation" Phase 0).
+add_library(crate_script_runtime STATIC
+    src/script/Value.cpp
+    src/script/Runtime.cpp
+    src/scene/Actor.cpp
+)
+target_include_directories(crate_script_runtime PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
+if(MSVC)
+    target_compile_options(crate_script_runtime PRIVATE /W4 /permissive-)
+endif()
+
 # --- Crate engine core -----------------------------------------------------
 add_library(crate_core STATIC
     src/core/Log.cpp
-    src/scene/Actor.cpp
     src/scene/Scene.cpp
     src/scene/ComponentRegistry.cpp
     src/scene/BuiltinComponents.cpp
     src/script/Lexer.cpp
     src/script/Parser.cpp
-    src/script/Value.cpp
     src/script/Interpreter.cpp
     src/script/Format.cpp
     src/script/ScriptComponent.cpp
@@ -78,7 +92,7 @@ add_library(crate_core STATIC
     src/editor/EditorApp.cpp
 )
 target_include_directories(crate_core PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
-target_link_libraries(crate_core PUBLIC imgui imgui_texteditor imguizmo ufbx comdlg32 xinput)
+target_link_libraries(crate_core PUBLIC crate_script_runtime imgui imgui_texteditor imguizmo ufbx comdlg32 xinput)
 
 # --- Editor executable ---------------------------------------------------
 add_executable(Crate WIN32 src/main.cpp)
@@ -107,6 +121,10 @@ enable_testing()
 add_executable(actor_tests tests/actor_tests.cpp)
 target_link_libraries(actor_tests PRIVATE crate_core)
 add_test(NAME actor_tests COMMAND actor_tests)
+
+add_executable(runtime_tests tests/runtime_tests.cpp)
+target_link_libraries(runtime_tests PRIVATE crate_core)
+add_test(NAME runtime_tests COMMAND runtime_tests)
 
 add_executable(fbx_tests tests/fbx_tests.cpp)
 target_link_libraries(fbx_tests PRIVATE crate_core)

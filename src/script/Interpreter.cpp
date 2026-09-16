@@ -1,6 +1,7 @@
 #include "script/Interpreter.h"
 
 #include "core/Math.h"
+#include "script/Runtime.h"
 #include "scene/Actor.h"
 #include "scene/BuiltinComponents.h"
 
@@ -10,25 +11,6 @@
 #include <random>
 
 namespace crate::script {
-
-Value makeVector(const std::string& kind, double x, double y, double z) {
-    auto o = std::make_shared<ScriptObject>();
-    o->builtin = kind;
-    o->fields["x"] = Value::Float(x);
-    o->fields["y"] = Value::Float(y);
-    o->fields["z"] = Value::Float(kind == "Vector2" ? 0.0 : z);
-    return Value::Obj(o);
-}
-
-// True for a Vector2 / Vector3 aggregate value.
-static bool isVec(const Value& v) {
-    return v.t == Value::T::Object && v.obj &&
-           (v.obj->builtin == "Vector2" || v.obj->builtin == "Vector3");
-}
-static double vfield(const Value& v, const char* f) {
-    auto it = v.obj->fields.find(f);
-    return it == v.obj->fields.end() ? 0.0 : it->second.num();
-}
 
 Interpreter::Interpreter(ScriptContext* ctx, std::shared_ptr<ScriptObject> self)
     : ctx_(ctx), self_(std::move(self)) {
@@ -43,24 +25,6 @@ std::shared_ptr<ScriptObject> Interpreter::instantiate(ScriptContext* ctx, const
     Interpreter interp(ctx, obj);
     interp.constructFields();
     return obj;
-}
-
-// Coerce a value to a declared type name (best effort; keeps the value on a
-// mismatch rather than erroring, in the spirit of a loose scripting language).
-static Value coerce(Value v, const std::string& ty) {
-    if (ty.empty())
-        return v;
-    if (ty == "int")
-        return Value::Int((long long)v.num());
-    if (ty == "float")
-        return Value::Float(v.num());
-    if (ty == "bool")
-        return Value::Bool(v.truthy());
-    if (ty == "string")
-        return v.t == Value::T::String ? v : Value::Str(v.str());
-    if (ty == "char")
-        return v.t == Value::T::Char ? v : Value::Char(v.str().empty() ? '\0' : v.str()[0]);
-    return v; // Actor / Vector / arrays / class types pass through
 }
 
 void Interpreter::constructFields() {
@@ -375,52 +339,10 @@ Value Interpreter::evalBinary(const Expr& e) {
 }
 
 Value Interpreter::arith(Tok op, const Value& a, const Value& b, int line) {
-    if (op == Tok::Plus && (a.t == Value::T::String || b.t == Value::T::String ||
-                            a.t == Value::T::Char || b.t == Value::T::Char))
-        return Value::Str(a.str() + b.str());
-
-    // Vector math: vector op vector is component-wise; vector op scalar (and
-    // scalar op vector) broadcasts the scalar to every component.
-    if (isVec(a) || isVec(b)) {
-        const std::string kind = ((isVec(a) && a.obj->builtin == "Vector3") ||
-                                  (isVec(b) && b.obj->builtin == "Vector3"))
-                                     ? "Vector3"
-                                     : "Vector2";
-        double ax, ay, az, bx, by, bz;
-        if (isVec(a)) { ax = vfield(a, "x"); ay = vfield(a, "y"); az = vfield(a, "z"); }
-        else          { ax = ay = az = a.num(); }
-        if (isVec(b)) { bx = vfield(b, "x"); by = vfield(b, "y"); bz = vfield(b, "z"); }
-        else          { bx = by = bz = b.num(); }
-        switch (op) {
-            case Tok::Plus:  return makeVector(kind, ax + bx, ay + by, az + bz);
-            case Tok::Minus: return makeVector(kind, ax - bx, ay - by, az - bz);
-            case Tok::Star:  return makeVector(kind, ax * bx, ay * by, az * bz);
-            case Tok::Slash:
-                if (bx == 0.0 || by == 0.0 || (kind == "Vector3" && bz == 0.0))
-                    throw RuntimeError("division by zero", line);
-                return makeVector(kind, ax / bx, ay / by, az / bz);
-            default:
-                throw RuntimeError("operator not defined for vectors", line);
-        }
-    }
-
-    bool bothInt = a.t == Value::T::Int && b.t == Value::T::Int;
-    double x = a.num(), y = b.num();
-    switch (op) {
-        case Tok::Plus: return bothInt ? Value::Int(a.i + b.i) : Value::Float(x + y);
-        case Tok::Minus: return bothInt ? Value::Int(a.i - b.i) : Value::Float(x - y);
-        case Tok::Star: return bothInt ? Value::Int(a.i * b.i) : Value::Float(x * y);
-        case Tok::Slash:
-            if (y == 0.0)
-                throw RuntimeError("division by zero", line);
-            return bothInt ? Value::Int(a.i / b.i) : Value::Float(x / y);
-        case Tok::Percent:
-            if (y == 0.0)
-                throw RuntimeError("modulo by zero", line);
-            return bothInt ? Value::Int(a.i % b.i) : Value::Float(std::fmod(x, y));
-        default: break;
-    }
-    throw RuntimeError("bad operator", line);
+    // Thin wrapper: the actual logic is stateless (no dependency on self_/
+    // ctx_/scopes_) and lives in Runtime.h/.cpp so generated native code can
+    // call the identical implementation. See transpiration.txt Phase 0.
+    return crate::script::arith(op, a, b, line);
 }
 
 Value Interpreter::actorMember(crate::Actor* a, const std::string& name, int line) {
@@ -445,111 +367,6 @@ Value Interpreter::actorMember(crate::Actor* a, const std::string& name, int lin
         return makeVector("Vector3", dir.x, dir.y, dir.z);
     }
     throw RuntimeError("Actor has no member '" + name + "'", line);
-}
-
-// Native (non-script) components are exposed through get_component() as a
-// "live" ScriptObject: builtin names which kind and nativePtr points at the
-// real component, so reads/writes below go straight to it instead of a
-// disposable fields-map snapshot. Add a case here (and in setNativeField)
-// for each native component type that should be get_component()-able.
-static bool getNativeField(const ScriptObject& o, const std::string& name, Value& out) {
-    if (o.builtin == "Fog") {
-        auto* fc = static_cast<FogComponent*>(o.nativePtr);
-        if (name == "color") { out = makeVector("Vector3", fc->color[0], fc->color[1], fc->color[2]); return true; }
-        if (name == "start") { out = Value::Float(fc->start); return true; }
-        if (name == "end") { out = Value::Float(fc->end); return true; }
-        if (name == "height_range") { out = Value::Float(fc->heightRange); return true; }
-    }
-    if (o.builtin == "Camera") {
-        auto* cc = static_cast<CameraComponent*>(o.nativePtr);
-        if (name == "fov") { out = Value::Float(cc->fovY); return true; }
-        if (name == "near") { out = Value::Float(cc->nearZ); return true; }
-        if (name == "far") { out = Value::Float(cc->farZ); return true; }
-        if (name == "active") { out = Value::Bool(cc->enabled); return true; }
-    }
-    return false;
-}
-
-// Camera.main (task 77): unlike Fog/get_component, this isn't reached from a
-// specific actor -- it's a bare global, so the scene it searches is found by
-// walking up from the *calling* script's own actor to the root. Kept as
-// small tree-walk helpers here (rather than a shared utility) to match the
-// rest of this file's per-native-type static functions, and because the
-// editor's own copy of this exclusivity logic (EditorApp::activateCamera)
-// runs from UI code that already holds the Scene directly.
-static CameraComponent* findCameraComp(crate::Actor& node, bool requireEnabled,
-                                       CameraComponent* exclude) {
-    if (auto* cc = node.getComponent<CameraComponent>())
-        if (cc != exclude && (!requireEnabled || cc->enabled))
-            return cc;
-    for (const auto& c : node.children())
-        if (CameraComponent* hit = findCameraComp(*c, requireEnabled, exclude))
-            return hit;
-    return nullptr;
-}
-
-static void disableOtherCameraComps(crate::Actor& node, CameraComponent* keep) {
-    if (auto* cc = node.getComponent<CameraComponent>())
-        if (cc != keep)
-            cc->enabled = false;
-    for (const auto& c : node.children())
-        disableOtherCameraComps(*c, keep);
-}
-
-static crate::Actor* sceneRootOf(crate::Actor* a) {
-    while (a && a->parent())
-        a = a->parent();
-    return a;
-}
-
-static CameraComponent* mainCameraFrom(crate::Actor* any) {
-    crate::Actor* root = sceneRootOf(any);
-    if (!root)
-        return nullptr;
-    for (const auto& child : root->children())
-        if (CameraComponent* hit = findCameraComp(*child, /*requireEnabled=*/true, nullptr))
-            return hit;
-    return nullptr;
-}
-
-static void activateMainCamera(crate::Actor* any, CameraComponent& cam) {
-    crate::Actor* root = sceneRootOf(any);
-    if (!root)
-        return;
-    for (const auto& child : root->children())
-        disableOtherCameraComps(*child, &cam);
-    cam.enabled = true;
-}
-
-static bool setNativeField(ScriptObject& o, const std::string& name, const Value& v) {
-    if (o.builtin == "Fog") {
-        auto* fc = static_cast<FogComponent*>(o.nativePtr);
-        if (name == "start") { fc->start = (float)v.num(); return true; }
-        if (name == "end") { fc->end = (float)v.num(); return true; }
-        if (name == "height_range") { fc->heightRange = (float)v.num(); return true; }
-        if (name == "color") {
-            if (v.t == Value::T::Object && v.obj) {
-                fc->color[0] = (float)v.obj->fields["x"].num();
-                fc->color[1] = (float)v.obj->fields["y"].num();
-                fc->color[2] = (float)v.obj->fields["z"].num();
-            }
-            return true;
-        }
-    }
-    if (o.builtin == "Camera") {
-        auto* cc = static_cast<CameraComponent*>(o.nativePtr);
-        if (name == "fov") { cc->fovY = (float)v.num(); return true; }
-        if (name == "near") { cc->nearZ = (float)v.num(); return true; }
-        if (name == "far") { cc->farZ = (float)v.num(); return true; }
-        if (name == "active") {
-            if (v.truthy())
-                activateMainCamera(o.owner, *cc);
-            else if (o.owner)
-                cc->enabled = false; // no fallback search here; use Camera.main for that
-            return true;
-        }
-    }
-    return false;
 }
 
 Value Interpreter::evalMember(const Expr& e) {

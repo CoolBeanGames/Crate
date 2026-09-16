@@ -18,6 +18,8 @@ CMakeUserPresets.json
 
 # Task-system scratch
 zen.tasks.json.bak
+.zen-queue.json
+.zen-queue.flushing.json
 
 # transient test artifact from script_integration_tests
 /assets/scripts/NewScript*.cscript

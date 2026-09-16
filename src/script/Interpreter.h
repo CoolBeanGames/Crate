@@ -1,10 +1,10 @@
 #pragma once
 #include "script/ClassInfo.h"
+#include "script/Runtime.h"
 #include "script/Value.h"
 
 #include <functional>
 #include <memory>
-#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -15,10 +15,10 @@ class Actor;
 
 namespace crate::script {
 
-struct RuntimeError : std::runtime_error {
-    int line;
-    RuntimeError(std::string msg, int ln) : std::runtime_error(std::move(msg)), line(ln) {}
-};
+// RuntimeError now lives in Runtime.h (crate::script::RuntimeError), shared
+// with the code that will eventually compile scripts to native C++; kept
+// visible here via the #include above so existing callers of Interpreter.h
+// don't need to change.
 
 // Shared services the interpreter needs: the type table and I/O hooks.
 struct ScriptContext {
@@ -116,8 +116,5 @@ private:
     Value callMethodOn(std::shared_ptr<ScriptObject> obj, const std::string& method,
                        std::vector<Value> args, int line, bool viaBase);
 };
-
-// Build a Vector2/Vector3 value.
-Value makeVector(const std::string& kind, double x, double y, double z);
 
 } // namespace crate::script
