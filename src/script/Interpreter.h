@@ -67,6 +67,19 @@ public:
     static std::shared_ptr<ScriptObject> instantiate(ScriptContext* ctx, const ClassInfo* cls,
                                                      crate::Actor* owner);
 
+    // Call a method by name on an ARBITRARY interpreted ScriptObject (not
+    // necessarily this Interpreter's own self_) -- walks obj->cls's base
+    // chain via findFunction(), non-resumable (do_async in the called
+    // method runs synchronously to completion, exactly like any other
+    // internal/cross-object call -- see Interpreter::call()'s own
+    // resumable=true being reserved for the top-level hook-invocation entry
+    // point only). Public so crate::script::callObjectMethod
+    // (ObjectDispatch.h, Phase 9a) can dispatch to an interpreted target
+    // without duplicating this logic. `viaBase=true` starts the lookup at
+    // obj->cls->baseClass instead of obj->cls itself (this.base.method()).
+    Value callMethodOn(std::shared_ptr<ScriptObject> obj, const std::string& method,
+                       std::vector<Value> args, int line, bool viaBase);
+
 private:
     struct Scope {
         std::unordered_map<std::string, Value> vars;
@@ -113,8 +126,6 @@ private:
     void emitSignal(const std::shared_ptr<ScriptObject>& owner, const std::string& name,
                     std::vector<Value> args, int line);
     Value actorMember(crate::Actor* a, const std::string& name, int line);
-    Value callMethodOn(std::shared_ptr<ScriptObject> obj, const std::string& method,
-                       std::vector<Value> args, int line, bool viaBase);
 };
 
 } // namespace crate::script

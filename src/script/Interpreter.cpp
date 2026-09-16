@@ -1,6 +1,8 @@
 #include "script/Interpreter.h"
 
 #include "core/Math.h"
+#include "script/CompiledClassInfo.h"
+#include "script/ObjectDispatch.h"
 #include "script/Runtime.h"
 #include "scene/Actor.h"
 #include "scene/BuiltinComponents.h"
@@ -370,24 +372,11 @@ Value Interpreter::evalMember(const Expr& e) {
         if (obj.obj->builtin == "InputButton" &&
             (name == "just_pressed" || name == "just_released" || name == "pressed"))
             return Value::SignalRef(obj.obj, name);
-        if (obj.obj->nativePtr) {
-            Value out;
-            if (getNativeField(*obj.obj, name, out))
-                return out;
-            throw RuntimeError(obj.obj->builtin + " has no member '" + name + "'", e.line);
-        }
-        auto it = obj.obj->fields.find(name);
-        if (it != obj.obj->fields.end())
-            return it->second;
-        // A script instance exposes its owning actor as `this.actor`.
-        if (obj.obj->cls && name == "actor")
-            return Value::ActorRef(obj.obj->owner);
-        // Signals and bare method references (Godot-style callables).
-        if (obj.obj->cls && obj.obj->cls->hasSignal(name))
-            return Value::SignalRef(obj.obj, name);
-        if (obj.obj->cls && obj.obj->cls->findFunction(name))
-            return Value::Fn(obj.obj, name);
-        throw RuntimeError("no member '" + name + "'", e.line);
+        // Generic dispatch: correctly handles an interpreted script
+        // instance, a compiled script instance live view, or a
+        // BuiltinComponent live view (Fog/Camera), uniformly -- see
+        // ObjectDispatch.h / transpiration.txt Phase 9a.
+        return crate::script::getObjectMember(obj.obj, name, e.line);
     }
     if (obj.t == Value::T::Actor)
         return actorMember(obj.actor, name, e.line);
@@ -503,10 +492,25 @@ Value Interpreter::evalCall(const Expr& e) {
                 return callMethodOn(so, method, std::move(args), e.line, false);
         }
 
-        if (obj.t == Value::T::Object && obj.obj && obj.obj->cls) {
-            // `this.get_component(...)` / `this.actor` shortcuts forward to the
-            // owning actor when the script class has no such method.
-            if (!obj.obj->cls->findFunction(method)) {
+        if (obj.t == Value::T::Object && obj.obj &&
+            (obj.obj->cls || (obj.obj->nativePtr && obj.obj->compiledInfo))) {
+            // Does the object ITSELF declare this method? (Kind-agnostic:
+            // an interpreted instance checks its ClassInfo's base-chain
+            // findFunction; a compiled instance checks its
+            // CompiledClassInfo's method table.) If not, `get_component`/
+            // `actor`/the Godot-3 signal API shortcuts below take over --
+            // exactly matching the interpreted-only behavior this block
+            // used to have, now also available on a compiled target.
+            bool hasOwnMethod = obj.obj->cls ? obj.obj->cls->findFunction(method) != nullptr
+                                             : [&] {
+                                                   for (size_t i = 0;
+                                                        i < obj.obj->compiledInfo->methodCount; ++i)
+                                                       if (obj.obj->compiledInfo->methods[i].name ==
+                                                           method)
+                                                           return true;
+                                                   return false;
+                                               }();
+            if (!hasOwnMethod) {
                 // Godot-3 style signal API on any script object.
                 if (method == "emit_signal" && !args.empty()) {
                     emitSignal(obj.obj, args[0].str(),
@@ -528,7 +532,11 @@ Value Interpreter::evalCall(const Expr& e) {
                     return Value::Null_();
                 }
             }
-            return callMethodOn(obj.obj, method, std::move(args), e.line, false);
+            // Generic dispatch: interpreted target routes through
+            // callMethodOn as before; a compiled target routes through its
+            // reflection table's method-invoke function pointer -- see
+            // ObjectDispatch.h / transpiration.txt Phase 9a.
+            return crate::script::callObjectMethod(ctx_, obj.obj, method, std::move(args), e.line);
         }
 
         // native Actor methods
@@ -572,7 +580,11 @@ Value Interpreter::invokeCallable(const Value& fn, std::vector<Value> args, int 
     auto self = fn.wobj.lock();
     if (!self)
         return Value::Null_(); // target was freed; a no-op, as in Godot
-    return callMethodOn(self, fn.s, std::move(args), line, false);
+    // Generic dispatch (Phase 9a): a Callable's bound target may now be a
+    // COMPILED script instance (e.g. a signal connected to a native
+    // method, or a first-class reference to one), not just an interpreted
+    // one -- callObjectMethod handles both uniformly.
+    return crate::script::callObjectMethod(ctx_, self, fn.s, std::move(args), line);
 }
 
 void Interpreter::emitSignal(const std::shared_ptr<ScriptObject>& owner, const std::string& name,
@@ -725,11 +737,12 @@ void Interpreter::assign(const Expr& target, Value v) {
     if (target.kind == ExprKind::Member) {
         Value obj = eval(*target.a);
         // Native component write-back, e.g. get_component(type_of(Fog)).start = 10:
-        // such an object is a live view onto the real component (see
-        // getNativeField/setNativeField), not a fields-map snapshot, whether
-        // reached directly off the call or via a variable holding it.
+        // such an object is a live view onto the real component -- a
+        // BuiltinComponent (Fog/Camera) or, since Phase 9a, a compiled
+        // script instance -- not a fields-map snapshot, whether reached
+        // directly off the call or via a variable holding it.
         if (obj.t == Value::T::Object && obj.obj && obj.obj->nativePtr) {
-            if (setNativeField(*obj.obj, target.strVal, v))
+            if (crate::script::trySetObjectMember(obj.obj, target.strVal, v))
                 return;
             throw RuntimeError(obj.obj->builtin + " has no member '" + target.strVal + "'",
                                target.line);

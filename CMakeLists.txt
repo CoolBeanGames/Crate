@@ -53,9 +53,17 @@ endif()
 # AssetDatabase::get()) so it is safe to statically link into a future
 # natively-compiled script DLL without creating a second, disconnected copy
 # of those singletons (see transpiration.txt, "Transplation" Phase 0).
+# Interpreter.cpp and ObjectDispatch.cpp joined this target in Phase 9a --
+# both were already singleton-free (everything routes through the
+# ScriptContext* they're handed), confirmed by re-reading their #include
+# lists before moving them, so a script DLL can construct real Interpreter
+# instances itself (needed so generated code can dispatch a cross-object
+# call onto an INTERPRETED target without reimplementing the interpreter).
 add_library(crate_script_runtime STATIC
     src/script/Value.cpp
     src/script/Runtime.cpp
+    src/script/Interpreter.cpp
+    src/script/ObjectDispatch.cpp
     src/scene/Actor.cpp
 )
 target_include_directories(crate_script_runtime PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
@@ -71,7 +79,6 @@ add_library(crate_core STATIC
     src/scene/BuiltinComponents.cpp
     src/script/Lexer.cpp
     src/script/Parser.cpp
-    src/script/Interpreter.cpp
     src/script/CodeGen.cpp
     src/script/NativeModule.cpp
     src/script/NativeClassRegistry.cpp
@@ -210,3 +217,9 @@ target_link_libraries(do_async_native_tests PRIVATE crate_core)
 target_compile_definitions(do_async_native_tests PRIVATE
     CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
 add_test(NAME do_async_native_tests COMMAND do_async_native_tests)
+
+add_executable(object_dispatch_tests tests/object_dispatch_tests.cpp)
+target_link_libraries(object_dispatch_tests PRIVATE crate_core)
+target_compile_definitions(object_dispatch_tests PRIVATE
+    CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
+add_test(NAME object_dispatch_tests COMMAND object_dispatch_tests)

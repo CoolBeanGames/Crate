@@ -8,6 +8,7 @@
 #include "scene/ComponentRegistry.h"
 #include "script/Format.h"
 #include "script/Lexer.h"
+#include "script/NativeScriptComponent.h"
 #include "script/Parser.h"
 #include "script/ScriptComponent.h"
 
@@ -37,10 +38,34 @@ ScriptSystem::ScriptSystem() {
         if (!a)
             return nullptr;
         for (const auto& c : a->components()) {
-            auto* sc = dynamic_cast<ScriptComponent*>(c.get());
-            if (sc && sc->classInfo() &&
-                (sc->classInfo()->name == typeName || sc->classInfo()->isA(typeName)))
-                return sc->object();
+            if (auto* sc = dynamic_cast<ScriptComponent*>(c.get())) {
+                if (sc->classInfo() &&
+                    (sc->classInfo()->name == typeName || sc->classInfo()->isA(typeName)))
+                    return sc->object();
+                continue;
+            }
+            // Natively-compiled script components (Phase 9a): matched by
+            // the SAME interpreted ClassInfo every script still has
+            // (NativeScriptComponent keeps cls_ around purely for this and
+            // Inspector purposes) -- once matched, wrap the REAL native
+            // instance as a compiledInfo-backed live view, generalizing
+            // the exact pattern the Fog/Camera cases below already use for
+            // a raw native pointer. FIXES a real pre-existing bug: before
+            // this, get_component() silently never found a native script
+            // component at all (only ScriptComponent was ever checked).
+            if (auto* nsc = dynamic_cast<NativeScriptComponent*>(c.get())) {
+                if (nsc->classInfo() &&
+                    (nsc->classInfo()->name == typeName || nsc->classInfo()->isA(typeName))) {
+                    auto view = nsc->ensureNativeView();
+                    if (view.instance && view.classInfo) {
+                        auto o = std::make_shared<ScriptObject>();
+                        o->nativePtr = view.instance;
+                        o->compiledInfo = view.classInfo;
+                        o->owner = a;
+                        return o;
+                    }
+                }
+            }
         }
         // Native (non-script) components: get_component(type_of(Fog)) returns
         // a live view onto the real component (see Interpreter's

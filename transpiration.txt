@@ -2116,3 +2116,115 @@ entries above.
   design before writing any code, and continue logging progress below,
   one sub-phase at a time, exactly like every phase before it.
 ===========================================================================
+
+2026-09-16 — User mid-turn reminder: "dont forget signals" -- already
+  captured in the Phase 9 plan's 9d sub-phase; noted here for the record
+  since it arrived as a separate message.
+
+2026-09-16 — SUB-PHASE 9a COMPLETE AND VERIFIED (foundation: generalized
+  cross-object dispatch + the get_component bugfix).
+  Value.h: ScriptObject gains `const CompiledClassInfo* compiledInfo =
+  nullptr;` alongside its existing nativePtr, generalizing the existing
+  "live view onto a native pointer" pattern (previously Fog/Camera only)
+  to also cover a compiled script instance. A ScriptObject is now exactly
+  one of FOUR kinds (see the big design comment in the PHASE 9 section
+  above): 1) cls!=null (interpreted), 2) nativePtr set/compiledInfo null
+  (BuiltinComponent, e.g. Fog/Camera), 3) nativePtr+compiledInfo both set
+  (compiled script instance), 4) neither cls nor nativePtr set, `fields`
+  populated directly (a plain aggregate -- Vector2/Vector3/InputButton).
+  CMakeLists.txt: moved src/script/Interpreter.cpp from crate_core into
+  crate_script_runtime (confirmed safe first: its #include list --
+  core/Math.h, script/Runtime.h, scene/Actor.h, scene/BuiltinComponents.h
+  -- touches no engine singleton, exactly like Runtime.cpp already didn't
+  in Phase 0). This is what lets a script DLL construct a REAL Interpreter
+  for the "target happens to be interpreted" half of cross-object
+  dispatch, reusing 100% of existing, already-tested interpreter logic
+  instead of reimplementing method/field resolution a second time for the
+  compiled side.
+  New src/script/ObjectDispatch.h/.cpp (crate_script_runtime):
+  getObjectMember/trySetObjectMember/callObjectMethod, dispatching
+  correctly over all four ScriptObject kinds. callObjectMethod's
+  interpreted-target branch literally constructs an `Interpreter(ctx,
+  obj)` and calls the now-PUBLIC `Interpreter::callMethodOn` (moved from
+  private to public in Interpreter.h specifically for this -- it already
+  took obj as an explicit parameter and didn't depend on self_, so making
+  it callable from outside needed no logic changes, just a visibility
+  change).
+  ScriptSystem.cpp: fixed ctx_.getComponent to ALSO
+  dynamic_cast<NativeScriptComponent*> each component (previously
+  ScriptComponent only) -- confirmed this was a REAL, currently-shipping
+  bug: any Actor with a native-backed script component was invisible to
+  get_component() from ANY caller, interpreted or native, since Phase
+  4/7 first made native components exist in the running editor. Needed a
+  new public accessor on NativeScriptComponent
+  (`ensureNativeView() -> {instance, classInfo}`, lazily creating the
+  native instance if this is the very first access) since ctx_ lives in
+  ScriptSystem and had no way to reach into NativeScriptComponent's
+  private native_/compiledInfo_ state before.
+  Interpreter.cpp: evalMember's general-Object branch, evalCall's
+  general-object-method-call branch, invokeCallable, and assign()'s
+  nativePtr-write-back branch all now route through the new ObjectDispatch
+  helpers instead of only handling `obj.obj->cls`/hardcoded Fog-Camera
+  dispatch -- closing the SAME gap for the INTERPRETER's own execution,
+  not just for generated native code (which doesn't exist for this
+  construct yet -- that's 9b). evalCall's signal/get_component/
+  emit_signal shortcut block (previously gated on `obj.obj->cls` only) is
+  now gated on `obj.obj->cls || (obj.obj->nativePtr &&
+  obj.obj->compiledInfo)`, with a kind-agnostic "does the object declare
+  this method itself" check before falling through to the shortcuts.
+  REAL REGRESSION FOUND AND FIXED DURING THIS SUB-PHASE'S OWN
+  IMPLEMENTATION (not by review -- by the FULL EXISTING TEST SUITE
+  immediately failing the moment evalMember's Object branch was first
+  simplified to call getObjectMember uniformly): the first version of
+  getObjectMember/trySetObjectMember only checked the `fields` map INSIDE
+  the `if (obj->cls)` branch -- completely missing Kind 4 (a plain
+  aggregate with cls==nullptr but a populated `fields` map, e.g. every
+  Vector2/Vector3 value in the entire language). This broke reading ANY
+  vector component (`v.y`) anywhere, immediately failing script_tests.cpp
+  ("cannot read '.y' on Vector3"), script_bug_tests.cpp (tasks 45/46,
+  transform.position.y += 1), AND script_integration_tests.cpp (Mover's
+  rotation.y access) -- three of the oldest, most foundational tests in
+  the whole project. Fixed by moving the `fields.find(name)` check OUT of
+  the `if (obj->cls)` gate entirely, checking it unconditionally
+  (immediately after the nativePtr/compiledInfo-specific branches, which
+  correctly don't use `fields` at all), with the cls-specific "actor"/
+  signal/bound-method fallbacks only attempted AFTER a fields-map miss,
+  exactly restoring Interpreter::evalMember's original ordering. This is
+  exactly the kind of mistake the parity-testing discipline built up over
+  Phases 0-8 exists to catch immediately rather than let ship -- confirmed
+  caught within the SAME build/test cycle, before any commit.
+  New test: tests/object_dispatch_tests.cpp -- 47 checks: dedicated
+  coverage of getObjectMember/trySetObjectMember/callObjectMethod against
+  EACH of the four ScriptObject kinds individually (including the exact
+  Kind 4 regression scenario above, now passing), PLUS the get_component
+  regression test itself (an Actor with a NativeScriptComponent attached;
+  get_component() finds it, correctly wraps it as a compiledInfo-backed
+  live view, and a field read/write + method call through that live view
+  observes the SAME live state a direct ensureNativeView()-based check
+  does), PLUS a check that isA()-style base-name matching (e.g. finding a
+  class by its "Actor3D" base name) works for a native component exactly
+  like it already did for ScriptComponent. Confirmed repeatable across 3
+  consecutive runs. Skips the compiler-dependent (Kind 3) checks
+  gracefully without a discoverable MSVC toolchain.
+  Verification performed: `powershell -ExecutionPolicy Bypass -File
+  scripts\build.ps1 Debug` built clean; ran all 17 test executables
+  directly (object_dispatch_tests included) -- all passed, zero
+  regressions (after the Kind-4 fix above), confirmed
+  object_dispatch_tests repeatable across 3 consecutive runs.
+  Files touched this sub-phase: src/script/Value.h (modified:
+  ScriptObject::compiledInfo added), src/script/Interpreter.h (modified:
+  callMethodOn made public), src/script/Interpreter.cpp (modified:
+  evalMember/evalCall/invokeCallable/assign route through ObjectDispatch),
+  src/script/ObjectDispatch.h (new), src/script/ObjectDispatch.cpp (new),
+  src/script/NativeScriptComponent.h (modified: ensureNativeView() added),
+  src/script/ScriptSystem.cpp (modified: ctx_.getComponent recognizes
+  NativeScriptComponent), tests/object_dispatch_tests.cpp (new),
+  CMakeLists.txt (modified: Interpreter.cpp moved into
+  crate_script_runtime, ObjectDispatch.cpp added there too, new
+  object_dispatch_tests target).
+  NOT YET COMMITTED to git as of writing this entry -- see next action.
+  Next step: commit + push sub-phase 9a, then continue to 9b
+  (get_component + type_of(AnyClass) + general cross-object access, in
+  CodeGen.cpp) -- the foundation this sub-phase built is what 9b's
+  generated-code changes will call into.
+===========================================================================

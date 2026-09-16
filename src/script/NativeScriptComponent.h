@@ -48,6 +48,21 @@ public:
     // ScriptComponent::object(), for symmetry with existing callers/tests.
     std::shared_ptr<ScriptObject> object();
 
+    // Ensures the native instance exists (lazily creating it if this is
+    // the very first access -- actor() must already be valid, i.e. this
+    // component must already be attached to an Actor) and returns a live
+    // view onto it, for building a compiledInfo-backed ScriptObject --
+    // used by ScriptSystem.cpp's ctx_.getComponent (Phase 9a) exactly the
+    // way it already wraps a raw FogComponent*/CameraComponent* pointer.
+    struct NativeView {
+        void* instance;
+        const CompiledClassInfo* classInfo;
+    };
+    NativeView ensureNativeView() {
+        ensureNative();
+        return {native_, compiledInfo_};
+    }
+
     void start() override;
     void update(float dt) override;
     void physicsUpdate(float dt) override;

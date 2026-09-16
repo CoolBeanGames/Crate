@@ -12,6 +12,7 @@ namespace crate::script {
 
 struct ClassInfo;
 struct ScriptObject;
+struct CompiledClassInfo;
 
 // A dynamically typed cScript value. `var` variables and untyped expressions
 // hold one of these; typed declarations are checked/coerced on assignment.
@@ -91,6 +92,16 @@ struct ScriptObject {
     // so e.g. `get_component(type_of(Fog)).start = 10` actually mutates the
     // live FogComponent rather than a disposable snapshot.
     void* nativePtr = nullptr;
+
+    // Non-null (alongside nativePtr) => nativePtr is a NATIVELY-COMPILED
+    // script instance rather than a BuiltinComponent (Fog/Camera) -- field/
+    // method access goes through this class's reflection table
+    // (FieldAccessor/MethodAccessor/overflow, see CompiledClassInfo.h)
+    // instead of either `fields` or the Fog/Camera-only getNativeField/
+    // setNativeField table. Generalizes the same "live view" pattern
+    // Fog/Camera already use to cover compiled script classes too (see
+    // transpiration.txt, "Transplation" Phase 9a).
+    const CompiledClassInfo* compiledInfo = nullptr;
 
     // do_async suspension: which top-level do_async of which method is paused.
     std::string asyncResumeFn;
