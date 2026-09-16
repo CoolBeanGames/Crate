@@ -332,13 +332,19 @@ void EditorApp::drawToolbar() {
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(14, 6));
     ImGui::Dummy(ImVec2(1, 2));
 
-    const char* playLabel = playing_ ? "  Pause  " : "  Play  ";
-    if (playing_)
+    // Snapshot before the button: its click handler flips playing_
+    // synchronously, so gating the push/pop on the live (mutable-mid-frame)
+    // flag instead of this snapshot produces an unbalanced PopStyleColor on
+    // every click (Debug builds assert/abort; Release corrupts the style
+    // stack silently).
+    const bool wasPlaying = playing_;
+    const char* playLabel = wasPlaying ? "  Pause  " : "  Play  ";
+    if (wasPlaying)
         ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
     ImGui::SameLine(0, 12);
     if (ImGui::Button(playLabel))
         setPlaying(!playing_);
-    if (playing_)
+    if (wasPlaying)
         ImGui::PopStyleColor();
 
     ImGui::SameLine();
