@@ -2423,3 +2423,196 @@ entries above.
   signals per the user's own reminder). This is the largest remaining
   sub-phase; re-read the 9d plan section above in full before starting.
 ===========================================================================
+
+2026-09-16 — SUB-PHASE 9d COMPLETE AND VERIFIED (first-class function
+  references + signals, including InputButton signals -- the largest
+  remaining sub-phase, per the user's explicit "dont forget signals"
+  reminder).
+  DESIGN: chose plan option (b) for the connections-map question (see the
+  PHASE 9 section's 9d write-up) -- every generated instance owns exactly
+  ONE canonical ScriptObject wrapper, `selfView_` (constructed once in the
+  constructor: nativePtr=this, compiledInfo=&kClassInfo_<suffix>,
+  owner=owner_), and CompiledClassInfo grew a `selfView(void*) ->
+  shared_ptr<ScriptObject>` accessor function pointer (mirroring
+  `overflow`'s shape) so ANY external consumer (get_component, a future
+  cross-object reference) can reach that SAME object rather than
+  constructing a fresh wrapper. THIS TURNED OUT TO BE LOAD-BEARING, NOT
+  OPTIONAL: ScriptSystem.cpp's ctx_.getComponent used to build a brand-new
+  ScriptObject on every call for a native target -- harmless before
+  signals existed, but would have made a connection made through one
+  get_component() call invisible to an emit through another, since
+  connections live on ScriptObject::connections, not on the underlying
+  instance. Fixed by having getComponent's native branch call
+  `ci->selfView(instance)` instead of constructing `{nativePtr,
+  compiledInfo, owner}` by hand. CompiledClassInfo also grew
+  `signalNames`/`signalCount` (declared `signal foo();` names, generated
+  from decl.signals) so a member read for one of them on an EXTERNALLY
+  obtained reference (not just `this`) resolves to a SignalRef via
+  getObjectMember's Kind-3 branch, mirroring ClassInfo::hasSignal() for the
+  interpreted side.
+  MAJOR CONSOLIDATION (not just new code -- real duplication removed):
+  signalCall/emitSignal/invokeCallable (and the sameCallable() helper they
+  used) were already stateless Interpreter member functions with no real
+  self_/scopes_ dependency (same situation as actorMember, extracted in
+  9b) -- moved to ObjectDispatch.h/.cpp as free functions taking
+  ScriptContext* explicitly; Interpreter's own methods are now one-line
+  thin wrappers. MORE IMPORTANTLY: callObjectMethod itself absorbed the
+  Godot-3-style shortcut block (get_component/emit_signal/connect/
+  disconnect/is_connected on a script instance that doesn't declare its
+  own method of that name) that used to live ONLY inline in
+  Interpreter::evalCall -- that whole block (~40 lines) is now GONE from
+  Interpreter.cpp, replaced with a 2-line delegation to callObjectMethod,
+  and callValueMethod's Object branch similarly simplified to a direct
+  delegation. This means the interpreter and generated code now share
+  ONE implementation of the signal-shortcut logic, not two that could
+  silently drift -- exactly the "single source of truth" pattern 9a/9b/9c
+  already established, now applied to the single largest remaining piece
+  of duplicated dispatch logic. Also moved the InputButton
+  just_pressed/just_released/pressed special case out of
+  Interpreter::evalMember and into getObjectMember itself (it was
+  previously kept inline specifically because ObjectDispatch didn't handle
+  it -- now it does, for both the interpreter and generated code).
+  DELIBERATE, NARROW NON-CONSOLIDATION: Interpreter::evalCall's Signal/
+  Callable/TypeRef-static/Actor/Array/.str() branches (everything BEFORE
+  the Object-branch it now delegates) were left exactly as they were,
+  NOT redirected through the new callValueMethod (which also implements
+  Signal/Callable/Actor/Array/.str() for CodeGen's benefit) -- because
+  callValueMethod does not yet handle a TypeRef-static receiver
+  (StaticClass.method()), which only ever resolves an INTERPRETED static
+  instance today and is explicitly 9e's own scope to wire up generically.
+  Redirecting evalCall fully would have either silently dropped static-
+  method-call support from the interpreter or required pulling a piece of
+  9e's design in early -- rejected both, accepting this one narrow,
+  documented pocket of duplication (all short, stable, already-tested
+  logic) rather than scope-creep into 9e. Flagging this explicitly per the
+  "make it 1:1, no exceptions" directive.
+  CodeGen.cpp changes: Gen gained signalNames_/isSignal() (from
+  decl.signals, built in the constructor like fieldNames_/funcNames_).
+  Generated classes gain a `selfView_` member (public, alongside
+  overflow_/asyncResumeFn_) and construct it first thing in the
+  constructor -- which required MOVING the reflection-table + CompiledClassInfo
+  emission from the END of the generated .cpp to BEFORE the constructor
+  (safe: every accessor wrapper only needs the class's declaration, from
+  the already-included header, never its out-of-line method bodies).
+  This-branch Member reads recognize a signal name (SignalRef bound to
+  selfView_). This-branch Calls for anything that isn't the class's own
+  method now route through callValueMethod(ctx_, Value::Obj(selfView_),
+  ...) UNCONDITIONALLY (subsuming 9b's separate this.get_component special
+  case, which is now just one of several things this same dispatch
+  handles) -- mirrors how the interpreter's `this` was ALREADY just
+  Value::Obj(self_) with no special-casing at all; CodeGen's `this` fast
+  path was always purely a performance optimization for field/own-method
+  access, never a SEMANTIC difference, and now that's true for calls too.
+  A bare own-method-name-as-value (`var f = helper;`) now compiles to
+  Value::Fn(this->selfView_, "helper") instead of being refused. Identifier-
+  callee calls (`name(args)`) were refactored: the print/type_of/str/
+  Vector2/Vector3/emit_signal/own-method/"unknown function" dispatch was
+  extracted into a new identifierCallDispatch() helper so it can be reused
+  as the RUNTIME non-Callable fallback after a new check -- a local or
+  field CURRENTLY holding a Callable is invoked via
+  crate::script::invokeCallable directly, exactly mirroring
+  Interpreter::evalCall's own `findVar`/self_-field Callable check. Added a
+  `dynamicFallback` flag to identifierCallDispatch so ITS OWN "unknown
+  function" ending emits a RUNTIME throw (not a CodeGen::fail()) when
+  reached via that fallback path -- a real bug caught by the FIRST test run
+  after writing this ("unknown function 'f'" CodeGen error for a genuine
+  local named `f`): calling identifierCallDispatch unconditionally to build
+  the fallback TEXT was triggering fail()'s error-latching side effect even
+  when the Callable branch (the one that actually executes for that
+  specific test) was what would really run -- fixed once caught by the
+  build+test-immediately discipline, before any commit. The bare global
+  `emit_signal(name, ...)` form now compiles too (fires on
+  this->selfView_). generateClass()'s upfront signal-declarations refusal
+  was removed entirely.
+  REAL PRE-EXISTING BUG FOUND AND FIXED (found while implementing the
+  InputButton-signals-from-native-code test this sub-phase's own plan text
+  explicitly demanded, NOT by review): ScriptSystem::dispatchInput() has
+  ALWAYS invoked a connected InputButton signal handler via
+  `Interpreter(&ctx_, self).call(cb.s)` -- which bails out and returns
+  Value::Null_() SILENTLY (not even an error) when self_->cls is null,
+  which is ALWAYS true for a compiled target (Kind 3 ScriptObjects never
+  set cls). This means, before this fix, connecting
+  `Input.get_button(...).just_pressed.connect(...)` to a NATIVE script's
+  method compiled and ran with no error at all, but the handler NEVER
+  fired on a real key press -- a silent, hard-to-notice gap that predates
+  this whole "Transplation" effort's existence (dispatchInput() was
+  written when only interpreted Callables could exist). Fixed by branching
+  on self->cls (unchanged: the resumable Interpreter::call() path) vs
+  self->nativePtr && self->compiledInfo (new: crate::script::
+  callObjectMethod, non-resumable -- matching every other cross-object
+  call onto a compiled instance; only a generated class's OWN
+  start/update/physics_update hooks ever get resumable do_async
+  treatment).
+  New tests:
+  - tests/codegen_tests.cpp: 4 new must-compile scenarios (bare own-method
+    reference invoked via a local, signal declare+connect+emit+disconnect+
+    is_connected via this.<signal>, the bare global emit_signal(...) form,
+    the Godot-3 shortcuts on a general non-this receiver) -- replaced the
+    now-obsolete "bare own-method name... is refused" and "signal
+    declarations are refused" expectRefused cases. codegen_tests.cpp now
+    at 117 checks (was 111).
+  - tests/signals_parity_tests.cpp (NEW, per 9d's own plan text): (1)
+    self-signal declare/connect/emit_signal/disconnect/is_connected + a
+    first-class function reference invoked via a local -- interpreted vs
+    native, identical results (count=1 after one connected + one
+    disconnected emit, callableResult=42). (2) cross-object signal via
+    get_component() + the Godot-3 connect(name,callable)/bare
+    emit_signal(...) shortcut forms, ALL 4 holder-native x target-native
+    combinations, asserting the connection made through one get_component()
+    reference is correctly fired by doFire()'s OWN internal emit_signal --
+    this is the test that would have caught the "fresh wrapper every
+    get_component() call" bug directly if the selfView_ design hadn't
+    already prevented it. (3) InputButton signal fired via a native
+    handler -- the direct regression test for the dispatchInput() bug
+    above; since Input::get()'s real event queue is only populated by
+    poll() (live ImGui/XInput state, unavailable headless), this drives
+    the exact same underlying mechanism dispatchInput() uses
+    (crate::script::emitSignal on the button's real connections list,
+    populated by a REAL script's .connect() call) directly instead --
+    documented explicitly in the test's own comment as the reason it
+    doesn't literally call Input::poll(). 50 checks. Registered in
+    CMakeLists.txt.
+  A TEST-WRITING BUG CAUGHT MID-SESSION (worth recording since it reveals
+  a subtlety future test-writers on this codebase should know): the first
+  version of signals_parity_tests.cpp's cross-object test seeded a native
+  holder's `otherActor` field via its CANONICAL selfView_ object
+  (obj->fields["otherActor"] = ...) instead of its INTERPRETED MIRROR
+  (nc->object()) -- silently did nothing, since a Kind-3 ScriptObject's
+  `fields` map is NEVER read/written at all (field access always goes
+  through the CompiledClassInfo accessor table). Caught immediately by
+  combo NI failing while II passed. Fixed by using the mirror for pre-Play
+  field seeding (matching get_component_parity_tests.cpp/
+  camera_main_parity_tests.cpp's existing convention) and selfView_ ONLY
+  for the connections-identity check in the InputButton test. Two
+  DIFFERENT accessors for two DIFFERENT purposes on the same component --
+  worth remembering for 9e/9f's own tests too.
+  Verification performed: `powershell -ExecutionPolicy Bypass -File
+  scripts\build.ps1 Debug` built clean; ran all 20 test executables
+  directly -- all passed, zero regressions; re-ran
+  get_component_parity_tests/camera_main_parity_tests/
+  signals_parity_tests/object_dispatch_tests/native_reflection_tests two
+  additional times each (3 total) to confirm repeatability -- consistent.
+  Files touched this sub-phase: src/script/CompiledClassInfo.h (modified:
+  signalNames/signalCount/selfView added), src/script/ObjectDispatch.h/.cpp
+  (modified: signalCall/invokeCallable/emitSignal + sameCallable moved
+  here; callObjectMethod absorbed the Godot-3 shortcut block;
+  getObjectMember gained InputButton + Kind-3 signal handling;
+  callValueMethod gained Signal/Callable receivers and simplified its
+  Object branch), src/script/ScriptSystem.cpp (modified: getComponent's
+  native branch uses ci->selfView(); dispatchInput() fixed for a native
+  handler), src/script/Interpreter.h (unchanged signatures, only bodies
+  moved -- no edit needed beyond Interpreter.cpp), src/script/
+  Interpreter.cpp (modified: signalCall/emitSignal/invokeCallable now thin
+  wrappers, sameCallable removed, evalCall's Object branch + evalMember's
+  InputButton special case both simplified to delegate), src/script/
+  CodeGen.h/.cpp (modified: signalNames_, selfView_ member + construction,
+  reflection-table reordering, this.<signal> reads, this.<anything-else>
+  calls unified, bare-own-method-as-Fn, identifierCallDispatch refactor +
+  Callable-local-call dispatch + dynamicFallback fix, bare emit_signal(...),
+  signals-refusal removed), tests/codegen_tests.cpp (modified: 4 new
+  scenarios, 2 obsolete refusals replaced), tests/signals_parity_tests.cpp
+  (new), CMakeLists.txt (modified: new signals_parity_tests target).
+  NOT YET COMMITTED to git as of writing this entry -- see next action.
+  Next step: commit + push sub-phase 9d, then continue to 9e (static
+  classes compiled natively).
+===========================================================================

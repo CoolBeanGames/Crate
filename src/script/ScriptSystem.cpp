@@ -9,6 +9,7 @@
 #include "script/Format.h"
 #include "script/Lexer.h"
 #include "script/NativeScriptComponent.h"
+#include "script/ObjectDispatch.h"
 #include "script/Parser.h"
 #include "script/ScriptComponent.h"
 
@@ -47,23 +48,25 @@ ScriptSystem::ScriptSystem() {
             // Natively-compiled script components (Phase 9a): matched by
             // the SAME interpreted ClassInfo every script still has
             // (NativeScriptComponent keeps cls_ around purely for this and
-            // Inspector purposes) -- once matched, wrap the REAL native
-            // instance as a compiledInfo-backed live view, generalizing
-            // the exact pattern the Fog/Camera cases below already use for
-            // a raw native pointer. FIXES a real pre-existing bug: before
-            // this, get_component() silently never found a native script
-            // component at all (only ScriptComponent was ever checked).
+            // Inspector purposes) -- once matched, return the instance's
+            // OWN canonical selfView_ (Phase 9d) rather than constructing a
+            // fresh wrapper ScriptObject here: signals/connections live on
+            // a specific ScriptObject, so get_component() must always hand
+            // back the SAME one a `this`-originated reference inside that
+            // instance would use, or a connection made through one
+            // reference would be invisible to an emit through another.
+            // This also generalizes the exact pattern the Fog/Camera cases
+            // below already use for a raw native pointer. FIXES a real
+            // pre-existing bug: before Phase 9a, get_component() silently
+            // never found a native script component at all (only
+            // ScriptComponent was ever checked).
             if (auto* nsc = dynamic_cast<NativeScriptComponent*>(c.get())) {
                 if (nsc->classInfo() &&
                     (nsc->classInfo()->name == typeName || nsc->classInfo()->isA(typeName))) {
                     auto view = nsc->ensureNativeView();
-                    if (view.instance && view.classInfo) {
-                        auto o = std::make_shared<ScriptObject>();
-                        o->nativePtr = view.instance;
-                        o->compiledInfo = view.classInfo;
-                        o->owner = a;
-                        return o;
-                    }
+                    if (view.instance && view.classInfo && view.classInfo->selfView)
+                        if (auto self = view.classInfo->selfView(view.instance))
+                            return self;
                 }
             }
         }
@@ -246,12 +249,29 @@ void ScriptSystem::dispatchInput() {
             continue;
         for (const auto& cb : std::vector<Value>(cit->second)) {
             auto self = cb.wobj.lock();
-            if (self)
-                try {
+            if (!self)
+                continue;
+            try {
+                if (self->cls) {
+                    // Unchanged: resumable (do_async inside a handler can
+                    // frame-step across calls), exactly as before Phase 9d.
                     Interpreter(&ctx_, self).call(cb.s);
-                } catch (const std::exception& ex) {
-                    CR_ERROR("script", std::string("input signal handler: ") + ex.what());
+                } else if (self->nativePtr && self->compiledInfo) {
+                    // A NATIVELY-COMPILED handler (Phase 9d) -- REAL,
+                    // PRE-EXISTING BUG FIX: before this, an InputButton
+                    // signal connected to a compiled script's method was a
+                    // silent no-op (Interpreter::call() bails out
+                    // immediately when self_->cls is null, which is always
+                    // true for a compiled target). Non-resumable, matching
+                    // every other cross-object call onto a compiled
+                    // instance -- only a generated class's OWN start/
+                    // update/physics_update hooks ever get resumable
+                    // treatment (see CodeGen.cpp's emitHookBody).
+                    crate::script::callObjectMethod(&ctx_, self, cb.s, {}, 0);
                 }
+            } catch (const std::exception& ex) {
+                CR_ERROR("script", std::string("input signal handler: ") + ex.what());
+            }
         }
     }
 }

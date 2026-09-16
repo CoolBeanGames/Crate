@@ -352,14 +352,12 @@ Value Interpreter::evalMember(const Expr& e) {
     const std::string& name = e.strVal;
 
     if (obj.t == Value::T::Object && obj.obj) {
-        // Input button: just_pressed / just_released / pressed are signals.
-        if (obj.obj->builtin == "InputButton" &&
-            (name == "just_pressed" || name == "just_released" || name == "pressed"))
-            return Value::SignalRef(obj.obj, name);
         // Generic dispatch: correctly handles an interpreted script
-        // instance, a compiled script instance live view, or a
-        // BuiltinComponent live view (Fog/Camera), uniformly -- see
-        // ObjectDispatch.h / transpiration.txt Phase 9a.
+        // instance, a compiled script instance live view, a
+        // BuiltinComponent live view (Fog/Camera), or an InputButton's
+        // synthesized just_pressed/just_released/pressed signals,
+        // uniformly -- see ObjectDispatch.h / transpiration.txt Phase
+        // 9a/9d.
         return crate::script::getObjectMember(obj.obj, name, e.line);
     }
     if (obj.t == Value::T::Actor)
@@ -478,48 +476,15 @@ Value Interpreter::evalCall(const Expr& e) {
 
         if (obj.t == Value::T::Object && obj.obj &&
             (obj.obj->cls || (obj.obj->nativePtr && obj.obj->compiledInfo))) {
-            // Does the object ITSELF declare this method? (Kind-agnostic:
-            // an interpreted instance checks its ClassInfo's base-chain
-            // findFunction; a compiled instance checks its
-            // CompiledClassInfo's method table.) If not, `get_component`/
-            // `actor`/the Godot-3 signal API shortcuts below take over --
-            // exactly matching the interpreted-only behavior this block
-            // used to have, now also available on a compiled target.
-            bool hasOwnMethod = obj.obj->cls ? obj.obj->cls->findFunction(method) != nullptr
-                                             : [&] {
-                                                   for (size_t i = 0;
-                                                        i < obj.obj->compiledInfo->methodCount; ++i)
-                                                       if (obj.obj->compiledInfo->methods[i].name ==
-                                                           method)
-                                                           return true;
-                                                   return false;
-                                               }();
-            if (!hasOwnMethod) {
-                // Godot-3 style signal API on any script object.
-                if (method == "emit_signal" && !args.empty()) {
-                    emitSignal(obj.obj, args[0].str(),
-                               std::vector<Value>(args.begin() + 1, args.end()), e.line);
-                    return Value::Null_();
-                }
-                if ((method == "connect" || method == "disconnect" || method == "is_connected") &&
-                    args.size() >= 2 && args[1].t == Value::T::Callable) {
-                    Value sigRef = Value::SignalRef(obj.obj, args[0].str());
-                    return signalCall(sigRef, method, {args[1]}, e.line);
-                }
-                if (method == "get_component") {
-                    std::string tn;
-                    if (!args.empty())
-                        tn = args[0].t == Value::T::TypeRef ? args[0].s : args[0].str();
-                    if (ctx_->getComponent)
-                        if (auto so = ctx_->getComponent(obj.obj->owner, tn))
-                            return Value::Obj(so);
-                    return Value::Null_();
-                }
-            }
-            // Generic dispatch: interpreted target routes through
-            // callMethodOn as before; a compiled target routes through its
-            // reflection table's method-invoke function pointer -- see
-            // ObjectDispatch.h / transpiration.txt Phase 9a.
+            // Generic dispatch: handles "does the object declare this
+            // method itself" (kind-agnostic), the get_component/Godot-3
+            // signal API shortcuts (emit_signal/connect/disconnect/
+            // is_connected) for when it doesn't, and the actual call
+            // (interpreted target via callMethodOn, compiled target via its
+            // reflection table's method-invoke function pointer) -- ALL
+            // consolidated into callObjectMethod itself (Phase 9d), so
+            // generated code's identical dispatch (callValueMethod) can't
+            // drift from the interpreter's. See ObjectDispatch.h.
             return crate::script::callObjectMethod(ctx_, obj.obj, method, std::move(args), e.line);
         }
 
@@ -552,73 +517,25 @@ Value Interpreter::evalCall(const Expr& e) {
     throw RuntimeError("expression is not callable", e.line);
 }
 
-// Two callables refer to the same target+method (for disconnect / is_connected).
-static bool sameCallable(const Value& a, const Value& b) {
-    return a.t == Value::T::Callable && b.t == Value::T::Callable && a.s == b.s &&
-           a.wobj.lock() == b.wobj.lock();
-}
-
+// Thin wrappers: signalCall/emitSignal/invokeCallable (and the
+// sameCallable() helper they used) were already stateless (no self_/
+// scopes_/dispatchClass_ dependency, only ctx_ -- which the free-function
+// forms now take explicitly), moved to ObjectDispatch.h/.cpp (Phase 9d) so
+// generated native code shares the identical implementation rather than a
+// second copy -- exactly the same extraction pattern already used for
+// actorMember (Runtime.cpp, Phase 9b) and mathCall (Runtime.cpp, Phase 0).
 Value Interpreter::invokeCallable(const Value& fn, std::vector<Value> args, int line) {
-    if (fn.t != Value::T::Callable)
-        throw RuntimeError("value is not callable", line);
-    auto self = fn.wobj.lock();
-    if (!self)
-        return Value::Null_(); // target was freed; a no-op, as in Godot
-    // Generic dispatch (Phase 9a): a Callable's bound target may now be a
-    // COMPILED script instance (e.g. a signal connected to a native
-    // method, or a first-class reference to one), not just an interpreted
-    // one -- callObjectMethod handles both uniformly.
-    return crate::script::callObjectMethod(ctx_, self, fn.s, std::move(args), line);
+    return crate::script::invokeCallable(ctx_, fn, std::move(args), line);
 }
 
 void Interpreter::emitSignal(const std::shared_ptr<ScriptObject>& owner, const std::string& name,
                              std::vector<Value> args, int line) {
-    if (!owner)
-        return;
-    auto it = owner->connections.find(name);
-    if (it == owner->connections.end())
-        return;
-    // Copy: a handler may connect/disconnect while we iterate.
-    std::vector<Value> handlers = it->second;
-    for (const auto& h : handlers)
-        invokeCallable(h, args, line);
+    crate::script::emitSignal(ctx_, owner, name, std::move(args), line);
 }
 
 Value Interpreter::signalCall(const Value& sig, const std::string& method, std::vector<Value> args,
                               int line) {
-    if (!sig.obj)
-        throw RuntimeError("signal has no owner", line);
-    auto& conns = sig.obj->connections[sig.s];
-
-    if (method == "connect") {
-        if (args.empty() || args[0].t != Value::T::Callable)
-            throw RuntimeError("signal.connect expects a callable", line);
-        for (const auto& c : conns)
-            if (sameCallable(c, args[0]))
-                return Value::Null_(); // already connected
-        conns.push_back(args[0]);
-        return Value::Null_();
-    }
-    if (method == "disconnect") {
-        if (!args.empty())
-            conns.erase(std::remove_if(conns.begin(), conns.end(),
-                                       [&](const Value& c) { return sameCallable(c, args[0]); }),
-                        conns.end());
-        return Value::Null_();
-    }
-    if (method == "is_connected") {
-        for (const auto& c : conns)
-            if (!args.empty() && sameCallable(c, args[0]))
-                return Value::Bool(true);
-        return Value::Bool(false);
-    }
-    if (method == "emit") {
-        emitSignal(sig.obj, sig.s, std::move(args), line);
-        return Value::Null_();
-    }
-    if (method == "get_connections")
-        return Value::Int((long long)conns.size());
-    throw RuntimeError("signal has no method '" + method + "'", line);
+    return crate::script::signalCall(ctx_, sig, method, std::move(args), line);
 }
 
 Value Interpreter::mathCall(const std::string& fn, std::vector<Value>& args, int line) {

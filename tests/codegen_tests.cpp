@@ -427,14 +427,58 @@ int main() {
         }
     )", vcvars, scratchDir)) return 1;
 
-    if (expectRefused("bare own-method name used as a value is refused", R"(
+    // ---- Phase 9d: first-class function references + signals, now real
+    // (not refused) --------------------------------------------------------
+
+    if (expectCompiles("bare own-method name as a value, then invoked via a local", R"(
         class GenBareMethod : Actor {
-            func helper() { return 1; }
+            var result = 0;
+            func helper(int x) { return x * 2; }
             func update(float delta) {
                 var f = helper;
+                result = f(21);
             }
         }
-    )", "Phase 5")) return 1;
+    )", vcvars, scratchDir)) return 1;
+
+    if (expectCompiles("signal declaration + this.<signal>.connect/emit/disconnect/is_connected", R"(
+        class GenSignal : Actor {
+            signal died(cause);
+            var lastCause = "";
+            func onDied(cause) {
+                lastCause = cause;
+            }
+            func update(float delta) {
+                this.died.connect(onDied);
+                var wasConnected = this.died.is_connected(onDied);
+                this.emit_signal("died", "fell");
+                this.died.disconnect(onDied);
+            }
+        }
+    )", vcvars, scratchDir)) return 1;
+
+    if (expectCompiles("bare global emit_signal(...) form", R"(
+        class GenBareEmitSignal : Actor {
+            signal ping();
+            func update(float delta) {
+                emit_signal("ping");
+            }
+        }
+    )", vcvars, scratchDir)) return 1;
+
+    if (expectCompiles("Godot-3 style connect/disconnect/is_connected/emit_signal shortcuts "
+                      "on a general (non-this) receiver", R"(
+        class GenGeneralSignalShortcuts : Actor {
+            var other = null;
+            func handler(x) {}
+            func update(float delta) {
+                this.other.connect("died", handler);
+                var c = this.other.is_connected("died", handler);
+                this.other.emit_signal("died", 1);
+                this.other.disconnect("died", handler);
+            }
+        }
+    )", vcvars, scratchDir)) return 1;
 
     // ---- constructs Phase 2 explicitly REFUSES (must fail cleanly) --------
 
@@ -443,13 +487,6 @@ int main() {
             func update(float delta) {}
         }
     )", "base")) return 1;
-
-    if (expectRefused("signal declarations are refused", R"(
-        class GenSignal : Actor {
-            signal died();
-            func update(float delta) {}
-        }
-    )", "signal")) return 1;
 
     if (expectRefused("bare get_component(...) (no such global function -- only "
                       "this.get_component/actor.get_component exist) is refused", R"(

@@ -40,9 +40,41 @@ bool trySetObjectMember(const std::shared_ptr<ScriptObject>& obj, const std::str
 // do_async inside the called method runs synchronously to completion --
 // resumable=true is reserved for the top-level hook-invocation entry point
 // only, see Interpreter::call()). Throws RuntimeError if `obj` is null, has
-// no `method`, or isn't a callable kind of ScriptObject at all.
+// no `method`, or isn't a callable kind of ScriptObject at all. ALSO tries,
+// before dispatching to a declared method, the Godot-3-style signal API
+// (emit_signal/connect/disconnect/is_connected) and the get_component
+// escape hatch -- exactly like Interpreter::evalCall's own inline shortcut
+// block used to (now consolidated here, Phase 9d, so it isn't duplicated
+// between the interpreter and generated code) -- but ONLY when `obj`
+// itself doesn't already declare a method of that name.
 Value callObjectMethod(ScriptContext* ctx, const std::shared_ptr<ScriptObject>& obj,
                        const std::string& method, std::vector<Value> args, int line);
+
+// ---- Signals (Godot-style): connect / disconnect / emit / is_connected /
+// get_connections, and first-class Callable invocation (Phase 9d) ----
+// Moved out of Interpreter (which were private, self_/ctx_-free member
+// functions already, exactly like actorMember was -- see Runtime.cpp) so
+// generated native code shares the IDENTICAL implementation, not a second
+// copy. Interpreter's own signalCall/emitSignal/invokeCallable are now thin
+// wrappers wired to these.
+
+// `sig` must be a Value::T::Signal (a SignalRef, e.g. from `this.mySignal`
+// or `someObj.get_component(...).mySignal`). Throws RuntimeError if
+// sig.obj is null or `method` isn't one of connect/disconnect/is_connected/
+// emit/get_connections.
+Value signalCall(ScriptContext* ctx, const Value& sig, const std::string& method,
+                 std::vector<Value> args, int line);
+
+// Invokes a Value::T::Callable (a bound method reference, e.g. from a bare
+// own-method-name-as-value or a signal connection). Returns Value::Null_()
+// (a no-op, matching Godot) if the bound target has been freed; throws
+// RuntimeError if `fn` isn't actually a Callable.
+Value invokeCallable(ScriptContext* ctx, const Value& fn, std::vector<Value> args, int line);
+
+// Fires every Callable connected to `owner`'s `name` signal, in connection
+// order. No-op if `owner` is null or has no connections for `name`.
+void emitSignal(ScriptContext* ctx, const std::shared_ptr<ScriptObject>& owner,
+               const std::string& name, std::vector<Value> args, int line);
 
 // ---- Value-level generic dispatch (Phase 9b) ----
 // A "general receiver" in generated native code (anything not statically
@@ -53,12 +85,13 @@ Value callObjectMethod(ScriptContext* ctx, const std::shared_ptr<ScriptObject>& 
 // Interpreter::evalMember/evalCall/assign's own fallback dispatch (the part
 // reached AFTER their syntactic special cases, which depend on identifier
 // text, not the evaluated value, and so stay separately hand-written at
-// each call site) over Object/Actor/Array receivers, so CodeGen has exactly
-// one dispatcher to call regardless of what the receiver turns out to be at
-// runtime. Signal/Callable/TypeRef-static receivers are not handled here
-// yet (signals are Phase 9d, static classes are Phase 9e) -- an unhandled
-// receiver kind throws/returns false exactly as the interpreter's own
-// fallthrough does today for those not-yet-compiled forms.
+// each call site) over Object/Actor/Array/Signal/Callable/Camera-TypeRef
+// receivers, so CodeGen has exactly one dispatcher to call regardless of
+// what the receiver turns out to be at runtime. A general TypeRef receiver
+// for anything but Camera.main is not handled here yet (static classes are
+// Phase 9e) -- an unhandled receiver kind throws/returns false exactly as
+// the interpreter's own fallthrough does today for that not-yet-compiled
+// form.
 
 // Member read. Throws RuntimeError for a null/unsupported receiver or an
 // unknown member (matches Interpreter::evalMember's fail-fast contract).
@@ -75,10 +108,12 @@ Value getValueMember(const Value& v, const std::string& name, int line, crate::A
 // RuntimeError, matching trySetObjectMember's contract.
 bool trySetValueMember(const Value& v, const std::string& name, const Value& val);
 
-// Method call, including the get_component(...) escape hatch on an Object
-// OR Actor receiver (mirrors evalCall's two separate get_component
-// branches in one place). Throws RuntimeError for a null/unsupported
-// receiver or an unknown method.
+// Method call: Object (declared method / get_component / the Godot-3
+// signal shortcuts, all via callObjectMethod), Actor (get_component only),
+// Array (.add/.length), Signal (connect/disconnect/is_connected/emit/
+// get_connections, via signalCall), Callable (.call()/.emit(), via
+// invokeCallable), plus the universal .str(). Throws RuntimeError for a
+// null/unsupported receiver or an unknown method.
 Value callValueMethod(ScriptContext* ctx, const Value& v, const std::string& method,
                       std::vector<Value> args, int line);
 

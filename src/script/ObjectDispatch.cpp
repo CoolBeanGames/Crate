@@ -7,11 +7,25 @@
 #include "scene/Actor.h"
 #include "scene/BuiltinComponents.h"
 
+#include <algorithm>
+
 namespace crate::script {
 
 Value getObjectMember(const std::shared_ptr<ScriptObject>& obj, const std::string& name, int line) {
     if (!obj)
         throw RuntimeError("cannot read '." + name + "' on a null value", line);
+
+    // InputButton signals: just_pressed/just_released/pressed aren't stored
+    // fields (an InputButton object is Kind 4, `fields` stays empty) --
+    // they're synthesized as a SignalRef on demand. Moved here (Phase 9d)
+    // from Interpreter::evalMember's own inline special case, generalizing
+    // it so generated code's getValueMember -> getObjectMember path gets it
+    // too, not just the interpreter -- checked before every other branch
+    // below since it applies regardless of kind (though in practice
+    // builtin=="InputButton" is always Kind 4).
+    if (obj->builtin == "InputButton" &&
+        (name == "just_pressed" || name == "just_released" || name == "pressed"))
+        return Value::SignalRef(obj, name);
 
     // Kind 3: compiled script instance live view. Checked before the
     // `fields` map since these objects don't use `fields` at all.
@@ -28,6 +42,15 @@ Value getObjectMember(const std::shared_ptr<ScriptObject>& obj, const std::strin
         }
         if (name == "actor")
             return Value::ActorRef(obj->owner);
+        // Declared `signal foo();` names (Phase 9d): resolves to a
+        // SignalRef pointing at `obj` itself -- correct ONLY because `obj`
+        // is guaranteed to be the canonical selfView_ for this instance
+        // (see CompiledClassInfo::selfView's doc comment), so its
+        // `connections` map is the SAME one every other reference to this
+        // instance shares.
+        for (size_t i = 0; i < ci->signalCount; ++i)
+            if (name == ci->signalNames[i])
+                return Value::SignalRef(obj, name);
         for (size_t i = 0; i < ci->methodCount; ++i)
             if (name == ci->methods[i].name)
                 return Value::Fn(obj, name); // bound Callable, invoked via callObjectMethod
@@ -98,27 +121,6 @@ bool trySetObjectMember(const std::shared_ptr<ScriptObject>& obj, const std::str
     return true;
 }
 
-Value callObjectMethod(ScriptContext* ctx, const std::shared_ptr<ScriptObject>& obj,
-                       const std::string& method, std::vector<Value> args, int line) {
-    if (!obj)
-        throw RuntimeError("cannot call '" + method + "' on a null value", line);
-
-    if (obj->cls) {
-        Interpreter interp(ctx, obj);
-        return interp.callMethodOn(obj, method, std::move(args), line, /*viaBase=*/false);
-    }
-
-    if (obj->nativePtr && obj->compiledInfo) {
-        const CompiledClassInfo* ci = obj->compiledInfo;
-        for (size_t i = 0; i < ci->methodCount; ++i)
-            if (method == ci->methods[i].name)
-                return ci->methods[i].invoke(obj->nativePtr, ctx, std::move(args));
-        throw RuntimeError("method '" + method + "' not found", line);
-    }
-
-    throw RuntimeError("cannot call '" + method + "' on a non-script value", line);
-}
-
 namespace {
 // args[0] as a get_component() type-name argument: a TypeRef's own name, or
 // str() of anything else -- mirrors both of Interpreter::evalCall's
@@ -139,7 +141,128 @@ Value getComponentOn(ScriptContext* ctx, const Value& receiver, const std::strin
             return Value::Obj(so);
     return Value::Null_();
 }
+
+// Two callables refer to the same target+method (for disconnect /
+// is_connected). Moved from Interpreter.cpp (Phase 9d) alongside
+// signalCall/emitSignal/invokeCallable, which all use it.
+bool sameCallable(const Value& a, const Value& b) {
+    return a.t == Value::T::Callable && b.t == Value::T::Callable && a.s == b.s &&
+           a.wobj.lock() == b.wobj.lock();
+}
 } // namespace
+
+Value callObjectMethod(ScriptContext* ctx, const std::shared_ptr<ScriptObject>& obj,
+                       const std::string& method, std::vector<Value> args, int line) {
+    if (!obj)
+        throw RuntimeError("cannot call '" + method + "' on a null value", line);
+
+    const bool isScriptInstance = obj->cls || (obj->nativePtr && obj->compiledInfo);
+    if (isScriptInstance) {
+        bool hasOwnMethod =
+            obj->cls ? obj->cls->findFunction(method) != nullptr
+                    : [&] {
+                          const CompiledClassInfo* ci = obj->compiledInfo;
+                          for (size_t i = 0; i < ci->methodCount; ++i)
+                              if (ci->methods[i].name == method)
+                                  return true;
+                          return false;
+                      }();
+        // Godot-3 style signal API + get_component escape hatch, available
+        // on ANY script instance (interpreted or compiled) that doesn't
+        // declare its own method of that name -- consolidated here (Phase
+        // 9d) from what used to be Interpreter::evalCall's own inline
+        // shortcut block, so BOTH the interpreter and generated code
+        // (via callValueMethod) get it from one place.
+        if (!hasOwnMethod) {
+            if (method == "emit_signal" && !args.empty()) {
+                emitSignal(ctx, obj, args[0].str(),
+                          std::vector<Value>(args.begin() + 1, args.end()), line);
+                return Value::Null_();
+            }
+            if ((method == "connect" || method == "disconnect" || method == "is_connected") &&
+                args.size() >= 2 && args[1].t == Value::T::Callable) {
+                Value sigRef = Value::SignalRef(obj, args[0].str());
+                return signalCall(ctx, sigRef, method, {args[1]}, line);
+            }
+            if (method == "get_component")
+                return getComponentOn(ctx, Value::Obj(obj), typeArgOrEmpty(args));
+        }
+    }
+
+    if (obj->cls) {
+        Interpreter interp(ctx, obj);
+        return interp.callMethodOn(obj, method, std::move(args), line, /*viaBase=*/false);
+    }
+
+    if (obj->nativePtr && obj->compiledInfo) {
+        const CompiledClassInfo* ci = obj->compiledInfo;
+        for (size_t i = 0; i < ci->methodCount; ++i)
+            if (method == ci->methods[i].name)
+                return ci->methods[i].invoke(obj->nativePtr, ctx, std::move(args));
+        throw RuntimeError("method '" + method + "' not found", line);
+    }
+
+    throw RuntimeError("cannot call '" + method + "' on a non-script value", line);
+}
+
+Value signalCall(ScriptContext* ctx, const Value& sig, const std::string& method, std::vector<Value> args,
+                 int line) {
+    if (!sig.obj)
+        throw RuntimeError("signal has no owner", line);
+    auto& conns = sig.obj->connections[sig.s];
+
+    if (method == "connect") {
+        if (args.empty() || args[0].t != Value::T::Callable)
+            throw RuntimeError("signal.connect expects a callable", line);
+        for (const auto& c : conns)
+            if (sameCallable(c, args[0]))
+                return Value::Null_(); // already connected
+        conns.push_back(args[0]);
+        return Value::Null_();
+    }
+    if (method == "disconnect") {
+        if (!args.empty())
+            conns.erase(std::remove_if(conns.begin(), conns.end(),
+                                       [&](const Value& c) { return sameCallable(c, args[0]); }),
+                        conns.end());
+        return Value::Null_();
+    }
+    if (method == "is_connected") {
+        for (const auto& c : conns)
+            if (!args.empty() && sameCallable(c, args[0]))
+                return Value::Bool(true);
+        return Value::Bool(false);
+    }
+    if (method == "emit") {
+        emitSignal(ctx, sig.obj, sig.s, std::move(args), line);
+        return Value::Null_();
+    }
+    if (method == "get_connections")
+        return Value::Int((long long)conns.size());
+    throw RuntimeError("signal has no method '" + method + "'", line);
+}
+
+Value invokeCallable(ScriptContext* ctx, const Value& fn, std::vector<Value> args, int line) {
+    if (fn.t != Value::T::Callable)
+        throw RuntimeError("value is not callable", line);
+    auto self = fn.wobj.lock();
+    if (!self)
+        return Value::Null_(); // target was freed; a no-op, as in Godot
+    return callObjectMethod(ctx, self, fn.s, std::move(args), line);
+}
+
+void emitSignal(ScriptContext* ctx, const std::shared_ptr<ScriptObject>& owner, const std::string& name,
+                std::vector<Value> args, int line) {
+    if (!owner)
+        return;
+    auto it = owner->connections.find(name);
+    if (it == owner->connections.end())
+        return;
+    // Copy: a handler may connect/disconnect while we iterate.
+    std::vector<Value> handlers = it->second;
+    for (const auto& h : handlers)
+        invokeCallable(ctx, h, args, line);
+}
 
 Value getValueMember(const Value& v, const std::string& name, int line, crate::Actor* callerOwner) {
     if (v.t == Value::T::Object && v.obj)
@@ -207,26 +330,22 @@ bool trySetValueMember(const Value& v, const std::string& name, const Value& val
 
 Value callValueMethod(ScriptContext* ctx, const Value& v, const std::string& method,
                       std::vector<Value> args, int line) {
-    if (v.t == Value::T::Object && v.obj && (v.obj->cls || (v.obj->nativePtr && v.obj->compiledInfo))) {
-        bool hasOwnMethod =
-            v.obj->cls ? v.obj->cls->findFunction(method) != nullptr
-                      : [&] {
-                            const CompiledClassInfo* ci = v.obj->compiledInfo;
-                            for (size_t i = 0; i < ci->methodCount; ++i)
-                                if (ci->methods[i].name == method)
-                                    return true;
-                            return false;
-                        }();
-        // get_component is an escape hatch available on any script instance
-        // that doesn't declare its own method of that name, exactly as in
-        // Interpreter::evalCall (signals/emit_signal/connect/disconnect/
-        // is_connected on a general Object receiver are Phase 9d, not yet
-        // handled here -- they fall through to callObjectMethod below,
-        // which throws "method not found" until then).
-        if (!hasOwnMethod && method == "get_component")
-            return getComponentOn(ctx, v, typeArgOrEmpty(args));
+    // Signal.connect/disconnect/is_connected/emit/get_connections (Phase
+    // 9d), and callable.call(args)/callable.emit(args) -- both delegate to
+    // the SAME free functions the interpreter itself now uses (see
+    // Interpreter::signalCall/invokeCallable's own thin wrappers), so a
+    // signal/Callable Value behaves identically regardless of which side
+    // (caller or target) is compiled.
+    if (v.t == Value::T::Signal)
+        return signalCall(ctx, v, method, std::move(args), line);
+    if (v.t == Value::T::Callable && (method == "call" || method == "emit"))
+        return invokeCallable(ctx, v, std::move(args), line);
+    // Object (declared method / get_component / the Godot-3 signal
+    // shortcuts) -- ALL of that logic now lives in callObjectMethod itself
+    // (Phase 9d consolidation), so this is a direct delegation, no
+    // duplicated hasOwnMethod/get_component logic here anymore.
+    if (v.t == Value::T::Object && v.obj && (v.obj->cls || (v.obj->nativePtr && v.obj->compiledInfo)))
         return callObjectMethod(ctx, v.obj, method, std::move(args), line);
-    }
     if (v.t == Value::T::Actor) {
         if (method == "get_component")
             return getComponentOn(ctx, v, typeArgOrEmpty(args));

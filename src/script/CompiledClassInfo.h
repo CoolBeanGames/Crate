@@ -53,6 +53,25 @@ struct CompiledClassInfo {
     // instance's dynamic overflow map by reference, so a name not present
     // in `fields` above can still be read/written generically.
     std::unordered_map<std::string, Value>& (*overflow)(void* instance);
+
+    // Declared `signal foo();` names (Phase 9d), so a member read for one
+    // of them on an EXTERNALLY-obtained reference (e.g. a get_component()
+    // result) resolves to a Value::T::Signal, exactly like a bare field
+    // name resolves to its value -- mirrors ClassInfo::hasSignal() for the
+    // interpreted side.
+    const char* const* signalNames;
+    size_t signalCount;
+
+    // The canonical ScriptObject wrapper for THIS instance (Phase 9d) --
+    // every generated class constructs exactly ONE of these in its
+    // constructor (see CodeGen.cpp's `selfView_` member) and this accessor
+    // always returns that SAME shared_ptr, never a fresh one. This is what
+    // makes signals/first-class references work AT ALL for a compiled
+    // instance: a signal's connections live on a specific ScriptObject
+    // (ScriptObject::connections), so get_component() and `this` must both
+    // resolve to the identical object, or a connection made through one
+    // reference would be invisible to an emit through another.
+    std::shared_ptr<ScriptObject> (*selfView)(void* instance);
 };
 
 } // namespace crate::script

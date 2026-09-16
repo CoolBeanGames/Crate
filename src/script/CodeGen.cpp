@@ -155,6 +155,8 @@ public:
             fieldNames_.insert(f.name);
         for (const auto& f : decl_.functions)
             funcNames_.insert(f.name);
+        for (const auto& s : decl_.signals)
+            signalNames_.insert(s.name);
     }
 
     bool ok() const { return err_.empty(); }
@@ -162,6 +164,7 @@ public:
 
     bool isField(const std::string& n) const { return fieldNames_.count(n) != 0; }
     bool isOwnFunc(const std::string& n) const { return funcNames_.count(n) != 0; }
+    bool isSignal(const std::string& n) const { return signalNames_.count(n) != 0; }
 
     // Returns a C++ expression of type crate::script::Value, or "" (check
     // ok()/error() afterward) on an unsupported construct.
@@ -202,10 +205,29 @@ private:
     bool assignTo(const Expr& target, const std::string& valueExpr, FnCtx& fc, std::ostringstream& out,
                   int indent, int line);
 
+    // The non-Callable fallback for a bare `name(args)` call (mirrors
+    // Interpreter::builtinCall): print/type_of/str/Vector2/Vector3/
+    // emit_signal, this class's own methods, or "unknown function". Split
+    // out of expr()'s Call/Identifier case (Phase 9d) so it can be reused
+    // as the runtime else-branch after a Callable check on a local/field of
+    // the same name. `args` are already-evaluated C++ expression strings.
+    // `dynamicFallback` is true when `name` is a KNOWN local/field that
+    // just isn't currently a Callable: the interpreter's own fallthrough
+    // for that exact case still reaches builtinCall(name, ...) and throws
+    // "unknown function" -- but dynamically, at RUNTIME, since it can't be
+    // ruled out at parse time either -- so the "no match" ending emits a
+    // runtime throw instead of a CodeGen::fail() (which would incorrectly
+    // refuse an ENTIRE class just because ONE of its locals COULD shadow a
+    // builtin name, even on the branch that's actually a Callable at
+    // runtime and never reaches this fallback at all).
+    std::string identifierCallDispatch(const std::string& name, const std::vector<std::string>& args,
+                                       int line, bool dynamicFallback);
+
     const ClassDecl& decl_;
     const std::unordered_set<std::string>& knownClassNames_;
     std::unordered_set<std::string> fieldNames_;
     std::unordered_set<std::string> funcNames_;
+    std::unordered_set<std::string> signalNames_;
     std::string err_;
     int tempCounter_ = 0;
 };
@@ -222,6 +244,89 @@ bool isTransformOrActorIdent(const Expr& e) {
 // them (see actorMember()).
 bool isTransformField(const std::string& name) {
     return name == "position" || name == "rotation" || name == "scale";
+}
+
+std::string Gen::identifierCallDispatch(const std::string& name, const std::vector<std::string>& args,
+                                        int line, bool dynamicFallback) {
+    if (name == "print") {
+        std::string out = "[&]() -> crate::script::Value {\n";
+        out += ind(1) + "std::string __s;\n";
+        for (size_t i = 0; i < args.size(); ++i) {
+            if (i)
+                out += ind(1) + "__s += \" \";\n";
+            out += ind(1) + "__s += (" + args[i] + ").str();\n";
+        }
+        out += ind(1) + "if (ctx_ && ctx_->print) ctx_->print(__s);\n";
+        out += ind(1) + "return crate::script::Value::Null_();\n";
+        out += ind(0) + "}()";
+        return out;
+    }
+    if (name == "type_of") {
+        if (args.empty())
+            return "crate::script::Value::Type(std::string())";
+        return "[&]() -> crate::script::Value {\n" + ind(1) + "crate::script::Value __a = (" +
+               args[0] + ");\n" + ind(1) +
+               "return __a.t == crate::script::Value::T::TypeRef ? __a : "
+               "crate::script::Value::Type(__a.typeName());\n" +
+               ind(0) + "}()";
+    }
+    if (name == "str") {
+        if (args.size() != 1) {
+            fail("str(...) expects exactly one argument", line);
+            return "";
+        }
+        return "crate::script::Value::Str((" + args[0] + ").str())";
+    }
+    if (name == "Vector3" || name == "Vector2") {
+        std::string x = args.size() > 0 ? "(" + args[0] + ").num()" : "0.0";
+        std::string y = args.size() > 1 ? "(" + args[1] + ").num()" : "0.0";
+        std::string z = args.size() > 2 ? "(" + args[2] + ").num()" : "0.0";
+        return "crate::script::makeVector(" + cppStringLiteral(name) + ", " + x + ", " + y + ", " + z +
+               ")";
+    }
+    if (name == "emit_signal") {
+        // Bare global emit_signal(name, ...args) form (Phase 9d), mirroring
+        // Interpreter::builtinCall's identical case: fires on `this`
+        // (this->selfView_, the canonical compiledInfo-backed view every
+        // generated instance owns -- see the constructor).
+        if (args.empty()) {
+            fail("emit_signal needs a signal name", line);
+            return "";
+        }
+        std::string tmp = freshTemp("emit");
+        std::ostringstream o;
+        o << "[&]() -> crate::script::Value {\n";
+        o << ind(1) << "std::vector<crate::script::Value> " << tmp << "_all = {";
+        for (size_t i = 0; i < args.size(); ++i) {
+            if (i)
+                o << ", ";
+            o << "(" << args[i] << ")";
+        }
+        o << "};\n";
+        o << ind(1) << "std::string " << tmp << "_name = " << tmp << "_all[0].str();\n";
+        o << ind(1) << "std::vector<crate::script::Value> " << tmp << "_rest(" << tmp
+          << "_all.begin() + 1, " << tmp << "_all.end());\n";
+        o << ind(1) << "crate::script::emitSignal(ctx_, this->selfView_, " << tmp << "_name, std::move("
+          << tmp << "_rest), " << line << ");\n";
+        o << ind(1) << "return crate::script::Value::Null_();\n";
+        o << ind(0) << "}()";
+        return o.str();
+    }
+    if (isOwnFunc(name)) {
+        std::string out = "this->" + methodName(name) + "(std::vector<crate::script::Value>{";
+        for (size_t i = 0; i < args.size(); ++i) {
+            if (i)
+                out += ", ";
+            out += "(" + args[i] + ")";
+        }
+        out += "})";
+        return out;
+    }
+    if (dynamicFallback)
+        return "[&]() -> crate::script::Value { throw crate::script::RuntimeError(\"unknown function '" +
+               name + "'\", " + std::to_string(line) + "); }()";
+    fail("unknown function '" + name + "'", line);
+    return "";
 }
 
 std::string Gen::expr(const Expr& e, FnCtx& fc) {
@@ -283,17 +388,17 @@ std::string Gen::expr(const Expr& e, FnCtx& fc) {
             // A bare reference to one of this class's own declared methods,
             // used as a first-class value rather than immediately called
             // (e.g. `var f = helper;` for later `.connect`/invocation) --
-            // the interpreter turns this into a Callable, which Phase 2
-            // doesn't support yet (Phase 5). This is a genuine, always-wrong
-            // construct that CodeGen CAN detect statically, so it's refused
-            // here rather than deferred to a runtime crash.
-            if (isOwnFunc(n)) {
-                fail("'" + n +
-                         "' used as a bare value (not immediately called) is not supported yet -- "
-                         "first-class function references need Phase 5",
-                     e.line);
-                return "";
-            }
+            // the interpreter turns this into a Callable bound to self_;
+            // the generated-code equivalent binds to `this->selfView_`
+            // (Phase 9d), the canonical compiledInfo-backed ScriptObject
+            // every generated instance constructs once (see the
+            // constructor) -- the SAME object get_component() would hand
+            // back for this instance from the outside, so a Callable
+            // captured this way keeps working even if `this` itself is
+            // later freed while something else still holds the reference
+            // (a weak_ptr, exactly like the interpreter's own Callable).
+            if (isOwnFunc(n))
+                return "crate::script::Value::Fn(this->selfView_, " + cppStringLiteral(n) + ")";
             // Anything else falls back to the dynamic overflow map at
             // RUNTIME, exactly mirroring Interpreter::eval's Identifier case
             // (`self_->fields.count(e.strVal)`): an identifier that was
@@ -402,59 +507,43 @@ std::string Gen::expr(const Expr& e, FnCtx& fc) {
                     if (!ok())
                         return "";
                 }
-                if (name == "print") {
-                    std::string out = "[&]() -> crate::script::Value {\n";
-                    out += ind(1) + "std::string __s;\n";
-                    for (size_t i = 0; i < args.size(); ++i) {
-                        if (i)
-                            out += ind(1) + "__s += \" \";\n";
-                        out += ind(1) + "__s += (" + args[i] + ").str();\n";
-                    }
-                    out += ind(1) + "if (ctx_ && ctx_->print) ctx_->print(__s);\n";
-                    out += ind(1) + "return crate::script::Value::Null_();\n";
-                    out += ind(0) + "}()";
-                    return out;
-                }
-                if (name == "type_of") {
-                    if (args.empty())
-                        return "crate::script::Value::Type(std::string())";
-                    return "[&]() -> crate::script::Value {\n" + ind(1) +
-                           "crate::script::Value __a = (" + args[0] + ");\n" + ind(1) +
-                           "return __a.t == crate::script::Value::T::TypeRef ? __a : "
-                           "crate::script::Value::Type(__a.typeName());\n" +
-                           ind(0) + "}()";
-                }
-                if (name == "str") {
-                    if (args.size() != 1) {
-                        fail("str(...) expects exactly one argument", e.line);
-                        return "";
-                    }
-                    return "crate::script::Value::Str((" + args[0] + ").str())";
-                }
-                if (name == "Vector3" || name == "Vector2") {
-                    std::string x = args.size() > 0 ? "(" + args[0] + ").num()" : "0.0";
-                    std::string y = args.size() > 1 ? "(" + args[1] + ").num()" : "0.0";
-                    std::string z = args.size() > 2 ? "(" + args[2] + ").num()" : "0.0";
-                    return "crate::script::makeVector(" + cppStringLiteral(name) + ", " + x + ", " +
-                           y + ", " + z + ")";
-                }
-                if (name == "emit_signal") {
-                    fail("emit_signal(...) is not supported yet (Phase 5 / signals)", e.line);
+                // First-class function references (Phase 9d): a local or
+                // field CURRENTLY holding a Callable is invoked directly --
+                // mirrors Interpreter::evalCall's Identifier-callee case
+                // exactly (`if (Value* v = findVar(...)) if (v->t ==
+                // Callable) return invokeCallable(...)`, then the same
+                // check against a self_ field). Checked at RUNTIME (CodeGen
+                // can't know statically whether `name` holds a Callable
+                // right now); the rest of this branch's dispatch (global
+                // builtins / this class's own methods / "unknown function")
+                // becomes the non-Callable fallback, via
+                // identifierCallDispatch() below.
+                std::string recvExpr;
+                if (fc.has(name))
+                    recvExpr = localName(name);
+                else if (isField(name))
+                    recvExpr = "this->" + fieldMember(name);
+                std::string rest = identifierCallDispatch(name, args, e.line, !recvExpr.empty());
+                if (!ok())
                     return "";
+                if (recvExpr.empty())
+                    return rest;
+                std::ostringstream o;
+                o << "[&]() -> crate::script::Value {\n";
+                o << ind(1) << "if ((" << recvExpr << ").t == crate::script::Value::T::Callable) {\n";
+                o << ind(2) << "std::vector<crate::script::Value> __cargs = {";
+                for (size_t i = 0; i < args.size(); ++i) {
+                    if (i)
+                        o << ", ";
+                    o << "(" << args[i] << ")";
                 }
-                if (isOwnFunc(name)) {
-                    std::string out =
-                        "this->" + methodName(name) + "(std::vector<crate::script::Value>{";
-                    for (size_t i = 0; i < args.size(); ++i) {
-                        if (i)
-                            out += ", ";
-                        out += "(" + args[i] + ")";
-                    }
-                    out += "})";
-                    return out;
-                }
-                fail("unknown function '" + name + "'", e.line);
-                return "";
+                o << "};\n";
+                o << ind(2) << "return crate::script::invokeCallable(ctx_, (" << recvExpr
+                  << "), std::move(__cargs), " << e.line << ");\n";
+                o << ind(1) << "}\n";
+                o << ind(1) << "return " << rest << ";\n";
+                o << ind(0) << "}()";
+                return o.str();
             }
 
             if (callee.kind == ExprKind::Member) {
@@ -539,34 +628,32 @@ std::string Gen::expr(const Expr& e, FnCtx& fc) {
                         out += "})";
                         return out;
                     }
-                    if (method == "get_component") {
-                        // this.get_component(...) is semantically identical
-                        // to this.actor.get_component(...) -- both just need
-                        // owner_ -- so route through the same generic
-                        // dispatcher a general Actor receiver uses (Phase
-                        // 9b), rather than duplicating the ctx_->getComponent
-                        // call inline.
-                        std::vector<std::string> args;
-                        for (const auto& a : e.items) {
-                            args.push_back(expr(*a, fc));
-                            if (!ok())
-                                return "";
-                        }
-                        std::string out = "crate::script::callValueMethod(ctx_, "
-                                          "crate::script::Value::ActorRef(owner_), "
-                                          "\"get_component\", std::vector<crate::script::Value>{";
-                        for (size_t i = 0; i < args.size(); ++i) {
-                            if (i)
-                                out += ", ";
-                            out += "(" + args[i] + ")";
-                        }
-                        out += "}, " + std::to_string(e.line) + ")";
-                        return out;
+                    // Anything else -- get_component, the Godot-3 signal
+                    // shortcuts (emit_signal/connect/disconnect/
+                    // is_connected), or a call on a first-class method
+                    // reference stored back onto `this` -- routes through
+                    // the same generic dispatcher a general receiver uses
+                    // (Phase 9b/9d), via this->selfView_ (the canonical
+                    // compiledInfo-backed view of `this` every generated
+                    // instance constructs once -- see the constructor).
+                    // Mirrors how the interpreter's `this` is ALREADY just
+                    // Value::Obj(self_) with no special-casing at all.
+                    std::vector<std::string> args;
+                    for (const auto& a : e.items) {
+                        args.push_back(expr(*a, fc));
+                        if (!ok())
+                            return "";
                     }
-                    fail("this." + method +
-                             "(...) is not supported yet (signals / this.base need Phase 5)",
-                         e.line);
-                    return "";
+                    std::string out = "crate::script::callValueMethod(ctx_, "
+                                      "crate::script::Value::Obj(this->selfView_), "
+                                      + cppStringLiteral(method) + ", std::vector<crate::script::Value>{";
+                    for (size_t i = 0; i < args.size(); ++i) {
+                        if (i)
+                            out += ", ";
+                        out += "(" + args[i] + ")";
+                    }
+                    out += "}, " + std::to_string(e.line) + ")";
+                    return out;
                 }
 
                 // General receiver: kind isn't known until runtime (could be
@@ -616,8 +703,16 @@ std::string Gen::expr(const Expr& e, FnCtx& fc) {
                     return "this->" + fieldMember(name);
                 if (name == "actor")
                     return "crate::script::Value::ActorRef(owner_)";
-                fail("this." + name + " is not a declared field (get_component / signals need Phase 5)",
-                     e.line);
+                // Declared `signal foo();` names (Phase 9d): resolves to a
+                // SignalRef pointing at this->selfView_, exactly mirroring
+                // Interpreter::evalMember's cls->hasSignal() fallback --
+                // needed for `this.mySignal.connect(...)`/`.emit(...)`/etc,
+                // which parse as a Call whose receiver expression is THIS
+                // Member read, not a this.-qualified Call itself.
+                if (isSignal(name))
+                    return "crate::script::Value::SignalRef(this->selfView_, " + cppStringLiteral(name) +
+                           ")";
+                fail("this." + name + " is not a declared field (this.base needs Phase 5)", e.line);
                 return "";
             }
 
@@ -1189,10 +1284,6 @@ CodeGenResult generateClass(const ClassDecl& decl,
                   "inheritance needs Phase 4/5's cross-class registry)";
         return r;
     }
-    if (!decl.signals.empty()) {
-        r.error = "signal declarations are not supported yet (Phase 5)";
-        return r;
-    }
     for (const auto& fn : decl.functions) {
         if (fn.isAbstract) {
             r.error = "function '" + fn.name + "' is abstract, but '" + decl.name +
@@ -1257,7 +1348,13 @@ CodeGenResult generateClass(const ClassDecl& decl,
     h << "    // crate::script::ScriptObject::asyncResumeFn/asyncResumeIndex: which\n";
     h << "    // top-level do_async of which hook is currently paused, if any.\n";
     h << "    std::string asyncResumeFn_;\n";
-    h << "    int asyncResumeIndex_ = 0;\n\n";
+    h << "    int asyncResumeIndex_ = 0;\n";
+    h << "    // The canonical ScriptObject wrapper for THIS instance (Phase 9d),\n";
+    h << "    // constructed once (see the constructor) -- signals/first-class\n";
+    h << "    // method references/get_component() ALL resolve to this SAME\n";
+    h << "    // object, never a fresh one, so a connection made through one\n";
+    h << "    // reference is visible to an emit through another.\n";
+    h << "    std::shared_ptr<crate::script::ScriptObject> selfView_;\n\n";
     h << "private:\n";
     h << "    crate::script::ScriptContext* ctx_;\n";
     h << "    crate::Actor* owner_;\n";
@@ -1270,9 +1367,81 @@ CodeGenResult generateClass(const ClassDecl& decl,
     c << "#include \"" << cls << ".gen.h\"\n";
     c << "#include \"script/CompiledClassInfo.h\"\n";
     c << "#include \"script/ObjectDispatch.h\"\n\n";
+
+    // ---- reflection table + extern "C" factory ABI (transpiration.txt
+    // Phase 4/5, signals + selfView added Phase 9d) ----
+    // Emitted BEFORE the constructor (moved here from the end of the file,
+    // Phase 9d) so the constructor can reference kClassInfo_<suffix>
+    // directly when building selfView_ -- safe to move: every accessor
+    // wrapper below only needs the generated class's DECLARATION (from the
+    // header, already included above), never its out-of-line method
+    // bodies, which come later in this same file. Deliberately minimal at
+    // the boundary -- no STL types by value cross it via the three
+    // dllexport functions themselves (CompiledClassInfo is always passed by
+    // pointer); field/method accessor function pointers take `void*`
+    // rather than the generated type, keeping this header-free reflection
+    // surface usable from NativeScriptComponent.cpp without it ever needing
+    // to know the per-class generated type either.
+    c << "namespace {\n";
+    for (const auto& f : decl.fields) {
+        c << "crate::script::Value get_" << exportSuffix << "_" << sanitize(f.name)
+          << "(void* p) { return static_cast<crate::script::generated::" << cls << "*>(p)->"
+          << fieldMember(f.name) << "; }\n";
+        c << "void set_" << exportSuffix << "_" << sanitize(f.name)
+          << "(void* p, const crate::script::Value& v) { static_cast<crate::script::generated::"
+          << cls << "*>(p)->" << fieldMember(f.name) << " = v; }\n";
+    }
+    if (!decl.fields.empty()) {
+        c << "const crate::script::FieldAccessor kFields_" << exportSuffix << "[] = {\n";
+        for (const auto& f : decl.fields)
+            c << "    { " << cppStringLiteral(f.name) << ", " << cppStringLiteral(f.type)
+              << ", &get_" << exportSuffix << "_" << sanitize(f.name) << ", &set_" << exportSuffix
+              << "_" << sanitize(f.name) << " },\n";
+        c << "};\n";
+    }
+    for (const auto& fn : decl.functions) {
+        c << "crate::script::Value invoke_" << exportSuffix << "_" << sanitize(fn.name)
+          << "(void* p, crate::script::ScriptContext*, std::vector<crate::script::Value> args) { "
+             "return static_cast<crate::script::generated::"
+          << cls << "*>(p)->" << methodName(fn.name) << "(std::move(args)); }\n";
+    }
+    if (!decl.functions.empty()) {
+        c << "const crate::script::MethodAccessor kMethods_" << exportSuffix << "[] = {\n";
+        for (const auto& fn : decl.functions)
+            c << "    { " << cppStringLiteral(fn.name) << ", &invoke_" << exportSuffix << "_"
+              << sanitize(fn.name) << " },\n";
+        c << "};\n";
+    }
+    c << "std::unordered_map<std::string, crate::script::Value>& overflow_" << exportSuffix
+      << "(void* p) { return static_cast<crate::script::generated::" << cls << "*>(p)->overflow_; }\n";
+    if (!decl.signals.empty()) {
+        c << "const char* const kSignals_" << exportSuffix << "[] = {\n";
+        for (const auto& sig : decl.signals)
+            c << "    " << cppStringLiteral(sig.name) << ",\n";
+        c << "};\n";
+    }
+    c << "std::shared_ptr<crate::script::ScriptObject> selfView_" << exportSuffix
+      << "(void* p) { return static_cast<crate::script::generated::" << cls << "*>(p)->selfView_; }\n";
+    c << "const crate::script::CompiledClassInfo kClassInfo_" << exportSuffix << " = {\n";
+    c << "    " << cppStringLiteral(decl.name) << ", \"\",\n";
+    c << "    " << (decl.fields.empty() ? "nullptr" : ("kFields_" + exportSuffix)) << ", "
+      << decl.fields.size() << ",\n";
+    c << "    " << (decl.functions.empty() ? "nullptr" : ("kMethods_" + exportSuffix)) << ", "
+      << decl.functions.size() << ",\n";
+    c << "    &overflow_" << exportSuffix << ",\n";
+    c << "    " << (decl.signals.empty() ? "nullptr" : ("kSignals_" + exportSuffix)) << ", "
+      << decl.signals.size() << ",\n";
+    c << "    &selfView_" << exportSuffix << "\n";
+    c << "};\n";
+    c << "} // namespace\n\n";
+
     c << "namespace crate::script::generated {\n\n";
     c << cls << "::" << cls << "(crate::script::ScriptContext* ctx, crate::Actor* owner)\n";
     c << "    : ctx_(ctx), owner_(owner) {\n";
+    c << "    selfView_ = std::make_shared<crate::script::ScriptObject>();\n";
+    c << "    selfView_->nativePtr = this;\n";
+    c << "    selfView_->compiledInfo = &kClassInfo_" << exportSuffix << ";\n";
+    c << "    selfView_->owner = owner;\n";
     {
         FnCtx fieldScope;
         fieldScope.push();
@@ -1353,55 +1522,12 @@ CodeGenResult generateClass(const ClassDecl& decl,
 
     c << "} // namespace crate::script::generated\n\n";
 
-    // ---- reflection table + extern "C" factory ABI (transpiration.txt
-    // Phase 4/5) ----
-    // Deliberately minimal at the boundary -- no STL types by value cross
-    // it via the three dllexport functions themselves (CompiledClassInfo is
-    // always passed by pointer); field/method accessor function pointers
-    // take `void*` rather than the generated type, keeping this header-free
-    // reflection surface usable from NativeScriptComponent.cpp without it
-    // ever needing to know the per-class generated type either.
-    c << "namespace {\n";
-    for (const auto& f : decl.fields) {
-        c << "crate::script::Value get_" << exportSuffix << "_" << sanitize(f.name)
-          << "(void* p) { return static_cast<crate::script::generated::" << cls << "*>(p)->"
-          << fieldMember(f.name) << "; }\n";
-        c << "void set_" << exportSuffix << "_" << sanitize(f.name)
-          << "(void* p, const crate::script::Value& v) { static_cast<crate::script::generated::"
-          << cls << "*>(p)->" << fieldMember(f.name) << " = v; }\n";
-    }
-    if (!decl.fields.empty()) {
-        c << "const crate::script::FieldAccessor kFields_" << exportSuffix << "[] = {\n";
-        for (const auto& f : decl.fields)
-            c << "    { " << cppStringLiteral(f.name) << ", " << cppStringLiteral(f.type)
-              << ", &get_" << exportSuffix << "_" << sanitize(f.name) << ", &set_" << exportSuffix
-              << "_" << sanitize(f.name) << " },\n";
-        c << "};\n";
-    }
-    for (const auto& fn : decl.functions) {
-        c << "crate::script::Value invoke_" << exportSuffix << "_" << sanitize(fn.name)
-          << "(void* p, crate::script::ScriptContext*, std::vector<crate::script::Value> args) { "
-             "return static_cast<crate::script::generated::"
-          << cls << "*>(p)->" << methodName(fn.name) << "(std::move(args)); }\n";
-    }
-    if (!decl.functions.empty()) {
-        c << "const crate::script::MethodAccessor kMethods_" << exportSuffix << "[] = {\n";
-        for (const auto& fn : decl.functions)
-            c << "    { " << cppStringLiteral(fn.name) << ", &invoke_" << exportSuffix << "_"
-              << sanitize(fn.name) << " },\n";
-        c << "};\n";
-    }
-    c << "std::unordered_map<std::string, crate::script::Value>& overflow_" << exportSuffix
-      << "(void* p) { return static_cast<crate::script::generated::" << cls << "*>(p)->overflow_; }\n";
-    c << "const crate::script::CompiledClassInfo kClassInfo_" << exportSuffix << " = {\n";
-    c << "    " << cppStringLiteral(decl.name) << ", \"\",\n";
-    c << "    " << (decl.fields.empty() ? "nullptr" : ("kFields_" + exportSuffix)) << ", "
-      << decl.fields.size() << ",\n";
-    c << "    " << (decl.functions.empty() ? "nullptr" : ("kMethods_" + exportSuffix)) << ", "
-      << decl.functions.size() << ",\n";
-    c << "    &overflow_" << exportSuffix << "\n";
-    c << "};\n";
-    c << "} // namespace\n\n";
+    // ---- extern "C" factory ABI (transpiration.txt Phase 4/5) ----
+    // The reflection table itself was moved above the constructor (Phase
+    // 9d) -- these three functions can stay here at the end regardless,
+    // since they only need crate::script::generated::<cls>'s DECLARATION
+    // (from the header) and kClassInfo_<suffix>'s definition (above both),
+    // not any particular emission order relative to the method bodies.
     c << "extern \"C\" __declspec(dllexport) crate::Component* CreateInstance_" << exportSuffix
       << "(crate::script::ScriptContext* ctx, crate::Actor* owner) {\n";
     c << "    return new crate::script::generated::" << cls << "(ctx, owner);\n";
