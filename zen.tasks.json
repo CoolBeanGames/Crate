@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "projectId": "8afe2a0217d7419db234ceda7ecb9dff",
   "name": "Crate",
-  "nextCardIndex": 78,
+  "nextCardIndex": 79,
   "latestExePath": "build-Release/Crate.exe",
   "latestReleasePath": "build-Release/Crate.exe",
   "tagCatalog": [
@@ -192,56 +192,6 @@
       "isSystem": false,
       "isLocked": false,
       "tasks": [
-        {
-          "id": "9b12342b8f7b401cba512baa8be13b66",
-          "index": 76,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "basic fog",
-          "task": "add basic height/distance/global volumetric fog as a spawnable actor component, if it exists in the scene fog is rendered. can be tinted and adjusted. is base type Actor3D and can be referenced as parent_actor.fog to set parameters",
-          "tags": [
-            "rendering",
-            "fog"
-          ],
-          "files": [],
-          "customTypeId": null,
-          "customValues": {},
-          "requirements": [
-            {
-              "id": "a727e2ae5b89408e8a5a525c4e660ef2",
-              "index": 1,
-              "text": "add fog to autocorrect",
-              "isDone": false
-            },
-            {
-              "id": "9dd9691857674f2e86fdfa31fce30952",
-              "index": 2,
-              "text": "can add fog",
-              "isDone": false
-            },
-            {
-              "id": "e35d176e5eb147d09c02674338146387",
-              "index": 3,
-              "text": "fog renders",
-              "isDone": false
-            }
-          ],
-          "notes": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": true,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-11T07:22:55.0394445+00:00",
-          "updatedAt": "2026-09-11T07:24:25.6050534+00:00"
-        },
         {
           "id": "fa544be0c3284e9a96c12489c3b0b568",
           "index": 75,
@@ -729,6 +679,49 @@
           "isCollapsed": false,
           "createdAt": "2026-09-11T07:16:00.9884077+00:00",
           "updatedAt": "2026-09-15T22:22:01.898201+00:00"
+        },
+        {
+          "id": "f66decbd579f49ba9e3f31b772bcb9a4",
+          "index": 78,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Script editor: accepting autocomplete with Tab/Enter inserts a stray tab/newline first",
+          "task": "Reported while testing the new Fog component: open the script editor, get an autocomplete popup open (type any identifier prefix that matches something), then press Tab (or Enter) to accept. Instead of just inserting the completion, a literal tab character (looked like an extra space) gets inserted right before the completion text, corrupting the line (\u0027messing up the autocomplete completely\u0027).\n\nRoot cause: ScriptEditor::updateAutocomplete()\u0027s per-frame character-forwarding loop (which forwards typed characters to keep the word growing while the popup is open, since TextEditor\u0027s own keyboard handling is disabled in that state) reads every character in io.InputQueueCharacters -- including \u0027\\t\u0027/\u0027\\r\u0027/\u0027\\n\u0027, which land there too when Tab/Enter is pressed, not just via ImGui::IsKeyPressed(). Those aren\u0027t alnum/underscore, so they fall into the loop\u0027s generic \u0027insert whatever this is\u0027 branch and get inserted as literal characters, immediately followed by the separate \u0027if (accept) { insert completion suffix }\u0027 block also firing for the same keypress -- so you get tab-then-completion instead of just the completion.\n\nFix applied on the rendering branch (2026-09-15): skip \u0027\\t\u0027/\u0027\\r\u0027/\u0027\\n\u0027 entirely in that forwarding loop (continue, no insert, don\u0027t touch acOpen_) since Tab/Enter acceptance is handled separately right below. User confirmed live (\u0027seems to be fixed\u0027).\n\nNote: the scripting branch\u0027s ScriptEditor.cpp has the identical loop structure (handleBracketCharForAc\u0027s else-branch has the same gap) and very likely has the same bug -- worth porting this same one-line-per-branch fix over there next time that branch is touched.",
+          "tags": [
+            "bug"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [
+            {
+              "id": "996c05250e7041509863fa0309a3ac80",
+              "index": 1,
+              "text": "autocomplete accept via Tab inserts only the completion, no stray tab/newline",
+              "isDone": true
+            },
+            {
+              "id": "5050220494794132a376a649e249e6e9",
+              "index": 2,
+              "text": "autocomplete accept via Enter inserts only the completion, no stray tab/newline",
+              "isDone": true
+            }
+          ],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-16T00:41:32.6219036+00:00",
+          "updatedAt": "2026-09-16T00:50:21.5693945+00:00"
         },
         {
           "id": "c9d4482b33c94eeda497726091ff6dbf",
@@ -3250,6 +3243,56 @@
           "isCollapsed": false,
           "createdAt": "2026-09-11T07:19:57.8891782+00:00",
           "updatedAt": "2026-09-15T23:03:20.3231085+00:00"
+        },
+        {
+          "id": "9b12342b8f7b401cba512baa8be13b66",
+          "index": 76,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "basic fog",
+          "task": "add basic height/distance/global volumetric fog as a spawnable actor component, if it exists in the scene fog is rendered. can be tinted and adjusted. is base type Actor3D and can be referenced as parent_actor.fog to set parameters",
+          "tags": [
+            "rendering",
+            "fog"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [
+            {
+              "id": "a727e2ae5b89408e8a5a525c4e660ef2",
+              "index": 1,
+              "text": "add fog to autocorrect",
+              "isDone": true
+            },
+            {
+              "id": "9dd9691857674f2e86fdfa31fce30952",
+              "index": 2,
+              "text": "can add fog",
+              "isDone": true
+            },
+            {
+              "id": "e35d176e5eb147d09c02674338146387",
+              "index": 3,
+              "text": "fog renders",
+              "isDone": true
+            }
+          ],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-11T07:22:55.0394445+00:00",
+          "updatedAt": "2026-09-16T00:50:21.2764667+00:00"
         }
       ]
     }
