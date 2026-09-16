@@ -13,6 +13,7 @@
 #include "scene/BuiltinComponents.h"
 
 #include <cassert>
+#include <cmath>
 #include <cstdio>
 
 using namespace crate;
@@ -152,6 +153,35 @@ static int testIsVecAndVfield() {
     CHECK(vfield(sparseVal, "y") == 0.0);
     CHECK(vfield(sparseVal, "z") == 0.0);
     CHECK(vfield(sparseVal, "nonexistent") == 0.0);
+
+    // vfieldSet: writes a single component in place.
+    Value writable = makeVector("Vector3", 1.0, 2.0, 3.0);
+    vfieldSet(writable, "x", 99.0);
+    CHECK(vfield(writable, "x") == 99.0);
+    CHECK(vfield(writable, "y") == 2.0); // other components untouched
+    vfieldSet(writable, "y", -5.0);
+    vfieldSet(writable, "z", 0.25);
+    CHECK(vfield(writable, "y") == -5.0);
+    CHECK(vfield(writable, "z") == 0.25);
+    // A brand-new field name not already present is simply added (matches
+    // ScriptObject::fields being a plain unordered_map).
+    vfieldSet(writable, "w", 7.0);
+    CHECK(vfield(writable, "w") == 7.0);
+
+    // vfieldSet on a non-vector Value is a silent no-op, not a crash.
+    Value notVec = Value::Int(5);
+    vfieldSet(notVec, "x", 1.0); // must not crash
+    CHECK(notVec.t == Value::T::Int);
+    CHECK(notVec.i == 5); // unchanged
+
+    // Aliasing: two Values sharing the same underlying ScriptObject (as
+    // produced by plain copy, since Value::obj is a shared_ptr) see a
+    // vfieldSet through either handle -- this is the deliberately-preserved
+    // reference-semantics behavior described in transpiration.txt.
+    Value original = makeVector("Vector3", 1.0, 1.0, 1.0);
+    Value alias = original; // shares the same ScriptObject
+    vfieldSet(alias, "x", 42.0);
+    CHECK(vfield(original, "x") == 42.0); // visible through the other handle too
 
     return 0;
 }
@@ -544,6 +574,166 @@ static int testActivateMainCamera() {
     return 0;
 }
 
+static int testNegate() {
+    CHECK(negate(Value::Int(5)).t == Value::T::Int);
+    CHECK(negate(Value::Int(5)).i == -5);
+    CHECK(negate(Value::Int(-5)).i == 5);
+    CHECK(negate(Value::Int(0)).i == 0);
+    // Any non-Int numeric type goes through Float, per the original ternary.
+    CHECK(negate(Value::Float(2.5)).t == Value::T::Float);
+    CHECK(negate(Value::Float(2.5)).f == -2.5);
+    CHECK(negate(Value::Bool(true)).t == Value::T::Float);
+    CHECK(negate(Value::Bool(true)).f == -1.0);
+    CHECK(negate(Value::Char('A')).f == -65.0); // 'A' == 65
+    CHECK(negate(Value::Str("x")).f == -0.0 || negate(Value::Str("x")).f == 0.0); // String.num()==0
+
+    return 0;
+}
+
+static int testValueComparisons() {
+    // Numeric vs numeric: compares by num(), across mixed numeric types.
+    CHECK(valueEquals(Value::Int(5), Value::Int(5)).b == true);
+    CHECK(valueEquals(Value::Int(5), Value::Float(5.0)).b == true); // cross-type numeric equality
+    CHECK(valueEquals(Value::Int(5), Value::Bool(true)).b == false); // 5 != 1
+    CHECK(valueEquals(Value::Bool(true), Value::Int(1)).b == true);
+    CHECK(valueNotEquals(Value::Int(5), Value::Int(6)).b == true);
+    CHECK(valueNotEquals(Value::Int(5), Value::Int(5)).b == false);
+
+    // Non-numeric: compares by (str(), t) equality -- same text but
+    // DIFFERENT types must NOT compare equal (e.g. int 5's str() is "5",
+    // matching a String "5", but they must not be Value-equal).
+    CHECK(valueEquals(Value::Str("5"), Value::Int(5)).b == false);
+    CHECK(valueEquals(Value::Str("hi"), Value::Str("hi")).b == true);
+    CHECK(valueEquals(Value::Str("hi"), Value::Str("bye")).b == false);
+    CHECK(valueEquals(Value::Null_(), Value::Null_()).b == true);
+    CHECK(valueNotEquals(Value::Str("5"), Value::Int(5)).b == true);
+
+    // Ordering: numeric via num().
+    CHECK(valueLess(Value::Int(1), Value::Int(2)).b == true);
+    CHECK(valueLess(Value::Int(2), Value::Int(1)).b == false);
+    CHECK(valueGreater(Value::Float(2.5), Value::Int(2)).b == true);
+    CHECK(valueLessEq(Value::Int(2), Value::Int(2)).b == true);
+    CHECK(valueLessEq(Value::Int(3), Value::Int(2)).b == false);
+    CHECK(valueGreaterEq(Value::Int(2), Value::Int(2)).b == true);
+    CHECK(valueGreaterEq(Value::Int(1), Value::Int(2)).b == false);
+
+    return 0;
+}
+
+static int testArrayHelpers() {
+    Value empty = Value::Arr({});
+    CHECK(arrayLength(empty).t == Value::T::Int);
+    CHECK(arrayLength(empty).i == 0);
+
+    Value three = Value::Arr({Value::Int(1), Value::Int(2), Value::Int(3)});
+    CHECK(arrayLength(three).i == 3);
+
+    // Non-Array / null-backing: 0, not a crash.
+    CHECK(arrayLength(Value::Int(5)).i == 0);
+    Value nullBacked;
+    nullBacked.t = Value::T::Array; // arr left null deliberately
+    CHECK(arrayLength(nullBacked).i == 0);
+
+    // arrayAdd: pushes and reports success for a real array.
+    Value arr = Value::Arr({Value::Int(1)});
+    CHECK(arrayAdd(arr, Value::Int(2)) == true);
+    CHECK(arr.arr->size() == 2);
+    CHECK((*arr.arr)[1].i == 2);
+
+    // arrayAdd on a non-Array: false, no crash, and definitely no mutation.
+    Value notArr = Value::Int(5);
+    CHECK(arrayAdd(notArr, Value::Int(1)) == false);
+    CHECK(notArr.i == 5);
+
+    // arrayAdd on a null-backing Array Value: false (matches the
+    // interpreter's own `!args.empty() && obj.arr` guard).
+    CHECK(arrayAdd(nullBacked, Value::Int(1)) == false);
+
+    return 0;
+}
+
+static int testMathCall() {
+    std::vector<Value> args;
+
+    args = {Value::Int(5), Value::Int(0), Value::Int(10)};
+    CHECK(mathCall("clamp", args, 1).i == 5);
+    args = {Value::Int(-5), Value::Int(0), Value::Int(10)};
+    CHECK(mathCall("clamp", args, 1).i == 0);
+    args = {Value::Int(50), Value::Int(0), Value::Int(10)};
+    CHECK(mathCall("clamp", args, 1).i == 10);
+    args = {Value::Float(5.5), Value::Float(0.0), Value::Float(10.0)};
+    CHECK(mathCall("clamp", args, 1).t == Value::T::Float);
+
+    args = {Value::Float(0.0), Value::Float(10.0), Value::Float(0.5)};
+    CHECK(mathCall("lerp", args, 1).f == 5.0);
+
+    args = {Value::Float(0.0)};
+    CHECK(mathCall("sin", args, 1).f == 0.0);
+    args = {Value::Float(0.0)};
+    CHECK(mathCall("sine", args, 1).f == 0.0); // alias
+    args = {Value::Float(0.0)};
+    CHECK(mathCall("cos", args, 1).f == 1.0);
+    args = {Value::Float(0.0)};
+    CHECK(mathCall("cosine", args, 1).f == 1.0); // alias
+
+    args = {Value::Float(4.0)};
+    CHECK(mathCall("sqrt", args, 1).f == 2.0);
+    args = {Value::Float(1.0), Value::Float(0.0)};
+    CHECK(mathCall("exp", args, 1).f == std::exp(1.0));
+    args = {Value::Float(2.0), Value::Float(3.0)};
+    CHECK(mathCall("pow", args, 1).f == 8.0);
+
+    args = {Value::Int(-5)};
+    CHECK(mathCall("abs", args, 1).t == Value::T::Int);
+    CHECK(mathCall("abs", args, 1).i == 5);
+    args = {Value::Float(-5.5)};
+    CHECK(mathCall("abs", args, 1).t == Value::T::Float);
+    CHECK(mathCall("abs", args, 1).f == 5.5);
+
+    args = {Value::Float(1.5)};
+    CHECK(mathCall("floor", args, 1).f == 1.0);
+    args = {Value::Float(1.5)};
+    CHECK(mathCall("ceil", args, 1).f == 2.0);
+    args = {Value::Float(1.5)};
+    CHECK(mathCall("round", args, 1).f == 2.0);
+
+    args = {Value::Int(3), Value::Int(7)};
+    CHECK(mathCall("min", args, 1).i == 3);
+    args = {Value::Int(3), Value::Int(7)};
+    CHECK(mathCall("max", args, 1).i == 7);
+    args = {Value::Float(3.0), Value::Float(7.0)};
+    CHECK(mathCall("min", args, 1).t == Value::T::Float); // not all-Int -> Float
+
+    args = {Value::Float(180.0)};
+    double rad = mathCall("deg2rad", args, 1).f;
+    CHECK(rad > 3.14 && rad < 3.15);
+    args = {Value::Float(rad)};
+    double deg = mathCall("rad2deg", args, 1).f;
+    CHECK(deg > 179.9 && deg < 180.1);
+
+    args = {};
+    Value rf = mathCall("rand_f", args, 1);
+    CHECK(rf.f >= 0.0 && rf.f < 1.0);
+    Value ri = mathCall("rand_i", args, 1);
+    CHECK(ri.i >= 0 && ri.i <= 0x7fffffff);
+    args = {Value::Float(5.0), Value::Float(10.0)};
+    Value rfr = mathCall("rand_f_range", args, 1);
+    CHECK(rfr.f >= 5.0 && rfr.f <= 10.0);
+    args = {Value::Int(5), Value::Int(10)};
+    Value rir = mathCall("rand_i_range", args, 1);
+    CHECK(rir.i >= 5 && rir.i <= 10);
+    // Reversed range (hi < lo) is swapped, not an empty/invalid range.
+    args = {Value::Int(10), Value::Int(5)};
+    Value rirRev = mathCall("rand_i_range", args, 1);
+    CHECK(rirRev.i >= 5 && rirRev.i <= 10);
+
+    // Unknown function name throws.
+    args = {};
+    CHECK_THROWS_RUNTIME_ERROR(mathCall("not_a_real_function", args, 1));
+
+    return 0;
+}
+
 int main() {
     if (testCoerce()) return 1;
     if (testIsVecAndVfield()) return 1;
@@ -557,6 +747,10 @@ int main() {
     if (testNativeFieldUnknownBuiltin()) return 1;
     if (testMainCameraFrom()) return 1;
     if (testActivateMainCamera()) return 1;
+    if (testNegate()) return 1;
+    if (testValueComparisons()) return 1;
+    if (testArrayHelpers()) return 1;
+    if (testMathCall()) return 1;
 
     std::printf("ok  %d checks passed\n", g_checks);
     return 0;

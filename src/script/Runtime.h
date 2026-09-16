@@ -4,6 +4,7 @@
 
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace crate {
 class Actor;
@@ -37,12 +38,54 @@ Value makeVector(const std::string& kind, double x, double y, double z);
 // True for a Vector2 / Vector3 aggregate value.
 bool isVec(const Value& v);
 double vfield(const Value& v, const char* f);
+// Write a single component of a vector Value in place (no-op if `v` isn't a
+// Vector2/Vector3 Object -- mirrors vfield()'s "missing -> silently do
+// nothing" leniency rather than throwing). Since makeVector()'s ScriptObject
+// is shared via shared_ptr (see Value::obj), this mutates every alias of
+// `v`, matching the same reference semantics plain field writes on any
+// ScriptObject already have -- deliberately preserved, see
+// transpiration.txt's Vector aliasing decision.
+void vfieldSet(const Value& v, const char* f, double x);
 
 // Arithmetic core shared by binary expressions and compound assignment.
 // Handles numbers, string concat (+), and Vector2/Vector3 math. Throws
 // RuntimeError on an invalid operation (bad operator, division/modulo by
 // zero, mismatched vector dimensions on division by a zero component).
 Value arith(Tok op, const Value& a, const Value& b, int line);
+
+// Unary minus: Int stays Int, everything else numeric goes through Float.
+// A small free function (rather than inlined duplicate-operand text) so
+// callers -- generated native code especially -- can pass a possibly
+// side-effecting operand expression exactly once.
+Value negate(const Value& a);
+
+// Value equality/ordering, exactly mirroring Interpreter::evalBinary's
+// comparison cases: numeric types compare by num(); everything else compares
+// by (str(), t) equality (ordering falls back to raw num(), 0.0 for
+// non-numeric types, matching Value::num()'s own default). Each takes both
+// operands by const reference so a caller never needs to duplicate a
+// possibly side-effecting operand's source text to use it twice.
+Value valueEquals(const Value& a, const Value& b);
+Value valueNotEquals(const Value& a, const Value& b);
+Value valueLess(const Value& a, const Value& b);
+Value valueGreater(const Value& a, const Value& b);
+Value valueLessEq(const Value& a, const Value& b);
+Value valueGreaterEq(const Value& a, const Value& b);
+
+// array.length (as either a bare member read or a zero-arg method call) --
+// 0 for a non-Array or a null backing vector, matching the interpreter's own
+// null-guarded reads.
+Value arrayLength(const Value& v);
+// array.add(item): pushes and returns true if `v` is a real Array; returns
+// false (does nothing) otherwise, matching the interpreter's silent
+// fallthrough for a non-Array/null-backing receiver.
+bool arrayAdd(const Value& v, const Value& item);
+
+// Math.<fn>(args) -- the free-function form of Interpreter::mathCall, moved
+// here (it never touched Interpreter's self_/ctx_/scopes_) so both the
+// interpreter and generated native code share one implementation. Throws
+// RuntimeError for an unknown function name.
+Value mathCall(const std::string& fn, std::vector<Value>& args, int line);
 
 // ---- Native (non-script) component field reflection ----
 // Fog/Camera (and, once natively-compiled script classes exist, those too)

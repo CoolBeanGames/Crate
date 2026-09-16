@@ -6,9 +6,6 @@
 #include "scene/BuiltinComponents.h"
 
 #include <algorithm>
-#include <cmath>
-#include <cstdlib>
-#include <random>
 
 namespace crate::script {
 
@@ -280,7 +277,7 @@ Value Interpreter::eval(const Expr& e) {
         case ExprKind::Unary: {
             Value a = eval(*e.a);
             if (e.op == Tok::Minus)
-                return a.t == Value::T::Int ? Value::Int(-a.i) : Value::Float(-a.num());
+                return crate::script::negate(a);
             if (e.op == Tok::Not)
                 return Value::Bool(!a.truthy());
             return a;
@@ -320,18 +317,12 @@ Value Interpreter::evalBinary(const Expr& e) {
     Value b = eval(*e.b);
 
     switch (e.op) {
-        case Tok::EqEq:
-            if (a.isNumeric() && b.isNumeric())
-                return Value::Bool(a.num() == b.num());
-            return Value::Bool(a.str() == b.str() && a.t == b.t);
-        case Tok::NotEq:
-            if (a.isNumeric() && b.isNumeric())
-                return Value::Bool(a.num() != b.num());
-            return Value::Bool(!(a.str() == b.str() && a.t == b.t));
-        case Tok::Lt: return Value::Bool(a.num() < b.num());
-        case Tok::Gt: return Value::Bool(a.num() > b.num());
-        case Tok::LtEq: return Value::Bool(a.num() <= b.num());
-        case Tok::GtEq: return Value::Bool(a.num() >= b.num());
+        case Tok::EqEq: return crate::script::valueEquals(a, b);
+        case Tok::NotEq: return crate::script::valueNotEquals(a, b);
+        case Tok::Lt: return crate::script::valueLess(a, b);
+        case Tok::Gt: return crate::script::valueGreater(a, b);
+        case Tok::LtEq: return crate::script::valueLessEq(a, b);
+        case Tok::GtEq: return crate::script::valueGreaterEq(a, b);
         default: break;
     }
 
@@ -401,7 +392,7 @@ Value Interpreter::evalMember(const Expr& e) {
     if (obj.t == Value::T::Actor)
         return actorMember(obj.actor, name, e.line);
     if (obj.t == Value::T::Array && name == "length")
-        return Value::Int(obj.arr ? (long long)obj.arr->size() : 0);
+        return crate::script::arrayLength(obj);
     if (obj.t == Value::T::TypeRef && obj.s == "Camera" && name == "main") {
         CameraComponent* cc = mainCameraFrom(self_ ? self_->owner : nullptr);
         if (!cc)
@@ -554,12 +545,10 @@ Value Interpreter::evalCall(const Expr& e) {
             throw RuntimeError("Actor has no method '" + method + "'", e.line);
         }
         if (obj.t == Value::T::Array) {
-            if (method == "add" && !args.empty() && obj.arr) {
-                obj.arr->push_back(args[0]);
+            if (method == "add" && !args.empty() && crate::script::arrayAdd(obj, args[0]))
                 return Value::Null_();
-            }
             if (method == "length" && obj.arr)
-                return Value::Int((long long)obj.arr->size());
+                return crate::script::arrayLength(obj);
         }
         // universal .str()
         if (method == "str")
@@ -637,69 +626,10 @@ Value Interpreter::signalCall(const Value& sig, const std::string& method, std::
 }
 
 Value Interpreter::mathCall(const std::string& fn, std::vector<Value>& args, int line) {
-    static std::mt19937 rng{std::random_device{}()};
-    auto n = [&](size_t i) { return i < args.size() ? args[i].num() : 0.0; };
-    auto allInt = [&]() {
-        for (const auto& a : args)
-            if (a.t != Value::T::Int)
-                return false;
-        return !args.empty();
-    };
-
-    if (fn == "clamp") {
-        double v = n(0), lo = n(1), hi = n(2);
-        double r = v < lo ? lo : (v > hi ? hi : v);
-        return allInt() ? Value::Int((long long)r) : Value::Float(r);
-    }
-    if (fn == "lerp")
-        return Value::Float(n(0) + (n(1) - n(0)) * n(2));
-    if (fn == "sine" || fn == "sin")
-        return Value::Float(std::sin(n(0)));
-    if (fn == "cos" || fn == "cosine")
-        return Value::Float(std::cos(n(0)));
-    if (fn == "tan")
-        return Value::Float(std::tan(n(0)));
-    if (fn == "sqrt")
-        return Value::Float(std::sqrt(n(0)));
-    if (fn == "exp")
-        return Value::Float(std::exp(n(0)));
-    if (fn == "pow")
-        return Value::Float(std::pow(n(0), n(1)));
-    if (fn == "abs")
-        return args.size() && args[0].t == Value::T::Int ? Value::Int(std::llabs(args[0].i))
-                                                         : Value::Float(std::fabs(n(0)));
-    if (fn == "floor")
-        return Value::Float(std::floor(n(0)));
-    if (fn == "ceil")
-        return Value::Float(std::ceil(n(0)));
-    if (fn == "round")
-        return Value::Float(std::round(n(0)));
-    if (fn == "min") {
-        double r = n(0) < n(1) ? n(0) : n(1);
-        return allInt() ? Value::Int((long long)r) : Value::Float(r);
-    }
-    if (fn == "max") {
-        double r = n(0) > n(1) ? n(0) : n(1);
-        return allInt() ? Value::Int((long long)r) : Value::Float(r);
-    }
-    if (fn == "deg2rad")
-        return Value::Float(n(0) * (kPi / 180.0));
-    if (fn == "rad2deg")
-        return Value::Float(n(0) * (180.0 / kPi));
-    if (fn == "rand_f")
-        return Value::Float(std::uniform_real_distribution<double>(0.0, 1.0)(rng));
-    if (fn == "rand_i")
-        return Value::Int(std::uniform_int_distribution<long long>(0, 0x7fffffff)(rng));
-    if (fn == "rand_f_range")
-        return Value::Float(std::uniform_real_distribution<double>(n(0), n(1))(rng));
-    if (fn == "rand_i_range") {
-        long long lo = (long long)n(0), hi = (long long)n(1);
-        if (hi < lo)
-            std::swap(lo, hi);
-        return Value::Int(std::uniform_int_distribution<long long>(lo, hi)(rng)); // inclusive
-    }
-
-    throw RuntimeError("Math has no function '" + fn + "'", line);
+    // Thin wrapper: stateless (no self_/ctx_/scopes_ dependency), moved to
+    // Runtime.h/.cpp so generated native code shares the same
+    // implementation. See transpiration.txt Phase 0/2.
+    return crate::script::mathCall(fn, args, line);
 }
 
 Value Interpreter::builtinCall(const std::string& name, std::vector<Value>& args, int line) {

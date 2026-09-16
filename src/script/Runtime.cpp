@@ -1,9 +1,13 @@
 #include "script/Runtime.h"
 
+#include "core/Math.h"
 #include "scene/Actor.h"
 #include "scene/BuiltinComponents.h"
 
 #include <cmath>
+#include <cstdlib>
+#include <random>
+#include <utility>
 
 namespace crate::script {
 
@@ -24,6 +28,110 @@ bool isVec(const Value& v) {
 double vfield(const Value& v, const char* f) {
     auto it = v.obj->fields.find(f);
     return it == v.obj->fields.end() ? 0.0 : it->second.num();
+}
+
+void vfieldSet(const Value& v, const char* f, double x) {
+    if (!isVec(v))
+        return;
+    v.obj->fields[f] = Value::Float(x);
+}
+
+Value negate(const Value& a) {
+    return a.t == Value::T::Int ? Value::Int(-a.i) : Value::Float(-a.num());
+}
+
+Value valueEquals(const Value& a, const Value& b) {
+    if (a.isNumeric() && b.isNumeric())
+        return Value::Bool(a.num() == b.num());
+    return Value::Bool(a.str() == b.str() && a.t == b.t);
+}
+
+Value valueNotEquals(const Value& a, const Value& b) {
+    if (a.isNumeric() && b.isNumeric())
+        return Value::Bool(a.num() != b.num());
+    return Value::Bool(!(a.str() == b.str() && a.t == b.t));
+}
+
+Value valueLess(const Value& a, const Value& b) { return Value::Bool(a.num() < b.num()); }
+Value valueGreater(const Value& a, const Value& b) { return Value::Bool(a.num() > b.num()); }
+Value valueLessEq(const Value& a, const Value& b) { return Value::Bool(a.num() <= b.num()); }
+Value valueGreaterEq(const Value& a, const Value& b) { return Value::Bool(a.num() >= b.num()); }
+
+Value arrayLength(const Value& v) {
+    return Value::Int(v.t == Value::T::Array && v.arr ? (long long)v.arr->size() : 0);
+}
+
+bool arrayAdd(const Value& v, const Value& item) {
+    if (v.t != Value::T::Array || !v.arr)
+        return false;
+    v.arr->push_back(item);
+    return true;
+}
+
+Value mathCall(const std::string& fn, std::vector<Value>& args, int line) {
+    static std::mt19937 rng{std::random_device{}()};
+    auto n = [&](size_t i) { return i < args.size() ? args[i].num() : 0.0; };
+    auto allInt = [&]() {
+        for (const auto& a : args)
+            if (a.t != Value::T::Int)
+                return false;
+        return !args.empty();
+    };
+
+    if (fn == "clamp") {
+        double v = n(0), lo = n(1), hi = n(2);
+        double r = v < lo ? lo : (v > hi ? hi : v);
+        return allInt() ? Value::Int((long long)r) : Value::Float(r);
+    }
+    if (fn == "lerp")
+        return Value::Float(n(0) + (n(1) - n(0)) * n(2));
+    if (fn == "sine" || fn == "sin")
+        return Value::Float(std::sin(n(0)));
+    if (fn == "cos" || fn == "cosine")
+        return Value::Float(std::cos(n(0)));
+    if (fn == "tan")
+        return Value::Float(std::tan(n(0)));
+    if (fn == "sqrt")
+        return Value::Float(std::sqrt(n(0)));
+    if (fn == "exp")
+        return Value::Float(std::exp(n(0)));
+    if (fn == "pow")
+        return Value::Float(std::pow(n(0), n(1)));
+    if (fn == "abs")
+        return args.size() && args[0].t == Value::T::Int ? Value::Int(std::llabs(args[0].i))
+                                                         : Value::Float(std::fabs(n(0)));
+    if (fn == "floor")
+        return Value::Float(std::floor(n(0)));
+    if (fn == "ceil")
+        return Value::Float(std::ceil(n(0)));
+    if (fn == "round")
+        return Value::Float(std::round(n(0)));
+    if (fn == "min") {
+        double r = n(0) < n(1) ? n(0) : n(1);
+        return allInt() ? Value::Int((long long)r) : Value::Float(r);
+    }
+    if (fn == "max") {
+        double r = n(0) > n(1) ? n(0) : n(1);
+        return allInt() ? Value::Int((long long)r) : Value::Float(r);
+    }
+    if (fn == "deg2rad")
+        return Value::Float(n(0) * (kPi / 180.0));
+    if (fn == "rad2deg")
+        return Value::Float(n(0) * (180.0 / kPi));
+    if (fn == "rand_f")
+        return Value::Float(std::uniform_real_distribution<double>(0.0, 1.0)(rng));
+    if (fn == "rand_i")
+        return Value::Int(std::uniform_int_distribution<long long>(0, 0x7fffffff)(rng));
+    if (fn == "rand_f_range")
+        return Value::Float(std::uniform_real_distribution<double>(n(0), n(1))(rng));
+    if (fn == "rand_i_range") {
+        long long lo = (long long)n(0), hi = (long long)n(1);
+        if (hi < lo)
+            std::swap(lo, hi);
+        return Value::Int(std::uniform_int_distribution<long long>(lo, hi)(rng)); // inclusive
+    }
+
+    throw RuntimeError("Math has no function '" + fn + "'", line);
 }
 
 Value coerce(Value v, const std::string& ty) {
