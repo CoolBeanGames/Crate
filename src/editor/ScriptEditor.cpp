@@ -76,6 +76,8 @@ void ScriptEditor::refreshFunctions() {
 }
 
 bool ScriptEditor::saveCurrent() {
+    if (playing_)
+        return false;
     auto* f = ScriptSystem::get().file(current_);
     if (!f)
         return false;
@@ -84,6 +86,12 @@ bool ScriptEditor::saveCurrent() {
 }
 
 void ScriptEditor::saveAll() {
+    if (playing_)
+        return;
+    // EditorApp::setPlaying() calls this to force-save before compiling,
+    // BEFORE calling setPlaying(true) on this object -- so playing_ is
+    // still false at that moment and the save proceeds normally (see
+    // transpiration.txt Phase 7).
     for (auto& f : ScriptSystem::get().files())
         if (f.dirty)
             ScriptSystem::get().saveFile(f);
@@ -97,7 +105,7 @@ bool ScriptEditor::hasUnsaved() const {
 }
 
 void ScriptEditor::pushToSystem() {
-    if (current_.empty())
+    if (playing_ || current_.empty())
         return;
     std::string txt = editor_.GetText();
     std::string nowName = ScriptSystem::get().setSource(current_, txt);
@@ -115,8 +123,9 @@ void ScriptEditor::draw() {
     if (current_.empty())
         openScript(ScriptSystem::get().files().front().name);
 
-    // Ctrl+S saves.
-    if (ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S))
+    // Ctrl+S saves (a no-op while Play is running -- saveCurrent() itself
+    // guards on playing_, see Phase 7).
+    if (!playing_ && ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S))
         saveCurrent();
 
     ImGui::Columns(2, "script_editor_cols", true);
@@ -180,7 +189,12 @@ void ScriptEditor::drawSidebar() {
 }
 
 void ScriptEditor::drawCode() {
-    // Toolbar
+    // Toolbar. Save/Format are visibly disabled while Play is running --
+    // saveCurrent()/pushToSystem() already no-op in that case (so this is
+    // belt-and-braces, not the actual enforcement), but a script editor
+    // that silently does nothing when you click Save is confusing on its
+    // own (see transpiration.txt Phase 7).
+    ImGui::BeginDisabled(playing_);
     if (ImGui::Button("Save"))
         saveCurrent();
     ImGui::SameLine();
@@ -191,14 +205,19 @@ void ScriptEditor::drawCode() {
         suppressSync_ = false;
         pushToSystem();
     }
+    ImGui::EndDisabled();
     ImGui::SameLine();
-    auto* f = ScriptSystem::get().file(current_);
-    if (f && !f->error.empty()) {
-        ImGui::PushStyleColor(ImGuiCol_Text, ImColor(0xC0, 0x32, 0x26).Value);
-        ImGui::TextUnformatted(f->error.c_str());
-        ImGui::PopStyleColor();
+    if (playing_) {
+        ImGui::TextDisabled("Play is running -- editing disabled");
     } else {
-        ImGui::TextDisabled("Ctrl+S to save   |   Ctrl+Space for completions");
+        auto* f = ScriptSystem::get().file(current_);
+        if (f && !f->error.empty()) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImColor(0xC0, 0x32, 0x26).Value);
+            ImGui::TextUnformatted(f->error.c_str());
+            ImGui::PopStyleColor();
+        } else {
+            ImGui::TextDisabled("Ctrl+S to save   |   Ctrl+Space for completions");
+        }
     }
 
     // Snapshot input *before* Render(): TextEditor's own keyboard handling
@@ -212,6 +231,7 @@ void ScriptEditor::drawCode() {
     enterPressed_ = ImGui::IsKeyPressed(ImGuiKey_Enter, false);
 
     editor_.SetHandleKeyboardInputs(!acOpen_);
+    editor_.SetReadOnly(playing_); // no silently-discarded edits while Play is running
     editor_.Render("##code", ImVec2(0, 0), true);
     applyAutoBrackets();
     applyElectricIndent();

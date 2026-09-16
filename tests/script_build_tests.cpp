@@ -208,6 +208,40 @@ int main() {
         std::printf("ok  building an empty/unknown namespace fails cleanly: %s\n", r.error.c_str());
     }
 
+    // --- REGRESSION: buildNamespace() must work with a RELATIVE scriptsDir
+    // argument too, not just an absolute one. This is exactly the bug
+    // manual testing in the real editor caught: EditorApp passes
+    // ScriptSystem::scriptsDir(), which in the real app is the relative
+    // path "assets/scripts" (assetDir_ defaults to "assets"), whereas every
+    // OTHER test in this file uses CRATE_SCRIPTS_DIR, an ABSOLUTE compile-
+    // time path -- so this specific failure mode was invisible everywhere
+    // else. buildNamespace() must internally resolve to an absolute path
+    // before using it as both a subprocess cwd and a source of command-line
+    // argument text (see ScriptBuild.cpp's own comment on this). -----------
+    {
+        std::error_code relEc;
+        std::string relDir = fs::relative(dir, fs::current_path(), relEc).generic_string();
+        // Only meaningful if a relative path actually exists between CWD
+        // and the scripts dir (always true here: both are under the same
+        // repo checkout) -- skip defensively rather than fail outright if
+        // some exotic environment ever put them on different drives.
+        if (!relEc && !relDir.empty() && relDir != ".") {
+            sys.setSource("SBTestAlpha",
+                          "class SBTestAlpha : Actor { var n = 7; func update(float delta) {} }");
+            BuildResult rRel = buildNamespace(ns, relDir);
+            if (!rRel.ok)
+                std::printf("  buildNamespace (relative path '%s') error: %s\n", relDir.c_str(),
+                           rRel.error.c_str());
+            CHECK(rRel.ok);
+            CHECK(fs::exists(rRel.dllPath, ec));
+            std::printf("ok  buildNamespace() works with a RELATIVE scriptsDir argument (regression "
+                       "test)\n");
+        } else {
+            std::printf(
+                "(skipping relative-scriptsDir regression check -- no relative path available)\n");
+        }
+    }
+
     std::printf("ok  %d checks passed\n", g_checks);
     return 0;
 }

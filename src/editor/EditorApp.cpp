@@ -12,6 +12,8 @@
 #include "scene/Actor3D.h"
 #include "scene/BuiltinComponents.h"
 #include "scene/ComponentRegistry.h"
+#include "editor/ScriptBuild.h"
+#include "script/NativeClassRegistry.h"
 #include "script/ScriptSystem.h"
 
 #include <algorithm>
@@ -1990,9 +1992,54 @@ void EditorApp::deleteSelection() {
 void EditorApp::setPlaying(bool playing) {
     if (playing_ == playing)
         return;
-    playing_ = playing;
-    if (playing_) {
-        scriptEditor_.saveAll(); // auto-save scripts on play
+    if (playing) {
+        // Force-save every unsaved script BEFORE compiling anything -- the
+        // on-disk source is what buildNamespace() actually reads (via
+        // CodeGen.cpp -> ScriptSystem::types()), so a dirty, unsaved buffer
+        // would silently compile the OLD on-disk text otherwise. This is
+        // the ONLY point a script ever compiles to native code (see
+        // transpiration.txt, "Transplation" Phase 7) -- Play is refused
+        // entirely below if any of it fails, so the user always finds out
+        // about a compile error before Play visibly starts, never mid-run.
+        scriptEditor_.saveAll();
+
+        const std::string scriptsDir = script::ScriptSystem::get().scriptsDir();
+        auto dirty = editor::scriptbuild::computeDirtyNamespaces(scriptsDir);
+        auto rebuildSet = editor::scriptbuild::computeRebuildSet(dirty, scriptsDir);
+
+        std::vector<editor::scriptbuild::BuildResult> built;
+        built.reserve(rebuildSet.size());
+        for (const auto& ns : rebuildSet) {
+            auto result = editor::scriptbuild::buildNamespace(ns, scriptsDir);
+            if (!result.ok) {
+                CR_ERROR("script", "namespace '" + ns + "' failed to compile -- Play not started: " +
+                                       result.error);
+                return; // playing_ stays false: Play never visibly starts
+            }
+            built.push_back(std::move(result));
+        }
+
+        // Every dirty namespace compiled successfully -- load them all
+        // (loadNamespace also re-registers namespaces that were ALREADY
+        // loaded from a previous Play session, so this is safe to call
+        // even for a namespace that didn't need rebuilding this time; only
+        // namespaces in rebuildSet are touched here, matching what was
+        // actually just (re)built).
+        for (const auto& result : built) {
+            std::vector<std::string> classNames;
+            for (const auto& [name, ci] : script::ScriptSystem::get().types())
+                if (script::ScriptSystem::get().namespaceOf(name) == result.namespaceName)
+                    classNames.push_back(name);
+            if (!script::NativeClassRegistry::get().loadNamespace(result.namespaceName,
+                                                                   result.dllPath, classNames)) {
+                CR_ERROR("script", "namespace '" + result.namespaceName +
+                                       "' compiled but failed to load -- Play not started");
+                return;
+            }
+        }
+
+        scriptEditor_.setPlaying(true);
+        playing_ = true;
         playBackup_ = scene_.clone();
         physicsAccum_ = 0.0f;
         scene_.startPlay();
@@ -2010,6 +2057,17 @@ void EditorApp::setPlaying(bool playing) {
         script::ScriptSystem::get().resetStatics();
         script::ScriptSystem::get().resetInput();
         (void)selName;
+        // scene_ has now been fully replaced -- every native component from
+        // the just-ended Play session is gone (the moved-from playBackup_
+        // that WAS scene_ is destroyed on reassignment above). Only now is
+        // it safe to unload the native modules those instances' code lived
+        // in -- see transpiration.txt's Phase 4 ordering-hazard note: never
+        // unload a namespace's DLL while a live instance of it still
+        // exists anywhere. unloadAll() also restores every affected class's
+        // interpreted registration, so Add-Component keeps offering them.
+        script::NativeClassRegistry::get().unloadAll();
+        scriptEditor_.setPlaying(false);
+        playing_ = false;
         CR_GAME("play", "--- Play stopped ---");
         CR_LOG("play", "Returned to edit mode (scene restored)");
     }

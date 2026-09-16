@@ -1570,3 +1570,146 @@ entries — this is a running history, not a status snapshot.)
   already gone), never before -- see the ordering-hazard note from Phase 4
   and the do_async_native_tests.cpp Harness destructor for a concrete
   worked example of getting this ordering right.
+
+2026-09-16 — Before wiring Phase 7 into the real Play button, checked
+  whether the risk flagged in decision #2 (Play refuses to start AT ALL if
+  ANY loaded script fails to compile, and CodeGen still refuses
+  get_component/signals/this.base/static classes) was about to make Play
+  unusable in practice: read every shipped .cscript file
+  (Counter/Mover/MyNewActor/Player) and confirmed none use any currently-
+  unsupported construct -- all would compile cleanly. Surfaced this risk to
+  the user anyway before wiring it in (since a FUTURE script using
+  get_component, which is a core, recently-built feature -- the actor/
+  component reference picker -- would immediately block Play entirely).
+  User's answer: "just wire it as planned, were not doing a full test
+  until the full system is in, so nobody is hitting play yet. just make
+  sure its all hooked up before we call the task 'done'" -- proceeded
+  exactly as originally speced (strict: any compile failure blocks Play).
+
+2026-09-16 — PHASE 7 COMPLETE AND VERIFIED, INCLUDING LIVE MANUAL TESTING
+  IN THE REAL EDITOR (not just automated tests -- this phase has zero
+  automated coverage of EditorApp itself, exactly as anticipated in the
+  approved plan, so manual verification was the primary check here).
+  ScriptEditor.h/.cpp: added a `playing_` flag + `setPlaying(bool)`/
+  `isPlaying()`. saveCurrent()/saveAll()/pushToSystem() all early-return
+  (no-op) while playing_ is true. drawCode() wraps the Save/Format buttons
+  in ImGui::BeginDisabled(playing_)/EndDisabled(), shows "Play is running
+  -- editing disabled" in place of the normal Ctrl+S hint, and calls
+  editor_.SetReadOnly(playing_) on the TextEditor widget itself so typing
+  during Play doesn't even produce a locally-visible, silently-discarded
+  edit (the underlying ImGuiColorTextEdit library already supports a
+  read-only mode, used as-is). Ctrl+S handling in draw() is also gated on
+  !playing_.
+  EditorApp.cpp's setPlaying(bool) rewritten exactly per the DECISIONS
+  section: on entering Play, force-save (scriptEditor_.saveAll(), called
+  BEFORE scriptEditor_.setPlaying(true) so the save itself isn't blocked by
+  its own new guard) -> compute dirty namespaces
+  (ScriptBuild::computeDirtyNamespaces then computeRebuildSet) -> build
+  each via ScriptBuild::buildNamespace(); on the FIRST failure, CR_ERROR
+  with the namespace name and compiler diagnostic and `return` immediately
+  -- playing_ is only ever set true AFTER every dirty namespace has both
+  compiled AND been loaded via NativeClassRegistry::loadNamespace()
+  successfully, so Play never partially starts. On Stop: the existing
+  scene_ = std::move(playBackup_) restore runs FIRST (exactly as before
+  this phase), and ONLY AFTER that -- once every native component instance
+  from the ending Play session is already destroyed -- does
+  NativeClassRegistry::get().unloadAll() run, per the Phase 4 ordering-
+  hazard note (unloading a DLL while one of its instances is still alive
+  would be a use-after-free).
+  A REAL BUG FOUND ONLY BY MANUALLY PRESSING PLAY IN THE ACTUAL EDITOR (not
+  by any of the 12 automated test suites building up to this point,
+  including 4 dedicated to exactly this DLL-build pipeline): the very
+  first real Play press failed with `cl.exe: fatal error C1083: Cannot
+  open source file: 'assets/scripts/.crate_build/gen/Global/
+  Counter_Native.gen.cpp'`. Root cause: every automated test passes
+  CRATE_SCRIPTS_DIR, an ABSOLUTE compile-time path baked in by CMake, as
+  scriptsDir -- but the REAL running editor's ScriptSystem::scriptsDir()
+  is "assets/scripts", a RELATIVE path (EditorApp::assetDir_ defaults to
+  the relative "assets"). ScriptBuild::buildNamespace() built genDir/
+  binDir/cPath/objPath by simple string concatenation onto whatever
+  scriptsDir it was given, then used THAT SAME (possibly relative) string
+  BOTH as the subprocess's CreateProcessW working directory AND embedded
+  directly inside the cl.exe command-line's source-file argument -- with a
+  relative scriptsDir, this meant a relative path got re-resolved a SECOND
+  time relative to itself once the subprocess's cwd was set to (a prefix
+  of) that same relative path, corrupting the final file path entirely.
+  Fixed by resolving scriptsDir to an absolute path (std::filesystem::
+  absolute(...).generic_string()) ONE TIME at the very top of
+  buildNamespace(), before anything else in the function uses it -- every
+  test target's own scriptsDir was already absolute, so nothing there ever
+  exercised this path, which is EXACTLY why this class of bug is worth
+  documenting prominently: an automated suite that only ever exercises
+  "the convenient case" (an absolute compile-time constant) can stay fully
+  green while the feature is broken for the ACTUAL, real-world caller.
+  Added a permanent regression test for this (see below) rather than just
+  fixing it silently. No .gitignore change needed -- .crate_build/ was
+  already covered by Phase 3's entry.
+  MANUAL VERIFICATION PERFORMED IN THE REAL EDITOR (via scripts/ac_ctl.ps1
+  UI automation, screenshots reviewed at each step, PLUS the user directly
+  testing live during this same session):
+    - Pressed Play with the fix in place: Engine Console showed all four
+      scripts loading, the toolbar switched to "PLAYING", and the Crate
+      actor's Mesh Renderer texture was visibly rotated in the Scene View
+      (Mover.cscript's native code actually running and mutating
+      transform.rotation through the real engine tick loop).
+    - User independently added a Mover component to a DIFFERENT actor
+      ("Set") live, through the normal Add-Component menu, WHILE Play was
+      running, and confirmed in their own words: "It does work, I added
+      mover to Set and it started rotating" -- direct, first-hand
+      confirmation that ComponentRegistry's native-class integration
+      (Phase 4/5) works correctly from the actual editor UI during a real
+      Play session, not just in an automated harness.
+    - Pressed Stop: toolbar reverted to "EDIT MODE", Engine Console logged
+      "Returned to edit mode (scene restored)", and the live-added Mover
+      component on "Set" correctly disappeared (scene reverted to the
+      pre-Play snapshot), with no crash and no hang.
+    - The user then cycled Play/Stop repeatedly themselves (visible in the
+      Engine Console log: "Entered play mode"/"Returned to edit mode"
+      alternating many times in quick succession, including once more
+      re-adding Mover to Set) -- all cycles completed cleanly with no
+      crash, confirming the native-module load/unload path is stable
+      across REPEATED Play sessions, not just a single one (i.e., DLL
+      versioning/shadow-copying and NativeClassRegistry's unload-then-
+      reload bookkeeping hold up under real, repeated use).
+  New regression test: extended tests/script_build_tests.cpp with a check
+  that calls buildNamespace() with a RELATIVE scriptsDir argument
+  (computed via std::filesystem::relative() from the test's own CWD),
+  confirming it now succeeds -- this is the automated, permanent version
+  of the exact manual-testing catch above, so this class of bug can never
+  silently regress again even though every OTHER test target still (by
+  necessity, for its own simplicity) uses an absolute CRATE_SCRIPTS_DIR.
+  Verification performed: `powershell -ExecutionPolicy Bypass -File
+  scripts\build.ps1 Debug` built clean; ran all 16 test executables
+  directly -- all passed, zero regressions:
+    script_build_tests: ok 21 checks passed (new relative-path regression
+    check included) / do_async_native_tests: ok 82 / native_reflection_tests:
+    ok 24 / native_module_tests: ok 20 / codegen_tests: ok 84 /
+    runtime_tests: ok 287 / script_metadata_tests: ok 28 / script_tests: ok
+    52 / script_bug_tests, script_integration_tests, actor_tests (60),
+    mesh_tests, lighting_bake_tests, asset_db_tests, image_tests (11),
+    fbx_tests: all ok, unchanged. PLUS the live manual editor verification
+    described above (build/test suites alone would NOT have caught the
+    relative-path bug -- this is exactly why the manual pass mattered).
+  Files touched this phase: src/editor/EditorApp.cpp (modified:
+  setPlaying() rewritten, new includes for ScriptBuild.h/
+  NativeClassRegistry.h), src/editor/ScriptEditor.h (modified: playing_
+  flag, setPlaying()/isPlaying()), src/editor/ScriptEditor.cpp (modified:
+  save methods gated, UI disabled state, TextEditor read-only toggle),
+  src/editor/ScriptBuild.cpp (modified: scriptsDir absolute-path
+  resolution fix), tests/script_build_tests.cpp (modified: relative-path
+  regression test added).
+  NOT YET COMMITTED to git as of writing this entry -- see next action.
+  Next step: continue to Phase 8 (test-strategy summary / final sign-off
+  checklist -- see the approved plan's own Phase 8 text; this is largely
+  informational/organizational rather than new code, since every phase 0-7
+  already added its own tests as it went, per the user's "bajillion tests"
+  mandate applied throughout). After Phase 8, per the ORIGINAL Zen task
+  card's own notes ("Do not close this task until i tell you to, leave it
+  open to test... only move on to the next task when i approve this one"),
+  STOP and wait for the user's explicit approval before considering
+  "Transplation" itself done or moving to any other task -- do not
+  auto-archive the Zen card. The user's own words when starting Phase 7
+  ("just make sure its all hooked up before we call the task 'done'")
+  reinforce this: report back that everything is hooked up and working,
+  including the live manual verification above, and let the user decide
+  when the task is actually complete.

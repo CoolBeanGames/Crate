@@ -27,6 +27,16 @@ public:
     // Start the "name your new script" prompt (the class gets the same name).
     void beginNewScript();
 
+    // Gates saveCurrent()/saveAll()/pushToSystem() to a no-op while true --
+    // called by EditorApp::setPlaying() (Phase 7). Scripts are force-saved
+    // once, synchronously, right before Play starts (the ONLY point a
+    // compile happens -- see transpiration.txt, "Transplation" Phase 7);
+    // editing/saving must be impossible for the remainder of Play so the
+    // on-disk source and the already-built native DLL can never drift
+    // apart while it's running.
+    void setPlaying(bool p) { playing_ = p; }
+    bool isPlaying() const { return playing_; }
+
     const std::string& current() const { return current_; }
 
 private:
@@ -75,6 +85,8 @@ private:
     TextEditor::Coordinates preCursor_{0, 0};
     std::string preLine_;
     bool enterPressed_ = false;
+
+    bool playing_ = false;
 };
 
 } // namespace crate

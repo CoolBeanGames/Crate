@@ -310,13 +310,34 @@ std::unordered_set<std::string> computeRebuildSet(const std::unordered_set<std::
 // buildNamespace
 // ---------------------------------------------------------------------------
 
-BuildResult buildNamespace(const std::string& namespaceName, const std::string& scriptsDir) {
+BuildResult buildNamespace(const std::string& namespaceName, const std::string& scriptsDirIn) {
     BuildResult r;
     r.namespaceName = namespaceName;
 
     auto& tc = ToolchainEnv::get();
     if (!tc.available()) {
         r.error = "no MSVC toolchain available: " + tc.error();
+        return r;
+    }
+
+    // Resolve to an ABSOLUTE path once, up front. This matters for two
+    // separate reasons, not just one: (1) CreateProcessW's lpCurrentDirectory
+    // parameter (passed as `cwd` to every tc.run() call below) is documented
+    // to require a full path -- a relative one is unreliable; (2) genDir/
+    // binDir/cPath/objPath/dllPath are all built by simple concatenation
+    // onto this value and then used BOTH as that same cwd AND embedded
+    // directly in command-line arguments (the source-file path passed to
+    // cl.exe) -- if scriptsDir were relative, a subprocess launched with
+    // cwd=genDir would resolve that SAME relative path a second time
+    // relative to genDir itself, effectively doubling it (this was an
+    // actual bug caught by manually pressing Play in the real editor,
+    // where ScriptSystem::scriptsDir() is "assets/scripts", a relative
+    // path -- every automated test happened to pass CRATE_SCRIPTS_DIR as
+    // an absolute compile-time path, so this never surfaced there).
+    std::error_code absEc;
+    const std::string scriptsDir = fs::absolute(fs::path(scriptsDirIn), absEc).generic_string();
+    if (absEc || scriptsDir.empty()) {
+        r.error = "could not resolve an absolute path for scripts directory '" + scriptsDirIn + "'";
         return r;
     }
 
