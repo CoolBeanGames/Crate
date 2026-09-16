@@ -135,12 +135,16 @@ int main() {
         std::printf("ok  a never-built namespace is reported dirty\n");
     }
 
-    // --- computeRebuildSet: identity function today (see ScriptBuild.h) -
+    // --- computeRebuildSet: with no cross-namespace inheritance edges,
+    // returns the same NAMES (order unspecified for an unrelated set) ----
     {
         std::unordered_set<std::string> in = {ns, "SomeOtherNamespace"};
         auto out = computeRebuildSet(in, dir);
-        CHECK(out == in);
-        std::printf("ok  computeRebuildSet is the identity function (no inheritance support yet)\n");
+        std::unordered_set<std::string> outAsSet(out.begin(), out.end());
+        CHECK(out.size() == in.size());
+        CHECK(outAsSet == in);
+        std::printf("ok  computeRebuildSet returns the same namespaces when none depend on "
+                    "another (no cross-namespace inheritance edges)\n");
     }
 
     if (!haveToolchain) {

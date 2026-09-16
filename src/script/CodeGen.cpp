@@ -1356,6 +1356,8 @@ bool Gen::stmt(const Stmt& s, FnCtx& fc, std::ostringstream& out, int indent) {
 
 } // namespace
 
+std::string sanitizeClassName(const std::string& name) { return sanitize(name); }
+
 CodeGenResult generateClass(const ClassInfo& classInfo,
                             const std::unordered_set<std::string>& knownClassNames) {
     CodeGenResult r;
@@ -1447,20 +1449,46 @@ CodeGenResult generateClass(const ClassInfo& classInfo,
     h << "#include \"scene/Component.h\"\n";
     h << "#include \"core/Math.h\"\n\n";
     if (hasScriptBase)
-        // Same-namespace only for now (Phase 9f): both classes' generated
-        // headers live in the same gen dir, so a plain relative include
-        // resolves via the SAME -I the whole namespace already compiles
-        // with -- no extra include path needed. Cross-namespace inheritance
-        // (a different -I / a base namespace's .lib) is not wired up yet.
+        // A plain quoted include resolves either way (Phase 9f full): for
+        // a same-namespace base it's already sitting in the same gen dir
+        // (no extra include path needed); for a cross-namespace one,
+        // ScriptBuild.cpp's buildNamespace() adds -I<base's gen dir> to
+        // this whole namespace's compile command.
         h << "#include \"" << baseCls << ".gen.h\"\n";
     h << "#include <memory>\n#include <string>\n#include <unordered_map>\n#include <vector>\n\n";
+    // Cross-DLL export/import (Phase 9f full): every generated class is
+    // POTENTIALLY a future cross-namespace base -- CodeGen has no way to
+    // know in advance whether some OTHER namespace will end up deriving
+    // from THIS one, so every class gets this guard unconditionally, and
+    // ScriptBuild.cpp's buildNamespace() unconditionally passes
+    // -DCRATE_GEN_BUILDING_<exportSuffix> when compiling THIS class's own
+    // .cpp (so it always self-exports); a DIFFERENT namespace's .cpp that
+    // #includes this header for inheritance does NOT define that macro,
+    // so it sees __declspec(dllimport) instead. Needed for the class's
+    // constructor (a derived class's ctor, in a different DLL, delegates
+    // to it via the C++ member-init list) and any of its OWN methods an
+    // inherited-but-not-overridden this->fn_X(...)/this.base.fn_X() call
+    // could reach from a derived class compiled into another DLL --
+    // dllexport on the class itself covers the whole vtable + every
+    // member function uniformly, which is simpler and safer than trying
+    // to annotate individual methods. A same-namespace-only base (or no
+    // base at all) never actually crosses a DLL boundary, so the ordinary
+    // intra-module extern trick (see kClassInfo_<suffix> below) still
+    // does the rest of the work for THAT case; this macro is what makes
+    // the SAME generated code ALSO correct when the base turns out to be
+    // in a different DLL.
+    h << "#if defined(CRATE_GEN_BUILDING_" << exportSuffix << ")\n";
+    h << "#define CRATE_GEN_API_" << exportSuffix << " __declspec(dllexport)\n";
+    h << "#else\n";
+    h << "#define CRATE_GEN_API_" << exportSuffix << " __declspec(dllimport)\n";
+    h << "#endif\n\n";
     h << "namespace crate::script::generated {\n\n";
     if (decl.isStatic) {
-        h << "class " << cls << " {\n";
+        h << "class CRATE_GEN_API_" << exportSuffix << " " << cls << " {\n";
         h << "public:\n";
         h << "    explicit " << cls << "(crate::script::ScriptContext* ctx);\n\n";
     } else {
-        h << "class " << cls << " : public "
+        h << "class CRATE_GEN_API_" << exportSuffix << " " << cls << " : public "
           << (hasScriptBase ? baseCls : "crate::Component") << " {\n";
         h << "public:\n";
         h << "    " << cls << "(crate::script::ScriptContext* ctx, crate::Actor* owner);\n\n";
@@ -1582,23 +1610,35 @@ CodeGenResult generateClass(const ClassInfo& classInfo,
       << "(void* p) { return static_cast<crate::script::generated::" << cls << "*>(p)->selfView_; }\n";
     c << "} // namespace\n\n";
     // kClassInfo_<suffix> itself is deliberately declared OUTSIDE the
-    // anonymous namespace above, with an explicit `extern` (Phase 9f):
-    // each class compiles as its OWN translation unit (a namespace's
-    // classes are compiled+linked together, not merged into one .cpp), so
-    // a DERIVED class's TU needs to reference an ANCESTOR's kClassInfo_
-    // by address across that TU boundary for baseClassInfo below --
-    // impossible if it stayed inside an unnamed namespace, since THOSE
-    // members always have internal (TU-local) linkage no matter what,
-    // `extern` or not. A plain top-level `const` also defaults to
-    // internal linkage in C++ (unlike C) unless marked `extern` too, so
-    // both things (moving it out, AND keeping the explicit extern) are
-    // required together. This still resolves at ordinary LINK time within
-    // the same DLL -- no dllexport/dllimport needed for an intra-module
-    // reference, only for a FUTURE cross-namespace (cross-DLL) base, which
-    // isn't wired up yet.
+    // anonymous namespace above, with an explicit `extern` PLUS the same
+    // CRATE_GEN_API_<suffix> dllexport/dllimport macro the class itself
+    // uses (Phase 9f, full): each class compiles as its OWN translation
+    // unit (a namespace's classes are compiled+linked together, not
+    // merged into one .cpp), so a DERIVED class's TU needs to reference an
+    // ANCESTOR's kClassInfo_ by address across that TU boundary for
+    // baseClassInfo below -- impossible if it stayed inside an unnamed
+    // namespace, since THOSE members always have internal (TU-local)
+    // linkage no matter what, `extern` or not. A plain top-level `const`
+    // also defaults to internal linkage in C++ (unlike C) unless marked
+    // `extern` too, so both things (moving it out, AND keeping the
+    // explicit extern) are required together. For a SAME-namespace
+    // reference this `extern` alone is already sufficient (ordinary
+    // intra-DLL link); for a CROSS-namespace one, `extern` alone is
+    // necessary but NOT sufficient -- a plain top-level `extern` symbol,
+    // even with external linkage, is still NOT visible to a genuinely
+    // DIFFERENT DLL's linker unless it's ALSO explicitly marked
+    // __declspec(dllexport) in the exporting DLL (Windows import
+    // libraries only contain symbols explicitly marked for export, unlike
+    // Unix shared libraries) -- caught by the FIRST real cross-namespace
+    // build attempt (LNK2001 unresolved external), which is exactly why
+    // this data symbol gets the SAME per-class macro the class itself
+    // does: dllexport when compiled as part of its OWN namespace,
+    // dllimport when referenced from a different one.
     if (hasScriptBase)
-        c << "extern const crate::script::CompiledClassInfo kClassInfo_" << baseExportSuffix << ";\n";
-    c << "extern const crate::script::CompiledClassInfo kClassInfo_" << exportSuffix << " = {\n";
+        c << "extern CRATE_GEN_API_" << baseExportSuffix << " const crate::script::CompiledClassInfo kClassInfo_"
+          << baseExportSuffix << ";\n";
+    c << "extern CRATE_GEN_API_" << exportSuffix << " const crate::script::CompiledClassInfo kClassInfo_"
+      << exportSuffix << " = {\n";
     c << "    " << cppStringLiteral(decl.name) << ", \"\", "
       << (hasScriptBase ? ("&kClassInfo_" + baseExportSuffix) : "nullptr") << ",\n";
     c << "    " << (decl.fields.empty() ? "nullptr" : ("kFields_" + exportSuffix)) << ", "

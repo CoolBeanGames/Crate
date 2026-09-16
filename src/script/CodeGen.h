@@ -22,17 +22,18 @@ namespace crate::script {
 // dynamic overflow map, exactly mirroring Interpreter::lvalue()),
 // transform/actor access, Math.*, Input.*, and print()/type_of()/str().
 //
-// Classes based on Actor/Actor2D/Actor3D, OR on another script class
-// compiled into the SAME namespace/module (Phase 9f: real C++ inheritance,
-// `class Derived_Native : public Base_Native`), are accepted. A script base
-// living in a DIFFERENT namespace is not wired up yet -- ScriptBuild.cpp
-// refuses that case explicitly (see its own comments) rather than this
-// function, since CodeGen itself has no notion of namespaces at all; the
-// generated inheritance syntax here is namespace-agnostic; only the BUILD
-// orchestration (include paths / import libs / topological build order)
-// differs for a cross-namespace base, and that part remains future work
-// (see transpiration.txt Phase 9f). Abstract classes are refused (they
-// don't map onto a single concrete native Component/static instance).
+// Classes based on Actor/Actor2D/Actor3D, OR on another script class --
+// same OR different namespace/module (Phase 9f: real C++ inheritance,
+// `class Derived_Native : public Base_Native`, with __declspec(dllexport/
+// dllimport) so it works whether the base ends up in the same DLL or a
+// different one) -- are accepted. CodeGen itself has no notion of
+// namespaces at all; the generated inheritance syntax here is namespace-
+// agnostic either way. Only the BUILD orchestration (include paths /
+// import libs / topological build order across namespaces, so a base is
+// always built before a namespace that depends on it) lives in
+// ScriptBuild.cpp, the one place that actually knows about namespaces.
+// Abstract classes are refused (they don't map onto a single concrete
+// native Component/static instance).
 struct CodeGenResult {
     bool ok = false;
     std::string className; // sanitized identifier base used for <ClassName>_Native etc.
@@ -40,6 +41,14 @@ struct CodeGenResult {
     std::string source;    // <ClassName>.gen.cpp contents
     std::string error;     // set iff !ok (first problem found, with a line number if known)
 };
+
+// The same identifier-sanitization generateClass() itself uses internally
+// for <ClassName>_Native/export-suffix names (alnum/underscore only,
+// prefixed with '_' if it would otherwise start with a digit or be
+// empty). Exposed so ScriptBuild.cpp can compute the IDENTICAL
+// -DCRATE_GEN_BUILDING_<suffix> macro name for a class without
+// duplicating (and risking drifting from) this logic.
+std::string sanitizeClassName(const std::string& name);
 
 // Takes the full ClassInfo (not just its owned ClassDecl), not just for its
 // `decl` -- Phase 9f needs `baseClass` (the resolved script base's own

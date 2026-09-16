@@ -46,15 +46,18 @@ private:
 std::unordered_set<std::string> computeDirtyNamespaces(const std::string& scriptsDir);
 
 // Expands `dirty` to include any namespace that structurally depends (via
-// script-to-script inheritance) on an already-dirty one, so a base-class
-// change safely rebuilds every dependent namespace instead of leaving them
-// linked against a stale layout. Returns the expanded set. NOTE: as of
-// Phase 2, generateClass() refuses any base other than Actor/Actor2D/
-// Actor3D, so no cross-namespace dependency edge can exist yet and this is
-// currently always the identity function on non-empty input -- built now
-// so Phase 4/5 inheritance support doesn't require revisiting this phase.
-std::unordered_set<std::string> computeRebuildSet(const std::unordered_set<std::string>& dirty,
-                                                  const std::string& scriptsDir);
+// cross-namespace script-to-script inheritance, Phase 9f) on an
+// already-dirty one, so a base-class change safely rebuilds every
+// dependent namespace instead of leaving them linked against a stale
+// layout -- then topologically sorts the expanded set so a base namespace
+// always appears before any namespace that depends on it (a dependent's
+// build needs the base's CURRENT .lib/generated headers to already exist).
+// Returns an ORDERED vector, not a set -- the caller (EditorApp::
+// setPlaying()) MUST build namespaces in this exact order, not an
+// unordered loop. A same-namespace-only base contributes no edge here at
+// all (nothing outside that one namespace depends on anything).
+std::vector<std::string> computeRebuildSet(const std::unordered_set<std::string>& dirty,
+                                           const std::string& scriptsDir);
 
 // Compiles every script currently in `namespaceName` (looked up live from
 // ScriptSystem) into a fresh, versioned, shadow-copied

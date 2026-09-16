@@ -3051,3 +3051,183 @@ entries above.
   "EXPLICIT CONTINUATION POINT" section, then implement 1-2-3-4-5 in that
   order (each is meaningfully testable on its own before the next).
 ===========================================================================
+
+2026-09-16 — SUB-PHASE 9f PART 2 COMPLETE AND VERIFIED: CROSS-NAMESPACE
+  script-to-script inheritance -- implements items 1-5 of the "EXPLICIT
+  CONTINUATION POINT" section directly above, in the same order it
+  proposed. THIS COMPLETES PHASE 9f, AND WITH IT THE ENTIRE "TRANSPLATION"
+  TASK'S FULL-PARITY MANDATE ("references, drag and drop, input, globals,
+  get_component, everything... dont forget signals") -- every construct
+  the original 8-phase plan deferred is now compiled, not just the
+  interpreter fallback. The user explicitly chose to continue into this
+  (rather than stop at the same-namespace checkpoint) after being told
+  plainly that it was a separate, substantial piece of work.
+  1) computeRebuildSet() (ScriptBuild.h/.cpp) is no longer the identity
+     function: builds the real "namespace B depends on namespace A" edge
+     graph (scanning every class's ClassInfo::baseClass for one resolving
+     into a DIFFERENT namespace), expands the dirty set transitively (a
+     dirty BASE namespace pulls in every namespace that depends on it --
+     directly closes the "known existing gap" this file flagged back in
+     Phase 3, now covered by its own explicit regression test), and
+     topologically sorts the result via DFS post-order so a base
+     namespace's entry always precedes any dependent's. Signature changed
+     from returning std::unordered_set to std::vector (ORDER now matters
+     to the caller) -- EditorApp.cpp's existing `for (const auto& ns :
+     rebuildSet)` loop needed no change at all (range-for works on either
+     container), it just now iterates in the correct order automatically.
+     script_build_tests.cpp's old "identity function" assertion updated
+     to compare CONTENTS (a plain unrelated-namespaces input has no
+     edges, so still no reordering requirement, but the return type
+     changed).
+  2) buildNamespace() (ScriptBuild.cpp): for each of ITS OWN classes with
+     a base in a genuinely different (already-built, i.e. present in the
+     manifest -- defensively verified, since computeRebuildSet's ordering
+     guarantee could theoretically be bypassed by a direct/out-of-order
+     caller) namespace, collects that namespace's CURRENT generated-
+     headers dir (for -I) and CURRENT versioned .lib (read from the
+     manifest -- the SAME manifest.tsv this file already used for
+     generation numbers) -- applied as extra -I/link-line entries for
+     the WHOLE namespace's build (simpler than per-class, and no class
+     needs to NOT see them). Also: every class in the namespace now gets
+     -DCRATE_GEN_BUILDING_<suffix> on ITS OWN compile (was previously
+     nothing) -- necessary even for a namespace with NO cross-namespace
+     bases at all, once CodeGen.cpp's classes are ALWAYS
+     dllexport/dllimport-guarded (see 3 below) -- self-building must be
+     explicit, there's no implicit "this is fine, we're all local" case
+     anymore.
+  3) THE ACTUAL HARD PART, exactly as this file predicted it would be:
+     CodeGen.cpp's generated class declaration gained a per-class
+     __declspec(dllexport)/dllimport macro guard (`#if defined
+     (CRATE_GEN_BUILDING_<suffix>) dllexport #else dllimport #endif`,
+     `class CRATE_GEN_API_<suffix> <Name>_Native : public ...`) --
+     UNCONDITIONALLY on every class, since CodeGen has no way to know in
+     advance whether some OTHER, not-yet-written namespace will later
+     derive from this one. dllexport on the class covers its vtable AND
+     every member function (including the constructor a derived class in
+     another DLL delegates to, and any inherited-but-not-overridden
+     method an unqualified this->fn_X(...) or a qualified
+     this.base.fn_X() could reach) in one declaration -- no per-method
+     annotation needed. Two REAL bugs were caught by the FIRST actual
+     cross-DLL build attempt (not by review):
+       (a) Same-namespace classes referencing EACH OTHER (the case that
+           already worked before this sub-phase) BROKE the moment the
+           macro guard went in class-wide, unconditionally: a
+           same-namespace reference to another class in the SAME
+           namespace would see that OTHER class's macro as dllimport
+           (its BUILDING flag wasn't defined for THIS specific
+           compile), and __declspec(dllimport) on a symbol that turns
+           out to be defined in the SAME link unit is invalid/fails to
+           link. FIXED by having buildNamespace() define
+           -DCRATE_GEN_BUILDING_<suffix> for EVERY class in the
+           namespace being built, on EVERY compile command in that
+           namespace -- not just each class's own suffix on its own
+           compile -- so every same-namespace reference is always
+           correctly treated as "local", and only a GENUINELY different
+           namespace's classes ever fall through to dllimport. Caught by
+           re-running the EXISTING inheritance_parity_tests.cpp (same-
+           namespace) immediately after adding the macro guard, before
+           ever attempting a real cross-namespace build -- exactly the
+           "test immediately after every change" discipline catching a
+           regression before it could compound.
+       (b) The actual first cross-namespace build attempt failed at LINK
+           time (LNK2001, unresolved external `kClassInfo_XnsBase`) even
+           WITH the class-level dllexport/dllimport guard in place:
+           kClassInfo_<suffix> is a free DATA symbol (not a class
+           member), and giving it plain `extern` linkage (Phase 9f part
+           1's same-namespace fix) is necessary but NOT sufficient for a
+           genuinely different DLL to see it -- Windows import libraries
+           only contain symbols EXPLICITLY marked dllexport in the
+           exporting DLL, unlike Unix shared libraries which export
+           everything with external linkage by default. FIXED by
+           applying the SAME CRATE_GEN_API_<suffix> macro to
+           kClassInfo_<suffix>'s own declaration/definition
+           (`extern CRATE_GEN_API_<suffix> const CompiledClassInfo
+           kClassInfo_<suffix> = {...};`), exactly mirroring the class
+           itself.
+     A NEW exported helper, crate::script::sanitizeClassName() (CodeGen.h/
+     .cpp), exposes CodeGen's own internal identifier-sanitization logic
+     so ScriptBuild.cpp (and codegen_tests.cpp, see below) can compute the
+     IDENTICAL -DCRATE_GEN_BUILDING_<suffix> macro name for a class
+     without duplicating (and risking drifting from) that logic.
+  4) The "cross-namespace script inheritance is not supported yet"
+     refusal in buildNamespace() is gone, replaced by the -I/.lib
+     cross-referencing logic in (2) -- a class whose base namespace
+     genuinely hasn't been built yet (manifest has no entry for it) still
+     gets a clear, specific error rather than a confusing compiler
+     failure.
+  5) Tests:
+     - tests/cross_namespace_inheritance_tests.cpp (NEW): the full
+       pipeline end to end -- computeRebuildSet() topological-order
+       assertions (base before dependent; a dirty BASE namespace expands
+       to include its dependent, the "known existing gap" scenario,
+       explicitly asserted), then a REAL two-namespace build (base
+       namespace built and loaded FIRST, derived namespace second, using
+       the base's just-built .lib/gen-dir), then the exact same
+       field-override/inherited-method/this.base.method()/inherited-
+       signal assertions inheritance_parity_tests.cpp already made for
+       the same-namespace case -- proving cross-namespace behaves
+       IDENTICALLY, not just "also compiles." 18 checks. Confirmed
+       repeatable across 4 runs.
+     - tests/codegen_tests.cpp: compileWithCl() (the test-local cl.exe
+       wrapper, separate from ScriptBuild.cpp's own) needed
+       -DCRATE_GEN_BUILDING_<suffix> added too, or EVERY existing
+       codegen_tests.cpp scenario would fail post-macro-guard (a
+       dllimport-declared kClassInfo_<suffix> WITH an initializer is a
+       compile error, "definition of dllimport data not allowed") --
+       caught immediately by the full-suite run right after implementing
+       the macro guard, fixed by threading the class's own
+       sanitizeClassName() result through to the compile command. All
+       137 existing checks still pass with this fix; no NEW codegen_tests
+       scenarios were needed for cross-namespace specifically (it's pure
+       build-orchestration + linkage, outside what a single generateClass()
+       call can exercise in isolation).
+  Verification performed: `powershell -ExecutionPolicy Bypass -File
+  scripts\build.ps1 Debug` built clean; ran all 22 test executables (now
+  including cross_namespace_inheritance_tests) directly -- all passed,
+  zero regressions (after the two macro-guard fallout fixes above, both
+  caught and fixed within this same sub-phase before committing); re-ran
+  cross_namespace_inheritance_tests.cpp AND inheritance_parity_tests.cpp
+  (the two riskiest, most novel tests) 2-3 additional times each for
+  repeatability -- consistent, clean exit every time.
+  Files touched this sub-phase: src/editor/ScriptBuild.h (modified:
+  computeRebuildSet returns vector<string>, doc comment rewritten),
+  src/editor/ScriptBuild.cpp (modified: real dependency-graph +
+  topological sort; buildNamespace() cross-namespace -I/.lib +
+  universal -DCRATE_GEN_BUILDING_ flags; cross-namespace refusal removed),
+  src/script/CodeGen.h (modified: sanitizeClassName() exposed; doc comment
+  updated -- cross-namespace is no longer "future work"), src/script/
+  CodeGen.cpp (modified: dllexport/dllimport macro guard on every
+  generated class AND on kClassInfo_<suffix> specifically), tests/
+  script_build_tests.cpp (modified: computeRebuildSet assertion updated
+  for the new return type), tests/codegen_tests.cpp (modified:
+  compileWithCl() defines the class's own BUILDING macro),
+  tests/cross_namespace_inheritance_tests.cpp (new), CMakeLists.txt
+  (modified: new cross_namespace_inheritance_tests target).
+
+  ============================================================
+  PHASE 9 COMPLETE. "TRANSPLATION" TASK STATUS: implementation-complete
+  per the user's own stated bar ("this task is not done until it is
+  literally 1:1 parity with the interpreted version... I want it all
+  working, references, drag and drop, input, globals, get_component,
+  everything... dont forget signals"). Every sub-phase (9a get_component/
+  references consolidation, 9b get_component/type_of(AnyClass)/general
+  cross-object access, 9c Camera.main, 9d first-class function references
+  + signals incl. InputButton, 9e static classes, 9f this.base.method() +
+  BOTH same- and cross-namespace real script-to-script inheritance) is
+  implemented, tested (every new function has direct test coverage per
+  the standing "bajillion tests" mandate -- 22 test executables, several
+  hundred checks total across them), and passing with zero regressions
+  against the full pre-existing suite.
+  STILL EXPLICITLY REQUIRED BEFORE THIS TASK CAN BE CONSIDERED DONE (per
+  the task's own original instructions, restated at the top of this file
+  and unchanged since): "Do not close this task until i tell you to...
+  only move on to the next task when i approve this one." A manual pass
+  in the live editor (pressing Play on a real scene using these
+  constructs, per this file's own "GENERAL VERIFICATION BAR" note that
+  automated tests alone have missed real-world-only failure modes before
+  -- e.g. Phase 7's relative-path bug) has NOT been performed this
+  session and is still recommended before considering the task fully
+  verified, though every construct now has a dedicated, passing,
+  build-the-real-DLL-and-run-it automated test. The task remains OPEN in
+  Zen pending the user's own review and explicit approval.
+===========================================================================

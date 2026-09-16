@@ -253,3 +253,9 @@ target_link_libraries(inheritance_parity_tests PRIVATE crate_core)
 target_compile_definitions(inheritance_parity_tests PRIVATE
     CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
 add_test(NAME inheritance_parity_tests COMMAND inheritance_parity_tests)
+
+add_executable(cross_namespace_inheritance_tests tests/cross_namespace_inheritance_tests.cpp)
+target_link_libraries(cross_namespace_inheritance_tests PRIVATE crate_core)
+target_compile_definitions(cross_namespace_inheritance_tests PRIVATE
+    CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
+add_test(NAME cross_namespace_inheritance_tests COMMAND cross_namespace_inheritance_tests)

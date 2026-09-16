@@ -11,8 +11,10 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <map>
 #include <sstream>
+#include <unordered_map>
 
 #ifndef CRATE_REPO_DIR
 #define CRATE_REPO_DIR "."
@@ -293,21 +295,77 @@ std::unordered_set<std::string> computeDirtyNamespaces(const std::string& script
     return dirty;
 }
 
-std::unordered_set<std::string> computeRebuildSet(const std::unordered_set<std::string>& dirty,
-                                                  const std::string& /*scriptsDir*/) {
-    // Phase 9f added REAL script-to-script inheritance -- but SAME-
-    // NAMESPACE only so far (see buildNamespace()'s own explicit refusal
-    // below for a cross-namespace base). Since a namespace's own classes
-    // can only depend on OTHER classes already compiled into that SAME
-    // namespace/DLL, "namespace B depends on namespace A, A != B" is
-    // still always empty -- this stays the identity function until
-    // cross-namespace inheritance is wired up (the true dependency-graph/
-    // topological-sort logic this function is named for), at which point
-    // the edge computation (scan each namespace's classes'
-    // ClassInfo::baseClass for one resolving into a *different*
-    // namespace) slots in here without needing to change any caller. See
-    // transpiration.txt Phase 9f's own notes on what's left.
-    return dirty;
+std::vector<std::string> computeRebuildSet(const std::unordered_set<std::string>& dirty,
+                                           const std::string& /*scriptsDir*/) {
+    auto& sys = script::ScriptSystem::get();
+
+    // Build the dependency graph: edge "B depends on A" for every
+    // namespace B containing a class whose resolved script base
+    // (ClassInfo::baseClass) lives in a DIFFERENT namespace A. A
+    // same-namespace base contributes no edge (nothing outside that one
+    // namespace needs it built first -- it's already compiled together).
+    std::unordered_map<std::string, std::unordered_set<std::string>> dependsOn;
+    for (const auto& [name, ci] : sys.types()) {
+        if (!ci->decl || !ci->baseClass)
+            continue;
+        std::string ns = sys.namespaceOf(name);
+        std::string baseNs = sys.namespaceOf(ci->baseClass->name);
+        if (baseNs != ns)
+            dependsOn[ns].insert(baseNs);
+    }
+
+    // Expand `dirty`: a namespace that (transitively) depends on an
+    // already-dirty one must also rebuild, or it would link against the
+    // base's STALE generated layout -- this is precisely the "known
+    // existing gap" scenario flagged earlier in this file (a derived
+    // namespace silently going stale when only its base's source
+    // changed), now closed for real.
+    std::unordered_set<std::string> expanded = dirty;
+    bool changed = true;
+    while (changed) {
+        changed = false;
+        for (const auto& [ns, deps] : dependsOn) {
+            if (expanded.count(ns))
+                continue;
+            for (const auto& dep : deps) {
+                if (expanded.count(dep)) {
+                    expanded.insert(ns);
+                    changed = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    // Topologically sort (DFS post-order): a base namespace is fully
+    // visited -- and so appears earlier in `order` -- before the
+    // dependent that needed it, exactly matching what buildNamespace()
+    // needs (a base's CURRENT .lib/generated headers must already exist
+    // by the time a dependent's compile/link step runs). `inProgress`
+    // guards against an unbuildable circular NAMESPACE dependency (two
+    // namespaces each deriving from a class in the other) -- a
+    // pathological case the interpreter itself doesn't defend against
+    // either (ClassInfo::findFunction/hasSignal would recurse forever on
+    // a circular CLASS hierarchy too), so this only prevents an infinite
+    // loop here, it doesn't attempt to diagnose the cycle specially.
+    std::vector<std::string> order;
+    std::unordered_set<std::string> visited, inProgress;
+    std::function<void(const std::string&)> visit = [&](const std::string& ns) {
+        if (visited.count(ns) || inProgress.count(ns))
+            return;
+        inProgress.insert(ns);
+        auto it = dependsOn.find(ns);
+        if (it != dependsOn.end())
+            for (const auto& dep : it->second)
+                if (expanded.count(dep))
+                    visit(dep);
+        inProgress.erase(ns);
+        visited.insert(ns);
+        order.push_back(ns);
+    };
+    for (const auto& ns : expanded)
+        visit(ns);
+    return order;
 }
 
 // ---------------------------------------------------------------------------
@@ -373,26 +431,63 @@ BuildResult buildNamespace(const std::string& namespaceName, const std::string& 
         if (ci->decl)
             knownClassNames.insert(name);
 
-    std::vector<std::string> cppFiles;
+    // Phase 9f: every class whose resolved script base lives in a
+    // DIFFERENT (already-built, per computeRebuildSet's topological
+    // order) namespace needs that namespace's generated-headers dir on
+    // the include path and its CURRENT .lib on the link line. Collected
+    // once, up front, as the SET of distinct base namespaces this
+    // namespace's classes reference cross-namespace -- applied uniformly
+    // to every compile/link command below rather than per-class, since
+    // it's simpler and no class needs to NOT see them.
+    auto manifestForDeps = readManifest(scriptsDir);
+    std::unordered_set<std::string> crossNamespaceBases;
     for (const auto* ci : classes) {
-        // Phase 9f: real C++ inheritance across the DLL boundary (a base
-        // in a DIFFERENT namespace, needing its own -I<genDir>/.lib and a
-        // topologically-ordered build across namespaces -- see
-        // computeRebuildSet's comment above) isn't wired up yet -- refuse
-        // explicitly and clearly here, at the ONE place that knows both a
-        // class's resolved script base (ci->baseClass) AND its namespace
-        // (sys.namespaceOf), rather than at CodeGen.cpp, which has no
-        // notion of namespaces at all (its own generated inheritance
-        // syntax is namespace-agnostic and works today for a SAME-
-        // namespace base, reached below).
-        if (ci->baseClass && sys.namespaceOf(ci->baseClass->name) != namespaceName) {
+        if (!ci->baseClass)
+            continue;
+        std::string baseNs = sys.namespaceOf(ci->baseClass->name);
+        if (baseNs == namespaceName)
+            continue; // same-namespace: no cross-DLL plumbing needed at all
+        if (!manifestForDeps.count(baseNs)) {
             r.error = ci->name + ": base class '" + ci->baseClass->name + "' is in namespace '" +
-                     sys.namespaceOf(ci->baseClass->name) +
-                     "', not '" + namespaceName +
-                     "' -- cross-namespace script inheritance is not supported yet (put both "
-                     "classes in the same namespace)";
+                     baseNs +
+                     "', which has not been built yet -- computeRebuildSet() should have "
+                     "ordered it first; this namespace cannot be built standalone";
             return r;
         }
+        crossNamespaceBases.insert(baseNs);
+    }
+    std::vector<std::string> crossIncludeFlags; // -I<base gen dir>, one per cross-namespace base
+    std::vector<std::string> crossLibPaths;     // <base's CURRENT .lib>, one per cross-namespace base
+    for (const auto& baseNs : crossNamespaceBases) {
+        const std::string baseGenDir = buildRoot + "/gen/" + baseNs;
+        crossIncludeFlags.push_back("-I\"" + baseGenDir + "\"");
+        const auto& baseEntry = manifestForDeps.at(baseNs);
+        crossLibPaths.push_back(binDir + "/" + baseNs + "_v" + std::to_string(baseEntry.generation) +
+                                ".lib");
+    }
+    std::string crossIncludeFlagsJoined;
+    for (const auto& f : crossIncludeFlags)
+        crossIncludeFlagsJoined += " " + f;
+
+    // Every class in THIS namespace self-exports (Phase 9f) -- defining
+    // -DCRATE_GEN_BUILDING_<suffix> for ALL of them (not just the one
+    // being compiled in a given cl.exe invocation) on EVERY compile
+    // command in this namespace matters: without it, class A referencing
+    // class B (BOTH in this SAME namespace) would see B's
+    // CRATE_GEN_API_B macro resolve to __declspec(dllimport) instead of
+    // plain (it's neither exporting nor importing across an ACTUAL DLL
+    // boundary for a same-namespace reference) -- __declspec(dllimport)
+    // on a symbol that turns out to be defined in the SAME link unit is
+    // incorrect/fails to link, so every class in this namespace must be
+    // treated as "self" by every OTHER class in this namespace, and only
+    // a GENUINELY different namespace's classes should fall through to
+    // the dllimport branch.
+    std::string buildingFlagsJoined;
+    for (const auto* ci : classes)
+        buildingFlagsJoined += " -DCRATE_GEN_BUILDING_" + script::sanitizeClassName(ci->name);
+
+    std::vector<std::string> cppFiles;
+    for (const auto* ci : classes) {
         script::CodeGenResult cg = script::generateClass(*ci, knownClassNames);
         if (!cg.ok) {
             r.error = ci->name + ": " + cg.error;
@@ -425,8 +520,9 @@ BuildResult buildNamespace(const std::string& namespaceName, const std::string& 
     for (const auto& cpp : cppFiles) {
         std::string obj = fs::path(cpp).replace_extension(".obj").string();
         std::string cmd = "cl.exe /nologo /c /std:c++17 /EHsc /DWIN32 /D_WINDOWS " +
-                          std::string(kConfigFlags) + " " + kCrtFlag + " -I\"" + incSrc +
-                          "\" -I\"" + incThirdParty + "\" \"" + cpp + "\" /Fo\"" + obj + "\"";
+                          std::string(kConfigFlags) + " " + kCrtFlag + buildingFlagsJoined +
+                          " -I\"" + incSrc + "\" -I\"" + incThirdParty + "\"" +
+                          crossIncludeFlagsJoined + " \"" + cpp + "\" /Fo\"" + obj + "\"";
         std::string out;
         int rc = tc.run(cmd, genDir, out);
         if (rc != 0 || !fs::exists(obj, ec)) {
@@ -441,6 +537,8 @@ BuildResult buildNamespace(const std::string& namespaceName, const std::string& 
                           "\" /IMPLIB:\"" + libPath + "\"";
     for (const auto& obj : objFiles)
         linkCmd += " \"" + obj + "\"";
+    for (const auto& lib : crossLibPaths)
+        linkCmd += " \"" + lib + "\"";
     linkCmd += " \"" + runtimeLib + "\"";
     {
         std::string out;

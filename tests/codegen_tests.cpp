@@ -80,10 +80,19 @@ static std::string findVcvars() {
 
 // Compiles `cppPath` with `cl.exe /c`; returns true iff it succeeds. On
 // failure, `diagnostics` gets the compiler's output for the test to print.
+// `exportSuffix` is the class's own (matching CodeGen.cpp's internal
+// exportSuffix, via sanitizeClassName()) -- Phase 9f's dllexport/dllimport
+// macro guard (CRATE_GEN_API_<suffix>, see CodeGen.cpp) needs
+// -DCRATE_GEN_BUILDING_<suffix> defined for THIS class's own compile, or
+// its kClassInfo_<suffix> definition (which has an initializer) would be
+// declared dllimport -- illegal for a DEFINITION -- exactly mirroring what
+// ScriptBuild.cpp's buildNamespace() now always does for every class.
 static bool compileWithCl(const std::string& vcvars, const std::string& cppPath,
-                          const std::string& objPath, std::string& diagnostics) {
+                          const std::string& objPath, const std::string& exportSuffix,
+                          std::string& diagnostics) {
     std::string cmd = "cmd.exe /c \"\"" + vcvars + "\" >nul && cl.exe /nologo /c /std:c++17 /EHsc "
-                      "/W3 -I\"" + std::string(CRATE_REPO_DIR) + "\\src\" -I\"" +
+                      "/W3 -DCRATE_GEN_BUILDING_" + exportSuffix + " -I\"" +
+                      std::string(CRATE_REPO_DIR) + "\\src\" -I\"" +
                       std::string(CRATE_REPO_DIR) + "\\third_party\" \"" + cppPath +
                       "\" /Fo\"" + objPath + "\"\"";
     diagnostics = runCapture(cmd);
@@ -173,7 +182,7 @@ static int expectCompiles(const std::string& label, const std::string& src, cons
     std::error_code ec;
     fs::remove(objPath, ec);
     std::string diag;
-    bool compiled = compileWithCl(vcvars, cPath, objPath, diag);
+    bool compiled = compileWithCl(vcvars, cPath, objPath, sanitizeClassName(info.name), diag);
     if (!compiled)
         std::printf("  (%s) cl.exe output:\n%s\n", label.c_str(), diag.c_str());
     CHECK(compiled);
