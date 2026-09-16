@@ -877,6 +877,7 @@ void TextEditor::Render()
 	}
 
 	ImVec2 cursorScreenPos = ImGui::GetCursorScreenPos();
+	mContentOrigin = cursorScreenPos; // for GetCursorScreenPos(), read back after Render()
 	auto scrollX = ImGui::GetScrollX();
 	auto scrollY = ImGui::GetScrollY();
 
@@ -1127,6 +1128,14 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder)
 	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
 	if (!mIgnoreImGuiChild)
 		ImGui::BeginChild(aTitle, aSize, aBorder, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_AlwaysHorizontalScrollbar | ImGuiWindowFlags_NoMove);
+
+	// Captured here (inside the child window, i.e. via ImGui::IsWindowFocused())
+	// rather than left for the caller to derive from ImGui::IsItemFocused() on
+	// the item that follows Render(): this editor has no real ImGui widgets in
+	// its text area (it's all direct ImDrawList calls), so g.NavId never ends
+	// up matching the child window's own item id and IsItemFocused() would
+	// always read false regardless of actual focus.
+	mFocused = ImGui::IsWindowFocused();
 
 	if (mHandleKeyboardInputs)
 	{
@@ -2124,6 +2133,16 @@ std::string TextEditor::GetCurrentLineText()const
 	return GetText(
 		Coordinates(mState.mCursorPosition.mLine, 0),
 		Coordinates(mState.mCursorPosition.mLine, lineLength));
+}
+
+ImVec2 TextEditor::GetCursorScreenPos() const
+{
+	int lineNo = mState.mCursorPosition.mLine;
+	float cx = TextDistanceToLineStart(mState.mCursorPosition);
+	// One line below the cursor's own line, not the cursor's own top edge --
+	// callers (e.g. the autocomplete popup) want to sit under the cursor,
+	// not have their top edge flush with it.
+	return ImVec2(mContentOrigin.x + mTextStart + cx, mContentOrigin.y + (lineNo + 1) * mCharAdvance.y);
 }
 
 void TextEditor::ProcessInputs()

@@ -308,7 +308,7 @@ bool ScriptEditor::handleBracketCharForAc(char c) {
 }
 
 void ScriptEditor::applyElectricIndent() {
-    if (!ImGui::IsItemFocused() || acOpen_)
+    if (!editor_.IsFocused() || acOpen_)
         return;
 
     auto cur = editor_.GetCursorPosition();
@@ -494,12 +494,15 @@ void ScriptEditor::collectLocalsInScope(int line, std::vector<std::string>& out)
 
 void ScriptEditor::updateAutocomplete() {
     ImGuiIO& io = ImGui::GetIO();
-    const bool editorFocused = ImGui::IsItemFocused() || acOpen_;
+    const bool editorFocused = editor_.IsFocused() || acOpen_;
 
-    // current line text up to the caret
+    // current line text up to the caret. cur.mColumn is a visual (tab
+    // expanded) column, not a raw index into `line` -- convert first, or
+    // this misreads the prefix on any indented line except when the caret
+    // happens to sit at the very end of it.
     TextEditor::Coordinates cur = editor_.GetCursorPosition();
     std::string line = editor_.GetCurrentLineText();
-    int col = std::min<int>(cur.mColumn, (int)line.size());
+    int col = std::min<int>(editor_.GetCharacterIndex(cur), (int)line.size());
     std::string upToCaret = line.substr(0, col);
 
     // word being typed + whether it's a member access (preceded by '.')
@@ -623,6 +626,11 @@ void ScriptEditor::updateAutocomplete() {
     // and anything else still reaches the buffer instead of being dropped.
     for (int i = 0; i < io.InputQueueCharacters.Size; ++i) {
         ImWchar c = io.InputQueueCharacters[i];
+        // Tab/Enter land in the character queue too (as '\t'/'\r'/'\n'), not
+        // just IsKeyPressed above -- skip them here so accepting a completion
+        // doesn't also insert a literal tab/newline right before it.
+        if (c == '\t' || c == '\n' || c == '\r')
+            continue;
         if (std::isalnum((int)c) || c == '_') {
             editor_.InsertText(std::string(1, (char)c));
         } else if (c == '.') {
@@ -634,9 +642,12 @@ void ScriptEditor::updateAutocomplete() {
         } else if (handleBracketCharForAc((char)c)) {
             acOpen_ = false;
         } else {
+            // Any other char closes the popup, but it was still meant to be
+            // typed (e.g. the '(' right after an accepted/abandoned function
+            // name) -- forward it instead of silently dropping it.
             if (c != 0)
                 editor_.InsertText(std::string(1, (char)c));
-            acOpen_ = false; // any other char closes the popup
+            acOpen_ = false;
         }
     }
     io.InputQueueCharacters.resize(0);
@@ -652,11 +663,10 @@ void ScriptEditor::updateAutocomplete() {
     if (!acOpen_)
         return;
 
-    // popup near the caret
-    ImVec2 pos = ImGui::GetItemRectMin();
-    pos.y = ImGui::GetMousePos().y; // rough; TextEditor lacks a caret-screen-pos API
-    ImGui::SetNextWindowPos(ImVec2(ImGui::GetItemRectMin().x + 60, ImGui::GetItemRectMin().y + 40),
-                            ImGuiCond_Appearing);
+    // Just below the cursor's own line, not a fixed guess from the widget's
+    // corner -- that could as easily land the popup right on top of the
+    // cursor as below it, depending on which line you're actually on.
+    ImGui::SetNextWindowPos(editor_.GetCursorScreenPos(), ImGuiCond_Appearing);
     ImGui::SetNextWindowSize(ImVec2(240, 180), ImGuiCond_Appearing);
     if (ImGui::Begin("##autocomplete", nullptr,
                      ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |

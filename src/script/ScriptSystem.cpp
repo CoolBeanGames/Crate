@@ -4,6 +4,7 @@
 #include "core/Log.h"
 #include "input/Input.h"
 #include "scene/Actor.h"
+#include "scene/BuiltinComponents.h"
 #include "scene/ComponentRegistry.h"
 #include "script/Format.h"
 #include "script/Lexer.h"
@@ -36,6 +37,28 @@ ScriptSystem::ScriptSystem() {
             if (sc && sc->classInfo() &&
                 (sc->classInfo()->name == typeName || sc->classInfo()->isA(typeName)))
                 return sc->object();
+        }
+        // Native (non-script) components: get_component(type_of(Fog)) returns
+        // a live view onto the real component (see Interpreter's
+        // getNativeField/setNativeField), not a copy -- add a case here for
+        // each native component type that should be reachable this way.
+        if (typeName == "Fog") {
+            if (auto* fc = a->getComponent<FogComponent>()) {
+                auto o = std::make_shared<ScriptObject>();
+                o->builtin = "Fog";
+                o->nativePtr = fc;
+                o->owner = a;
+                return o;
+            }
+        }
+        if (typeName == "Camera") {
+            if (auto* cc = a->getComponent<CameraComponent>()) {
+                auto o = std::make_shared<ScriptObject>();
+                o->builtin = "Camera";
+                o->nativePtr = cc;
+                o->owner = a;
+                return o;
+            }
         }
         return nullptr;
     };
@@ -414,6 +437,19 @@ void ScriptSystem::rebuildTypeDocs() {
         {"name", "position", "rotation", "scale", "forward", "right", "up", "get_component"});
     add("Actor3D", "Actor", false,
         {"name", "position", "rotation", "scale", "forward", "right", "up", "get_component"});
+    // Not spawnable/constructible from script -- only reachable via
+    // get_component(type_of(Fog)). Listed so its members show up in
+    // completions once you're chained off that call.
+    add("Fog", "", false, {"color", "start", "end", "height_range"});
+    // "Camera" is also reachable as a bare global for Camera.main (task 77):
+    // the scene's one active camera, readable and assignable to switch it.
+    add("Camera", "", false, {"main", "fov", "near", "far", "active"});
+    // Global namespace reached as Input.<method>(...), handled directly in
+    // Interpreter::evalCall rather than through get_component -- listed here
+    // purely so its methods show up in autocomplete (task: "Input global
+    // missing from script autocomplete").
+    add("Input", "", false,
+       {"get_button", "get_axis", "is_pressed", "is_just_pressed", "is_just_released"});
 
     for (const auto& [name, ci] : types_) {
         std::vector<std::string> members;
@@ -430,7 +466,8 @@ std::vector<std::string> ScriptSystem::completions(const std::string& prefix) co
                                      "switch", "case",   "default", "do",     "do_async", "true",
                                      "false",  "null",   "static", "abstract", "this",  "base",
                                      "break",  "continue"};
-    static const char* globals[] = {"print", "type_of", "Vector2", "Vector3", "transform", "actor"};
+    static const char* globals[] = {"print", "type_of", "Vector2", "Vector3",
+                                    "transform", "actor", "Camera", "Input"};
 
     std::vector<std::string> out;
     auto consider = [&](const std::string& s) {

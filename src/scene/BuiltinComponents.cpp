@@ -21,6 +21,19 @@ void MeshRenderer::drawInspector() {
                     primitive = p;
             ImGui::EndCombo();
         }
+        // Sized independently of the actor's Transform.scale (task 84) so a
+        // later physics collider can read the same numbers without also
+        // picking up whatever the transform's scale is used for elsewhere.
+        if (primitive == "Sphere") {
+            ImGui::DragFloat("Radius", &radius, 0.05f, 0.001f, 1000.0f);
+        } else if (primitive == "Cylinder" || primitive == "Capsule") {
+            ImGui::DragFloat("Radius", &radius, 0.05f, 0.001f, 1000.0f);
+            ImGui::DragFloat("Height", &height, 0.05f, 0.001f, 1000.0f);
+        } else if (primitive == "Plane" || primitive == "Quad") {
+            ImGui::DragFloat2("Size", planeSize, 0.05f, 0.001f, 1000.0f);
+        } else { // Cube
+            ImGui::DragFloat3("Size", boxSize, 0.05f, 0.001f, 1000.0f);
+        }
     }
     // Model / Texture / Material are edited by the editor as asset-picker
     // fields (the component can't reach the asset libraries).
@@ -47,11 +60,42 @@ void LightComponent::drawInspector() {
     ImGui::TextDisabled("+Z (the normal arrow) is the light's forward direction");
     ImGui::Checkbox("Static", &isStatic);
     if (isStatic)
-        ImGui::TextDisabled("Static: only affects meshes/probes via Bake Lighting");
+        ImGui::TextDisabled("Static: only affects meshes/probes via Bake Lightmaps");
+}
+
+void FogComponent::drawInspector() {
+    ImGui::ColorEdit3("Color", color);
+    ImGui::DragFloat("Start", &start, 0.1f, 0.0f, 1000.0f);
+    if (end < start)
+        end = start + 0.01f;
+    ImGui::DragFloat("End", &end, 0.1f, 0.01f, 2000.0f);
+    ImGui::DragFloat("Height Range", &heightRange, 0.1f, 0.0f, 500.0f);
+    ImGui::TextDisabled(
+        "Height Range: fades out this many units above this actor's own height\n"
+        "(0 = disabled, pure distance fog)");
+    ImGui::TextDisabled("Only the first Fog found in the scene is used.");
+}
+
+void VolumetricFogComponent::drawInspector() {
+    ImGui::ColorEdit3("Color", color);
+    ImGui::DragFloat("Density", &density, 0.01f, 0.0f, 1.0f);
+    ImGui::TextDisabled("Applies to the whole world; this actor's transform is unused.");
+    ImGui::TextDisabled("Only the first Volumetric Fog found in the scene is used.");
+}
+
+void CameraComponent::drawInspector() {
+    ImGui::DragFloat("Field of View", &fovY, 0.5f, 1.0f, 179.0f);
+    ImGui::DragFloat("Near", &nearZ, 0.01f, 0.001f, 1000.0f);
+    if (farZ < nearZ)
+        farZ = nearZ + 0.01f;
+    ImGui::DragFloat("Far", &farZ, 1.0f, 0.01f, 100000.0f);
+    ImGui::TextDisabled(enabled ? "Active: Game View renders from this camera."
+                                : "Inactive: right-click this component to make it active.");
+    ImGui::TextDisabled("Only one Camera in the scene is ever active at a time.");
 }
 
 void LightProbeComponent::drawInspector() {
-    ImGui::TextDisabled(bakedValid ? "baked" : "not baked yet - Object > Bake Lighting");
+    ImGui::TextDisabled(bakedValid ? "baked" : "not baked yet - Object > Bake Lightmaps");
     ImGui::ColorButton("##baked", ImVec4(bakedLight[0], bakedLight[1], bakedLight[2], 1.0f));
 }
 

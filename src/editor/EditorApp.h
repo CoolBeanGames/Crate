@@ -17,6 +17,11 @@ struct ID3D11DeviceContext;
 
 namespace crate {
 
+class CameraComponent;
+
+// What an asset-browser tile represents, for icon drawing purposes.
+enum class AssetIconKind { Folder, Material, Script, Image, Fbx, InputMap, Generic };
+
 // The editor shell. Owns the active Scene and draws every panel each frame.
 // Windowing is handled by the platform layer (see src/main.cpp); the D3D11
 // device is created there and handed in so the viewport renderer can share it.
@@ -54,10 +59,18 @@ private:
     void drawBottomPanel(); // Asset Browser / Engine Console / Game Console
     void assetBrowserMenu(); // right-click menu: create / import / new folder
     void drawAssetFolders(); // navigable folder tree of the assets directory (icon grid)
-    // One icon-grid cell: a coloured glyph tile + wrapped label. Returns true on
-    // a single click; *dbl is set if that click was a double-click.
-    bool assetIconTile(const char* strId, const char* glyph, unsigned int argb,
-                       const std::string& label, bool selected, bool* dbl = nullptr);
+    // One icon-grid cell: a per-type drawn icon + wrapped label. Returns true
+    // on a single click; *dbl is set if that click was a double-click.
+    // `imagePath` is only used for AssetIconKind::Image, to load and draw an
+    // actual thumbnail instead of a generic glyph.
+    bool assetIconTile(const char* strId, AssetIconKind kind, unsigned int accent,
+                       const std::string& label, bool selected, bool* dbl = nullptr,
+                       const std::string& imagePath = std::string());
+    // Draws the icon glyph itself (folder/sphere/paper+C/cube/gamepad/thumbnail)
+    // into the given rect; split out of assetIconTile so it only deals with
+    // per-type visuals.
+    void drawAssetIconGlyph(ImDrawList* dl, ImVec2 iconMin, ImVec2 iconMax, AssetIconKind kind,
+                            unsigned int accent, const std::string& imagePath);
     // Call after each tile (with whether more tiles follow) to wrap the grid
     // onto a new row instead of running off the panel's right edge.
     void assetGridWrap(bool moreFollow);
@@ -85,6 +98,13 @@ private:
 
     void setPlaying(bool playing);
 
+    // Camera activation (task 77): enforces "only one CameraComponent in the
+    // scene is enabled at a time". activateCamera disables every other one;
+    // deactivateCamera disables `cam` and, if another CameraComponent exists
+    // anywhere in the tree, activates that one instead.
+    void activateCamera(CameraComponent& cam);
+    void deactivateCamera(CameraComponent& cam);
+
     // Delete whatever is currently selected: a scene actor, a material asset,
     // or an imported asset (in that priority order).
     void deleteSelection();
@@ -102,7 +122,6 @@ private:
     ui::Popup renamePopup_;
     AssetPicker assetPicker_;
     bool openScriptsTab_ = false; // one-shot: select the viewport Scripts tab
-    bool spinPreview_ = true;
 
     // Viewport transform gizmo (ImGuizmo). op: 0=translate 1=rotate 2=scale.
     int gizmoOp_ = 0;

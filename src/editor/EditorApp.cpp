@@ -42,6 +42,27 @@ static Actor* findById(Actor& node, uint64_t id) {
     return nullptr;
 }
 
+// First CameraComponent found (depth-first), optionally skipping `exclude`
+// and/or requiring `enabled`. Backs both Game View's active-camera lookup and
+// the exclusive-activation bookkeeping below (task 77).
+static CameraComponent* findCamera(Actor& node, bool requireEnabled, CameraComponent* exclude) {
+    if (auto* cc = node.getComponent<CameraComponent>())
+        if (cc != exclude && (!requireEnabled || cc->enabled))
+            return cc;
+    for (const auto& c : node.children())
+        if (CameraComponent* hit = findCamera(*c, requireEnabled, exclude))
+            return hit;
+    return nullptr;
+}
+
+static void disableOtherCameras(Actor& node, CameraComponent* keep) {
+    if (auto* cc = node.getComponent<CameraComponent>())
+        if (cc != keep)
+            cc->enabled = false;
+    for (const auto& c : node.children())
+        disableOtherCameras(*c, keep);
+}
+
 EditorApp::EditorApp() : scene_(Scene::makeSample()) {
     registerBuiltinComponents();
     AssetDatabase::get().load(assetDir_);
@@ -63,6 +84,7 @@ EditorApp::EditorApp() : scene_(Scene::makeSample()) {
     }
     renderer_.setMeshLibrary(&meshLib_);
     renderer_.setMaterialLibrary(&materialLib_);
+    renderer_.loadLightmap(scene_, assetDir_); // apply any lightmap baked for this scene
     CR_LOG("app", "Crate editor started");
     CR_LOG("scene", "Loaded sample scene with " + std::to_string(scene_.actorCount()) + " actors");
 }
@@ -170,10 +192,6 @@ void EditorApp::onFrame() {
         selectedAsset_.clear();
     }
 
-    // "Spin preview" slowly orbits the camera so a lone object reads as 3D.
-    if (spinPreview_ && !playing_ && !ImGui::IsMouseDragging(ImGuiMouseButton_Left))
-        camera_.yaw += dt * 18.0f;
-
     // Play mode: tick components (frame update + fixed-step physics).
     if (playing_) {
         Input::get().poll();
@@ -270,10 +288,12 @@ void EditorApp::drawMenuBar() {
     if (ImGui::BeginMenu("File")) {
         if (ImGui::MenuItem("New Scene")) {
             scene_ = Scene("Untitled");
+            renderer_.loadLightmap(scene_, assetDir_);
             CR_LOG("scene", "New scene created");
         }
         if (ImGui::MenuItem("Load Sample Scene")) {
             scene_ = Scene::makeSample();
+            renderer_.loadLightmap(scene_, assetDir_);
             CR_LOG("scene", "Reloaded sample scene");
         }
         ImGui::Separator();
@@ -303,9 +323,18 @@ void EditorApp::drawMenuBar() {
         if (ImGui::MenuItem("Create Mesh"))        scene_.select(spawn("mesh", p));
         if (ImGui::MenuItem("Create Sprite"))      scene_.select(spawn("sprite", p));
         if (ImGui::MenuItem("Create UI Control"))  scene_.select(spawn("ui", p));
+        if (ImGui::BeginMenu("Rendering")) {
+            if (ImGui::MenuItem("Camera"))            scene_.select(spawn("camera", p));
+            if (ImGui::MenuItem("Directional Light")) scene_.select(spawn("light_directional", p));
+            if (ImGui::MenuItem("Point Light"))       scene_.select(spawn("light_point", p));
+            if (ImGui::MenuItem("Spot Light"))        scene_.select(spawn("light_spot", p));
+            if (ImGui::MenuItem("Fog"))               scene_.select(spawn("fog", p));
+            if (ImGui::MenuItem("Volumetric Fog"))    scene_.select(spawn("volumetricfog", p));
+            ImGui::EndMenu();
+        }
         ImGui::Separator();
-        if (ImGui::MenuItem("Bake Lighting")) {
-            renderer_.bakeLighting(scene_);
+        if (ImGui::MenuItem("Bake Lightmaps")) {
+            renderer_.bakeLighting(scene_, assetDir_);
             CR_LOG("render", "Baked static lights into meshes and light probes");
         }
         ImGui::EndMenu();
@@ -329,6 +358,11 @@ void EditorApp::drawToolbar() {
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(14, 6));
     ImGui::Dummy(ImVec2(1, 2));
 
+    // Snapshot before the button: its click handler flips playing_
+    // synchronously, so gating the push/pop on the live (mutable-mid-frame)
+    // flag instead of this snapshot produces an unbalanced PopStyleColor on
+    // every click (Debug builds assert/abort; Release corrupts the style
+    // stack silently).
     const bool wasPlaying = playing_;
     const char* playLabel = wasPlaying ? "  Pause  " : "  Play  ";
     if (wasPlaying)
@@ -416,6 +450,15 @@ bool EditorApp::hierarchyContextMenu(Actor& a) {
         if (menu.item("Mesh"))        scene_.select(spawn("mesh", &a));
         if (menu.item("Sprite"))      scene_.select(spawn("sprite", &a));
         if (menu.item("UI Control"))  scene_.select(spawn("ui", &a));
+        if (menu.beginSub("Rendering")) {
+            if (menu.item("Camera"))            scene_.select(spawn("camera", &a));
+            if (menu.item("Directional Light")) scene_.select(spawn("light_directional", &a));
+            if (menu.item("Point Light"))       scene_.select(spawn("light_point", &a));
+            if (menu.item("Spot Light"))        scene_.select(spawn("light_spot", &a));
+            if (menu.item("Fog"))               scene_.select(spawn("fog", &a));
+            if (menu.item("Volumetric Fog"))    scene_.select(spawn("volumetricfog", &a));
+            menu.endSub();
+        }
         menu.endSub();
     }
     if (menu.item("Reparent To New Node")) reparentToNewNode(&a);
@@ -468,7 +511,14 @@ void EditorApp::drawHierarchyNode(Actor& actor) {
     if (dimmed)
         ImGui::PopStyleColor();
 
-    if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
+    // IsItemClicked() fires on mouse-DOWN, before any drag has a chance to
+    // register -- selecting here would swap out whatever the Inspector was
+    // showing (e.g. a script field you meant to drag this row onto) the
+    // instant you pressed the mouse button, not just on an actual click.
+    // Select on release-while-still-hovered instead, which a completed drag
+    // (released over some other drop target) never satisfies.
+    if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left) &&
+        !ImGui::IsItemToggledOpen())
         scene_.select(&actor);
 
     // Drag source: carries the actor id, shows a ghost label ("where it was").
@@ -544,6 +594,15 @@ void EditorApp::drawHierarchy() {
                 if (addMenu.item("Mesh"))        scene_.select(spawn("mesh", p));
                 if (addMenu.item("Sprite"))      scene_.select(spawn("sprite", p));
                 if (addMenu.item("UI Control"))  scene_.select(spawn("ui", p));
+                if (addMenu.beginSub("Rendering")) {
+                    if (addMenu.item("Camera"))            scene_.select(spawn("camera", p));
+                    if (addMenu.item("Directional Light")) scene_.select(spawn("light_directional", p));
+                    if (addMenu.item("Point Light"))       scene_.select(spawn("light_point", p));
+                    if (addMenu.item("Spot Light"))        scene_.select(spawn("light_spot", p));
+                    if (addMenu.item("Fog"))               scene_.select(spawn("fog", p));
+                    if (addMenu.item("Volumetric Fog"))    scene_.select(spawn("volumetricfog", p));
+                    addMenu.endSub();
+                }
                 addMenu.end();
             }
         }
@@ -695,7 +754,17 @@ void EditorApp::drawInspector() {
                 comp->typeName(),
                 comp->inspectorOpen ? ImGuiTreeNodeFlags_DefaultOpen : 0);
             if (ImGui::BeginPopupContextItem("comp_ctx")) {
-                ImGui::Checkbox("Enabled", &comp->enabled);
+                if (auto* cc = dynamic_cast<CameraComponent*>(comp.get())) {
+                    bool camEn = cc->enabled;
+                    if (ImGui::Checkbox("Enabled", &camEn)) {
+                        if (camEn)
+                            activateCamera(*cc);
+                        else
+                            deactivateCamera(*cc);
+                    }
+                } else {
+                    ImGui::Checkbox("Enabled", &comp->enabled);
+                }
                 if (ImGui::MenuItem("Remove Component"))
                     toRemove = comp.get();
                 ImGui::EndPopup();
@@ -760,6 +829,8 @@ void EditorApp::drawInspector() {
                     Component* c = a->addComponent(ComponentRegistry::get().create(e.name));
                     if (c && playing_)
                         c->start();
+                    if (auto* cc = dynamic_cast<CameraComponent*>(c))
+                        activateCamera(*cc); // task 77: a newly added camera becomes the active one
                     CR_LOG("scene", "Added " + e.name + " to '" + a->name() + "'");
                 }
             }
@@ -780,8 +851,6 @@ void EditorApp::drawViewport() {
     if (ImGui::Begin("Viewport")) {
         if (ImGui::BeginTabBar("viewport_tabs")) {
             if (ImGui::BeginTabItem("Scene View")) {
-                ImGui::Checkbox("Spin preview", &spinPreview_);
-                ImGui::SameLine();
                 if (ImGui::RadioButton("Move", gizmoOp_ == 0)) gizmoOp_ = 0;
                 ImGui::SameLine();
                 if (ImGui::RadioButton("Rotate", gizmoOp_ == 1)) gizmoOp_ = 1;
@@ -845,13 +914,46 @@ void EditorApp::drawViewport() {
             }
             if (ImGui::BeginTabItem("Game View")) {
                 ImVec2 size = ImGui::GetContentRegionAvail();
-                ImVec2 p0 = ImGui::GetCursorScreenPos();
-                ImGui::GetWindowDrawList()->AddRectFilled(
-                    p0, ImVec2(p0.x + size.x, p0.y + size.y), IM_COL32_BLACK);
-                const char* msg = playing_ ? "GAME RUNNING" : "Press Play to run the game";
-                ImGui::GetWindowDrawList()->AddText(ImVec2(p0.x + 12, p0.y + 12),
-                                                    IM_COL32(0xF4, 0xF6, 0xFA, 0xFF), msg);
-                ImGui::Dummy(size);
+                int w = static_cast<int>(size.x), h = static_cast<int>(size.y);
+
+                // The active camera (task 77): the one enabled CameraComponent
+                // anywhere in the scene, if any. Scene View stays a free-roam
+                // OrbitCamera regardless.
+                CameraComponent* gameCam = nullptr;
+                for (const auto& child : scene_.root().children())
+                    if ((gameCam = findCamera(*child, /*requireEnabled=*/true, nullptr)))
+                        break;
+
+                void* srv = nullptr;
+                if (gameCam && renderer_.ready() && w > 0 && h > 0) {
+                    Transform world = gameCam->actor()->worldTransform();
+                    Mat4 rot = Mat4::rotationEuler(world.rotationEuler);
+                    Vec3 fwd = normalize(Vec3{rot.at(2, 0), rot.at(2, 1), rot.at(2, 2)});
+                    Vec3 up = normalize(Vec3{rot.at(1, 0), rot.at(1, 1), rot.at(1, 2)});
+                    Vec3 eye = world.position;
+                    Mat4 view = Mat4::lookAtLH(eye, eye + fwd, up);
+                    float aspect = float(w) / float(h);
+                    Mat4 proj = Mat4::perspectiveLH(gameCam->fovY, aspect, gameCam->nearZ,
+                                                   gameCam->farZ);
+                    Renderer::Options opt;
+                    opt.fogEnabled = fog_;
+                    opt.shadows = shadows_;
+                    srv = renderer_.render(scene_, view, proj, eye, gameCam->nearZ, gameCam->farZ,
+                                          w, h, opt);
+                }
+
+                if (srv) {
+                    ImGui::Image(reinterpret_cast<ImTextureID>(srv), size);
+                } else {
+                    ImVec2 p0 = ImGui::GetCursorScreenPos();
+                    ImGui::GetWindowDrawList()->AddRectFilled(
+                        p0, ImVec2(p0.x + size.x, p0.y + size.y), IM_COL32_BLACK);
+                    const char* msg = gameCam ? "Press Play to run the game"
+                                              : "No active Camera in the scene";
+                    ImGui::GetWindowDrawList()->AddText(ImVec2(p0.x + 12, p0.y + 12),
+                                                        IM_COL32(0xF4, 0xF6, 0xFA, 0xFF), msg);
+                    ImGui::Dummy(size);
+                }
                 ImGui::EndTabItem();
             }
             ImGuiTabItemFlags scriptsFlags =
@@ -974,6 +1076,29 @@ void EditorApp::drawViewportOverlays(float x, float y, float w, float h) {
                     line(s, s + fwd * 1.6f, lcol);
                 }
         }
+    }
+
+    // --- Camera gizmo (task 77): view frustum wireframe --------------------
+    if (auto* cc = sel->getComponent<CameraComponent>()) {
+        const ImU32 ccol =
+            cc->enabled ? IM_COL32(140, 255, 160, 220) : IM_COL32(150, 150, 150, 150);
+        float aspect = w / h;
+        float tanH = std::tan(radians(cc->fovY) * 0.5f);
+        // Drawn as a pyramid from the actor's own position to the far plane,
+        // not a true near-to-far frustum: at nearZ's usual tiny value (0.05),
+        // a separate near-plane rectangle sits imperceptibly close to the
+        // apex, which visually reads as a stray sliver right at the camera
+        // rather than any part of the visible volume worth drawing.
+        float farDraw = std::min(cc->farZ, 8.0f);
+        auto corner = [&](float dist, float sx, float sy) {
+            float hh = tanH * dist;
+            float hw = hh * aspect;
+            return o + fwd * dist + right * (sx * hw) + up * (sy * hh);
+        };
+        Vec3 f0 = corner(farDraw, -1, -1), f1 = corner(farDraw, 1, -1),
+             f2 = corner(farDraw, 1, 1), f3 = corner(farDraw, -1, 1);
+        line(f0, f1, ccol); line(f1, f2, ccol); line(f2, f3, ccol); line(f3, f0, ccol);
+        line(o, f0, ccol); line(o, f1, ccol); line(o, f2, ccol); line(o, f3, ccol);
     }
 }
 
@@ -1317,13 +1442,126 @@ void EditorApp::scanAssets() {
     }
 }
 
-// One icon-grid cell: a coloured glyph tile (the "icon") plus a wrapped label
-// underneath, sized/selectable like a real asset-browser tile. Everything
-// that used to be a text row (folders, files, materials, imported assets) is
-// drawn as one of these now; the click/drag/context-menu logic per item is
-// unchanged (task 61 - keep functionality, change presentation).
-bool EditorApp::assetIconTile(const char* strId, const char* glyph, unsigned int argb,
-                              const std::string& label, bool selected, bool* dbl) {
+// Draws the per-type icon glyph into [iconMin, iconMax]: a folder silhouette,
+// a shaded sphere, a document with a folded corner and a "C", an isometric
+// cube tagged "fbx", a gamepad, or (for images) an actual thumbnail loaded
+// through the renderer's texture cache. `accent` is the tile's background
+// tint for every kind except Image, which draws directly against a neutral
+// backing so the thumbnail's own colours read clearly.
+void EditorApp::drawAssetIconGlyph(ImDrawList* dl, ImVec2 iconMin, ImVec2 iconMax,
+                                   AssetIconKind kind, unsigned int accent,
+                                   const std::string& imagePath) {
+    const float w = iconMax.x - iconMin.x, h = iconMax.y - iconMin.y;
+    const ImVec2 c((iconMin.x + iconMax.x) * 0.5f, (iconMin.y + iconMax.y) * 0.5f);
+
+    if (kind == AssetIconKind::Image) {
+        dl->AddRectFilled(iconMin, iconMax, IM_COL32(20, 22, 28, 255), 6.0f);
+        if (void* srv = renderer_.loadTexture(imagePath)) {
+            ImVec2 pad(4.0f, 4.0f);
+            dl->AddImageRounded(reinterpret_cast<ImTextureID>(srv),
+                                ImVec2(iconMin.x + pad.x, iconMin.y + pad.y),
+                                ImVec2(iconMax.x - pad.x, iconMax.y - pad.y), ImVec2(0, 0),
+                                ImVec2(1, 1), IM_COL32_WHITE, 4.0f);
+        }
+        return;
+    }
+
+    dl->AddRectFilled(iconMin, iconMax, accent, 6.0f);
+
+    switch (kind) {
+    case AssetIconKind::Folder: {
+        unsigned int fg = IM_COL32(255, 255, 255, 235);
+        float bodyTop = iconMin.y + h * 0.34f;
+        dl->AddRectFilled(ImVec2(iconMin.x + w * 0.14f, iconMin.y + h * 0.22f),
+                          ImVec2(iconMin.x + w * 0.14f + w * 0.42f, bodyTop + 2.0f), fg, 2.0f);
+        dl->AddRectFilled(ImVec2(iconMin.x + w * 0.10f, bodyTop),
+                          ImVec2(iconMax.x - w * 0.10f, iconMax.y - h * 0.16f), fg, 3.0f);
+        break;
+    }
+    case AssetIconKind::Material: {
+        float r = h * 0.30f;
+        dl->AddCircleFilled(c, r, IM_COL32(212, 205, 226, 255), 32);
+        dl->AddCircle(c, r, IM_COL32(16, 16, 20, 130), 32, 1.5f);
+        ImVec2 hl(c.x - r * 0.35f, c.y - r * 0.38f);
+        dl->AddCircleFilled(hl, r * 0.34f, IM_COL32(255, 255, 255, 190), 16);
+        break;
+    }
+    case AssetIconKind::Script: {
+        float pw = w * 0.5f, ph = h * 0.62f;
+        ImVec2 pMin(c.x - pw * 0.5f, c.y - ph * 0.5f), pMax(c.x + pw * 0.5f, c.y + ph * 0.5f);
+        dl->AddRectFilled(pMin, pMax, IM_COL32(240, 240, 245, 255), 3.0f);
+        float fold = pw * 0.30f;
+        ImVec2 f0(pMax.x - fold, pMin.y), f1(pMax.x, pMin.y), f2(pMax.x, pMin.y + fold);
+        dl->AddTriangleFilled(f0, f1, f2, IM_COL32(200, 200, 210, 255));
+        dl->AddLine(f0, f2, IM_COL32(165, 165, 176, 255), 1.0f);
+        const char* letter = "C";
+        ImVec2 lsz = ImGui::CalcTextSize(letter);
+        dl->AddText(ImVec2(c.x - lsz.x * 0.5f, c.y - lsz.y * 0.5f + ph * 0.06f), accent, letter);
+        break;
+    }
+    case AssetIconKind::Fbx: {
+        float s = h * 0.26f, d = h * 0.30f;
+        ImVec2 T(c.x, c.y - s - d * 0.15f);
+        ImVec2 L(c.x - s * 0.87f, c.y - s * 0.5f - d * 0.15f);
+        ImVec2 R(c.x + s * 0.87f, c.y - s * 0.5f - d * 0.15f);
+        ImVec2 B(c.x, c.y - d * 0.15f);
+        ImVec2 Ld(L.x, L.y + d), Rd(R.x, R.y + d), Bd(B.x, B.y + d);
+        ImVec2 top[4] = {T, R, B, L};
+        ImVec2 left[4] = {L, B, Bd, Ld};
+        ImVec2 right[4] = {R, B, Bd, Rd};
+        dl->AddConvexPolyFilled(top, 4, IM_COL32(226, 226, 233, 255));
+        dl->AddConvexPolyFilled(left, 4, IM_COL32(166, 166, 179, 255));
+        dl->AddConvexPolyFilled(right, 4, IM_COL32(120, 120, 133, 255));
+        dl->AddPolyline(top, 4, IM_COL32(18, 18, 22, 140), ImDrawFlags_Closed, 1.0f);
+        dl->AddPolyline(left, 4, IM_COL32(18, 18, 22, 140), ImDrawFlags_Closed, 1.0f);
+        dl->AddPolyline(right, 4, IM_COL32(18, 18, 22, 140), ImDrawFlags_Closed, 1.0f);
+        const char* tag = "fbx";
+        ImVec2 tsz = ImGui::CalcTextSize(tag);
+        ImVec2 tagMin(iconMax.x - tsz.x - 6.0f, iconMax.y - tsz.y - 4.0f);
+        dl->AddRectFilled(tagMin, ImVec2(iconMax.x - 2.0f, iconMax.y - 2.0f),
+                          IM_COL32(15, 16, 20, 210), 2.0f);
+        dl->AddText(ImVec2(tagMin.x + 2.0f, tagMin.y + 1.0f), IM_COL32(232, 234, 240, 255), tag);
+        break;
+    }
+    case AssetIconKind::InputMap: {
+        float bw = w * 0.64f, bh = h * 0.36f;
+        ImVec2 bMin(c.x - bw * 0.5f, c.y - bh * 0.5f), bMax(c.x + bw * 0.5f, c.y + bh * 0.5f);
+        dl->AddRectFilled(bMin, bMax, IM_COL32(238, 238, 243, 255), bh * 0.5f);
+        float padCx = bMin.x + bw * 0.28f, padCy = c.y;
+        float armLen = bh * 0.30f, armW = bh * 0.15f;
+        dl->AddRectFilled(ImVec2(padCx - armW * 0.5f, padCy - armLen),
+                          ImVec2(padCx + armW * 0.5f, padCy + armLen), accent, 1.0f);
+        dl->AddRectFilled(ImVec2(padCx - armLen, padCy - armW * 0.5f),
+                          ImVec2(padCx + armLen, padCy + armW * 0.5f), accent, 1.0f);
+        float btnR = bh * 0.17f;
+        dl->AddCircleFilled(ImVec2(bMax.x - bw * 0.22f, c.y - bh * 0.15f), btnR, accent, 12);
+        dl->AddCircleFilled(ImVec2(bMax.x - bw * 0.34f, c.y + bh * 0.15f), btnR, accent, 12);
+        break;
+    }
+    case AssetIconKind::Generic: {
+        float pw = w * 0.46f, ph = h * 0.60f;
+        ImVec2 pMin(c.x - pw * 0.5f, c.y - ph * 0.5f), pMax(c.x + pw * 0.5f, c.y + ph * 0.5f);
+        dl->AddRectFilled(pMin, pMax, IM_COL32(220, 220, 226, 255), 3.0f);
+        float fold = pw * 0.30f;
+        ImVec2 f0(pMax.x - fold, pMin.y), f1(pMax.x, pMin.y), f2(pMax.x, pMin.y + fold);
+        dl->AddTriangleFilled(f0, f1, f2, IM_COL32(190, 190, 198, 255));
+        dl->AddLine(f0, f2, IM_COL32(150, 150, 160, 255), 1.0f);
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+// One icon-grid cell: a per-type drawn icon plus a wrapped label underneath,
+// sized/selectable like a real asset-browser tile. Everything that used to
+// be a text row (folders, files, materials, imported assets) is drawn as one
+// of these now; the click/drag/context-menu logic per item is unchanged
+// (task 61 - keep functionality, change presentation; task 74 - real icons
+// instead of 2-3 letter text glyphs).
+bool EditorApp::assetIconTile(const char* strId, AssetIconKind kind, unsigned int accent,
+                              const std::string& label, bool selected, bool* dbl,
+                              const std::string& imagePath) {
     constexpr float kTileW = 84.0f, kTileH = 96.0f, kIconH = 64.0f;
     ImGui::PushID(strId);
     ImVec2 topLeft = ImGui::GetCursorScreenPos();
@@ -1336,11 +1574,7 @@ bool EditorApp::assetIconTile(const char* strId, const char* glyph, unsigned int
     ImDrawList* dl = ImGui::GetWindowDrawList();
     ImVec2 iconMin(topLeft.x + 6.0f, topLeft.y + 4.0f);
     ImVec2 iconMax(topLeft.x + kTileW - 6.0f, topLeft.y + 4.0f + kIconH);
-    dl->AddRectFilled(iconMin, iconMax, argb, 6.0f);
-    ImVec2 gsz = ImGui::CalcTextSize(glyph);
-    dl->AddText(ImVec2(iconMin.x + (iconMax.x - iconMin.x - gsz.x) * 0.5f,
-                       iconMin.y + (iconMax.y - iconMin.y - gsz.y) * 0.5f),
-               IM_COL32(18, 18, 22, 255), glyph);
+    drawAssetIconGlyph(dl, iconMin, iconMax, kind, accent, imagePath);
 
     ImGui::PushClipRect(topLeft, ImVec2(topLeft.x + kTileW, topLeft.y + kTileH), true);
     ImGui::PushTextWrapPos(topLeft.x + kTileW - 2.0f);
@@ -1385,8 +1619,8 @@ void EditorApp::drawAssetFolders() {
         std::string rel = assetCwd_.empty() ? name : assetCwd_ + "/" + name;
         unsigned int col = folderColor(rel);
         bool dbl = false;
-        assetIconTile(rel.c_str(), "DIR", col ? col : IM_COL32(120, 110, 200, 255), name, false,
-                     &dbl);
+        assetIconTile(rel.c_str(), AssetIconKind::Folder, col ? col : IM_COL32(120, 110, 200, 255),
+                     name, false, &dbl);
         if (dbl)
             assetCwd_ = rel;
         folderContextMenu(rel);
@@ -1401,13 +1635,20 @@ void EditorApp::drawAssetFolders() {
         bool isImg = isSupportedImageExt(ext);
         bool isFbx = ext == "fbx";
         bool isMap = ext == "inputmap";
-        const char* glyph = isImg ? "IMG" : isFbx ? "MDL" : isMap ? "IN" : "FILE";
-        unsigned int col = isImg   ? IM_COL32(70, 150, 170, 255)
-                          : isFbx  ? IM_COL32(150, 110, 190, 255)
-                          : isMap  ? IM_COL32(90, 130, 200, 255)
-                                   : IM_COL32(90, 94, 104, 255);
+        bool isScript = ext == "cscript";
+        AssetIconKind kind = isImg      ? AssetIconKind::Image
+                            : isFbx     ? AssetIconKind::Fbx
+                            : isMap     ? AssetIconKind::InputMap
+                            : isScript  ? AssetIconKind::Script
+                                        : AssetIconKind::Generic;
+        unsigned int col = isImg      ? IM_COL32(70, 150, 170, 255)
+                          : isFbx     ? IM_COL32(150, 110, 190, 255)
+                          : isMap     ? IM_COL32(90, 130, 200, 255)
+                          : isScript  ? IM_COL32(56, 109, 154, 255)
+                                      : IM_COL32(90, 94, 104, 255);
         bool dbl = false;
-        bool clicked = assetIconTile(path.c_str(), glyph, col, name, false, &dbl);
+        bool clicked = assetIconTile(path.c_str(), kind, col, name, false, &dbl,
+                                     isImg ? path : std::string());
         if (clicked) {
             if (isMap) {
                 if (dbl) {
@@ -1581,8 +1822,8 @@ void EditorApp::drawBottomPanel() {
         auto matNames = materialLib_.names();
         for (size_t i = 0; i < matNames.size(); ++i) {
             const std::string& mn = matNames[i];
-            if (assetIconTile(("mat:" + mn).c_str(), "MAT", IM_COL32(180, 130, 220, 255), mn,
-                              selectedMaterial_ == mn)) {
+            if (assetIconTile(("mat:" + mn).c_str(), AssetIconKind::Material,
+                              IM_COL32(180, 130, 220, 255), mn, selectedMaterial_ == mn)) {
                 selectedMaterial_ = mn;
                 selectedAsset_.clear();
                 scene_.select(nullptr);
@@ -1602,9 +1843,9 @@ void EditorApp::drawBottomPanel() {
                 name = name.substr(s + 1);
             const std::string ext = lowerExt(a);
             bool isImg = isSupportedImageExt(ext);
-            if (assetIconTile(("ia:" + a).c_str(), isImg ? "IMG" : "MDL",
+            if (assetIconTile(("ia:" + a).c_str(), isImg ? AssetIconKind::Image : AssetIconKind::Fbx,
                               isImg ? IM_COL32(70, 150, 170, 255) : IM_COL32(150, 110, 190, 255),
-                              name, selectedAsset_ == a)) {
+                              name, selectedAsset_ == a, nullptr, isImg ? a : std::string())) {
                 selectedAsset_ = a;
                 selectedMaterial_.clear();
                 if (isImg) {
@@ -1706,6 +1947,21 @@ void EditorApp::setPlaying(bool playing) {
     }
 }
 
+void EditorApp::activateCamera(CameraComponent& cam) {
+    for (const auto& child : scene_.root().children())
+        disableOtherCameras(*child, &cam);
+    cam.enabled = true;
+}
+
+void EditorApp::deactivateCamera(CameraComponent& cam) {
+    cam.enabled = false;
+    for (const auto& child : scene_.root().children())
+        if (CameraComponent* next = findCamera(*child, /*requireEnabled=*/false, &cam)) {
+            next->enabled = true;
+            return;
+        }
+}
+
 Actor* EditorApp::spawn(const char* kind, Actor* parent) {
     std::unique_ptr<Actor> a;
     std::string k = kind;
@@ -1718,12 +1974,33 @@ Actor* EditorApp::spawn(const char* kind, Actor* parent) {
         a = std::make_unique<SpriteActor>("Sprite");
     } else if (k == "ui") {
         a = std::make_unique<UIControlActor>("UI Control");
+    } else if (k == "camera") {
+        a = std::make_unique<Actor3D>("Camera");
+        a->addComponent(std::make_unique<CameraComponent>());
+    } else if (k == "light_directional" || k == "light_point" || k == "light_spot") {
+        LightComponent::Type type = k == "light_directional" ? LightComponent::Type::Directional
+                                    : k == "light_point"      ? LightComponent::Type::Point
+                                                              : LightComponent::Type::Spot;
+        a = std::make_unique<Actor3D>(k == "light_directional" ? "Directional Light"
+                                     : k == "light_point"       ? "Point Light"
+                                                                : "Spot Light");
+        auto lc = std::make_unique<LightComponent>();
+        lc->type = type;
+        a->addComponent(std::move(lc));
+    } else if (k == "fog") {
+        a = std::make_unique<Actor3D>("Fog");
+        a->addComponent(std::make_unique<FogComponent>());
+    } else if (k == "volumetricfog") {
+        a = std::make_unique<Actor3D>("Volumetric Fog");
+        a->addComponent(std::make_unique<VolumetricFogComponent>());
     } else {
         a = std::make_unique<Actor>("Actor");
     }
 
     std::string name = a->name();
     Actor* added = scene_.add(std::move(a), parent);
+    if (auto* cc = added->getComponent<CameraComponent>())
+        activateCamera(*cc); // task 77: a newly added camera becomes the active one
     CR_LOG("scene", "Spawned " + name + (parent ? " under '" + parent->name() + "'" : ""));
     return added;
 }

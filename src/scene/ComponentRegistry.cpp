@@ -48,6 +48,10 @@ void registerBuiltinComponents() {
     r.add("Mesh Renderer", "Rendering", [] { return std::make_unique<MeshRenderer>(); });
     r.add("Light", "Rendering", [] { return std::make_unique<LightComponent>(); });
     r.add("Light Probe", "Rendering", [] { return std::make_unique<LightProbeComponent>(); });
+    r.add("Fog", "Rendering", [] { return std::make_unique<FogComponent>(); });
+    r.add("Volumetric Fog", "Rendering",
+         [] { return std::make_unique<VolumetricFogComponent>(); });
+    r.add("Camera", "Rendering", [] { return std::make_unique<CameraComponent>(); });
     r.add("Spinner", "Debug", [] { return std::make_unique<SpinnerComponent>(); });
 }
 

@@ -85,6 +85,13 @@ struct ScriptObject {
     std::unordered_map<std::string, std::vector<Value>> connections;
     crate::Actor* owner = nullptr;             // owning actor for script components
 
+    // Non-null => this object is a live view onto a native (non-script)
+    // component -- `builtin` names which kind (e.g. "Fog") and field
+    // reads/writes go straight through to the pointee instead of `fields`,
+    // so e.g. `get_component(type_of(Fog)).start = 10` actually mutates the
+    // live FogComponent rather than a disposable snapshot.
+    void* nativePtr = nullptr;
+
     // do_async suspension: which top-level do_async of which method is paused.
     std::string asyncResumeFn;
     int asyncResumeIndex = 0;
