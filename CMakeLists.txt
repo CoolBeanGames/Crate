@@ -88,12 +88,19 @@ add_library(crate_core STATIC
     src/editor/Console.cpp
     src/editor/ContextMenu.cpp
     src/editor/Popup.cpp
+    src/editor/ScriptBuild.cpp
     src/editor/ScriptEditor.cpp
     src/editor/Theme.cpp
     src/editor/EditorApp.cpp
 )
 target_include_directories(crate_core PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
 target_link_libraries(crate_core PUBLIC crate_script_runtime imgui imgui_texteditor imguizmo ufbx comdlg32 xinput)
+# For ScriptBuild.cpp (Phase 3): where to -I from when compiling a generated
+# script DLL, and where crate_script_runtime.lib for the RUNNING config lives
+# (CMake's default static-lib output directory, i.e. this build tree's root).
+target_compile_definitions(crate_core PRIVATE
+    CRATE_REPO_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+    CRATE_ENGINE_BUILD_DIR="${CMAKE_BINARY_DIR}")
 
 # --- Editor executable ---------------------------------------------------
 add_executable(Crate WIN32 src/main.cpp)
@@ -176,3 +183,9 @@ target_link_libraries(codegen_tests PRIVATE crate_core)
 target_compile_definitions(codegen_tests PRIVATE
     CRATE_REPO_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 add_test(NAME codegen_tests COMMAND codegen_tests)
+
+add_executable(script_build_tests tests/script_build_tests.cpp)
+target_link_libraries(script_build_tests PRIVATE crate_core)
+target_compile_definitions(script_build_tests PRIVATE
+    CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
+add_test(NAME script_build_tests COMMAND script_build_tests)

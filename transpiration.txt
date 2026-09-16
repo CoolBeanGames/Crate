@@ -962,3 +962,134 @@ entries — this is a running history, not a status snapshot.)
   AssetDatabase.cpp (crate_core-only) into something crate_script_runtime
   also builds, before script DLLs actually try to link only
   crate_script_runtime.lib.
+
+2026-09-16 — PHASE 3 COMPLETE AND VERIFIED. New src/editor/ScriptBuild.h/
+  .cpp:
+    - ToolchainEnv (singleton): discovers Visual Studio via vswhere.exe,
+      runs vcvars64.bat ONCE (`"<vcvars64.bat>" >nul && set`, captured via a
+      CreateProcessW-based subprocess runner, NOT cmd.exe environment
+      inheritance) and caches the resulting INCLUDE/LIB/PATH as an explicit
+      environment block; ToolchainEnv::run(commandLine, cwd, output) then
+      launches cl.exe/link.exe with that cached block on every subsequent
+      call, so a real Play-press compile never re-pays vcvars64.bat's own
+      non-trivial startup cost. available()/error() let a caller check
+      before using it rather than getting a confusing failure deep inside a
+      build.
+    - computeDirtyNamespaces(scriptsDir): groups ScriptSystem::files() by
+      ScriptSystem::namespaceOf(name), fingerprints each namespace (a
+      manually-written FNV-1a hash over sorted (className, source) pairs --
+      NOT std::hash, whose algorithm is unspecified and must not be trusted
+      to stay stable across process restarts / stdlib versions for a
+      value that gets PERSISTED to disk), and compares against
+      <scriptsDir>/.crate_build/manifest.tsv (namespace<TAB>generation<TAB>
+      fingerprint). Never-built or changed => dirty.
+    - computeRebuildSet(dirty, scriptsDir): the dependency-closure expansion
+      the plan calls for -- currently the IDENTITY FUNCTION, correctly, since
+      Phase 2's generateClass() refuses every base but Actor/Actor2D/
+      Actor3D, so no cross-namespace inheritance edge can exist yet. Written
+      now (rather than skipped) so its call sites and signature don't need
+      to change when Phase 4/5 add script-to-script inheritance -- only the
+      function body gains a real graph walk at that point.
+    - buildNamespace(namespaceName, scriptsDir): looks up every ClassInfo
+      currently assigned to that namespace, runs Phase 2's generateClass()
+      on each, writes <scriptsDir>/.crate_build/gen/<ns>/<Class>_Native.gen.
+      h/.cpp, compiles each with cl.exe (flags matching the RUNNING config
+      exactly -- reads CMake's own NDEBUG-gated branch at compile time to
+      pick /MDd+/Zi/Ob0/Od/RTC1 for Debug vs /MD+/O2/Ob2/DNDEBUG for
+      Release, so a script DLL always matches its host process's CRT), then
+      links with link.exe /DLL against ONLY crate_script_runtime.lib (never
+      crate_core.lib, per Phase 0's whole reason for existing) into a
+      VERSIONED, shadow-copied <scriptsDir>/.crate_build/bin/
+      <ns>_v<generation>.dll (+ .pdb + .lib, also generation-suffixed so
+      MSVC's debug-info writer never fights a locked file from a still-
+      loaded previous generation) -- generation = 1 + whatever the manifest
+      already recorded (so a script DLL is NEVER overwritten in place, since
+      Windows won't allow that against a loaded DLL and lock release after
+      FreeLibrary isn't instantaneous). Manifest is updated ONLY on success.
+    - Modified CMakeLists.txt: crate_core gets CRATE_REPO_DIR and
+      CRATE_ENGINE_BUILD_DIR compile definitions so ScriptBuild.cpp has an
+      authoritative -I path and knows exactly where THIS build's
+      crate_script_runtime.lib lives, instead of guessing.
+  TWO REAL BUGS FOUND DURING DEVELOPMENT (both caught only because this
+  phase's test actually drives cl.exe/link.exe end-to-end, not just checked
+  return values):
+    1. The vcvars64.bat capture command had a quoting bug --
+       `"\"\"" + vcvars + "\" >nul && set\""` produced a mismatched/extra
+       leading quote that made cmd.exe treat the whole thing as one broken
+       token, so vcvars64.bat silently never actually ran and
+       ToolchainEnv::available() was always false, even on this dev machine
+       which definitely has Visual Studio installed (proven by scripts/
+       build.ps1 working throughout this whole session). Fixed by removing
+       the extra quote pair: `"\"" + vcvars + "\" >nul && set"`. Caught by
+       script_build_tests.cpp printing tc.error() when !available() (added
+       specifically because the silent "no toolchain, skip" path otherwise
+       looks identical whether there's genuinely no VS install OR a bug in
+       the discovery code itself -- worth keeping that diagnostic printf
+       rather than removing it now that it's fixed, since it'll catch the
+       same class of regression again for free).
+    2. The test itself (not ScriptBuild) initially hardcoded
+       `dllPath.find(ns + "_v1.dll")` / `"_v2.dll"`, silently assuming the
+       manifest starts empty every run -- but the manifest is a real,
+       intentionally-persistent build cache (correctly, by design), so a
+       SECOND run of the same test naturally continues from whatever
+       generation the first run left it at. Fixed by asserting the
+       generation strictly increases by exactly 1 across a rebuild, rather
+       than asserting specific absolute numbers, and by having the test's
+       Cleanup guard also strip its own namespace's line out of
+       manifest.tsv (not just delete the generated .gen/.bin files) so
+       repeated CI-style runs don't accumulate v3, v4, v5... forever OR
+       leave a stale fingerprint entry that could make a later run's
+       "never-built namespace is dirty" assumption silently false (exactly
+       what happened once during development here, self-diagnosed by
+       checking the actual manifest.tsv contents on disk rather than
+       guessing). Verified fully repeatable via three consecutive back-to-
+       back runs, all passing identically.
+  New test: tests/script_build_tests.cpp -- 19 checks: ToolchainEnv
+  discovery + actually launching a real process through it; dirty-tracking
+  on a never-built namespace; computeRebuildSet's current identity-function
+  behavior; an ACTUAL end-to-end buildNamespace() producing a real,
+  loadable-shaped .dll (existence + naming checked, not just a non-error
+  return); the namespace becoming clean immediately after a successful
+  build; becoming dirty again after editing one of its scripts; a rebuild
+  producing a NEW, distinctly-versioned DLL while leaving the previous
+  generation's file untouched on disk; and building an unknown/empty
+  namespace failing cleanly with a clear error. Gracefully prints a note and
+  skips the compiler-dependent checks (not a failure) if no MSVC toolchain
+  is discoverable, via the test's own minimal, test-local vswhere.exe
+  lookup (separate from ScriptBuild's real ToolchainEnv, deliberately kept
+  simple/independent so the test isn't just re-exercising the same code
+  path it's supposed to be validating).
+  NOTE: buildNamespace() does NOT yet sweep/delete old generations (v1
+  stays on disk forever once superseded) -- this is a known, deliberately
+  deferred item (the plan only requires "best-effort delete stale
+  generations... otherwise sweep at next engine startup"), not implemented
+  in Phase 3 since nothing yet loads/frees these DLLs to know when a
+  generation is truly safe to remove (that's Phase 4's job). Revisit when
+  Phase 4's NativeModule/NativeClassRegistry FreeLibrary lifecycle exists.
+  Verification performed: `powershell -ExecutionPolicy Bypass -File
+  scripts\build.ps1 Debug` built clean; ran all 13 test executables directly
+  (script_build_tests included) -- all passed, zero regressions, confirmed
+  repeatable across 3 consecutive script_build_tests runs:
+    script_build_tests: ok 19 checks passed
+    codegen_tests: ok 84 checks passed / runtime_tests: ok 287 /
+    script_metadata_tests: ok 28 / script_tests: ok 52 / script_bug_tests,
+    script_integration_tests, actor_tests (60), mesh_tests,
+    lighting_bake_tests, asset_db_tests, image_tests (11), fbx_tests: all ok,
+    unchanged.
+  Files touched this phase: src/editor/ScriptBuild.h (new), src/editor/
+  ScriptBuild.cpp (new), tests/script_build_tests.cpp (new), CMakeLists.txt
+  (modified: ScriptBuild.cpp added to crate_core's sources, new
+  CRATE_REPO_DIR/CRATE_ENGINE_BUILD_DIR compile definitions on crate_core,
+  new script_build_tests target), .gitignore (modified: added
+  /assets/scripts/.crate_build/ and *.dll).
+  NOT YET COMMITTED to git as of writing this entry -- see next action.
+  Next step: git commit Phase 3, then continue to Phase 4 (runtime DLL
+  loading + extern "C" factory ABI + ComponentRegistry integration) since
+  the user has said to keep going without waiting for review between
+  phases. Phase 4 needs to actually add the `extern "C"` factory exports
+  (CreateInstance_<Class>/DestroyInstance_<Class>/GetClassInfo_<Class>) to
+  Phase 2's CodeGen.cpp output -- CodeGen.cpp currently emits ONLY the
+  class definition itself, no exported factory functions yet, since Phase 2
+  predates the ABI design being finalized in the approved plan. Re-read
+  CodeGen.h's own doc comment and the approved plan's Phase 4/5 sections
+  before starting.

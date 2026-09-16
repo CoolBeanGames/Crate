@@ -29,3 +29,5 @@ zen.tasks.json.bak
 /assets/.foldercolors
 /assets/.assetdb
 /assets/scripts/.scriptmeta
+/assets/scripts/.crate_build/
+*.dll
