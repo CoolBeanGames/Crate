@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "projectId": "8afe2a0217d7419db234ceda7ecb9dff",
   "name": "Crate",
-  "nextCardIndex": 79,
+  "nextCardIndex": 85,
   "latestExePath": "build-Release/Crate.exe",
   "latestReleasePath": "build-Release/Crate.exe",
   "tagCatalog": [
@@ -171,48 +171,33 @@
       "isCollapsed": false,
       "isSystem": false,
       "isLocked": false,
-      "tasks": []
-    },
-    {
-      "id": "2b668c739ffe45aaa32fa229a7aff5ed",
-      "name": "Assets",
-      "branch": "assets",
-      "isArchive": false,
-      "isCollapsed": false,
-      "isSystem": false,
-      "isLocked": false,
-      "tasks": []
-    },
-    {
-      "id": "14dbcb46c5b14e9e93f502f4c7f020dc",
-      "name": "Rendering",
-      "branch": "rendering",
-      "isArchive": false,
-      "isCollapsed": false,
-      "isSystem": false,
-      "isLocked": false,
       "tasks": [
         {
-          "id": "7608f2b669544fc8a4a648709650a5df",
-          "index": 77,
+          "id": "2fa907fcc1324eb9b70af26a9f60659c",
+          "index": 79,
           "kind": "task",
           "dueDate": null,
           "startedDate": null,
           "priority": null,
-          "title": "Camera",
-          "task": "add a camera with a view frustrum gizmo. if the camera is present then game view renders the cameras view (scene view is still free view). Only 1 camera can be active at a time, if a new camera is activated it becomes the 1 active camera. if that camera becomes deactivated then it looks for a present camera and activates that",
+          "title": "Actor/Camera references unusable in Inspector",
+          "task": "There is no way to reference actors or components (e.g. a Camera) from a script field in the scene. Dragging a hierarchy item onto a reference field doesn\u0027t work because clicking the item to start a drag immediately re-selects it in the Inspector, so the drag target is gone before you can drop it anywhere. Clicking directly on the variable field also does nothing -- no picker opens.",
           "tags": [
-            "rendering",
-            "camera"
+            "bug"
           ],
           "files": [],
           "customTypeId": null,
           "customValues": {},
           "requirements": [
             {
-              "id": "f87077e6971b452fa515f03eac80ad15",
+              "id": "337f052d359e46608bc02d216a0388d6",
               "index": 1,
-              "text": "camera in place and usable",
+              "text": "clicking an actor/component-typed field in the Inspector opens a picker to choose an actor from the scene",
+              "isDone": false
+            },
+            {
+              "id": "3fa3818e70f24a4790281fca9831d4be",
+              "index": 2,
+              "text": "dragging a hierarchy row onto a reference field works -- selecting it in the Inspector does not cancel/hijack the drag",
               "isDone": false
             }
           ],
@@ -227,8 +212,221 @@
           "isLocked": false,
           "isAwaitingFeedback": false,
           "isCollapsed": false,
-          "createdAt": "2026-09-11T07:24:32.0883338+00:00",
-          "updatedAt": "2026-09-11T07:25:54.4580051+00:00"
+          "createdAt": "2026-09-16T03:53:56.2044765+00:00",
+          "updatedAt": "2026-09-16T03:53:56.2046437+00:00"
+        },
+        {
+          "id": "c200df6cc46e4dfd8c935983352ccff9",
+          "index": 80,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Input global missing from script autocomplete",
+          "task": "Input and its members (e.g. Input.mouse) are completely absent from autocomplete suggestions, even though Input is presumably usable from scripts. Also, autocomplete doesn\u0027t trigger at all when typing something like \u0027Input.mouse\u0027.",
+          "tags": [
+            "bug"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [
+            {
+              "id": "2dc53e0cc55d45deadcdc88ae3b7bab7",
+              "index": 1,
+              "text": "Input appears in bare-identifier autocomplete",
+              "isDone": false
+            },
+            {
+              "id": "212d61829aa442fa80f97676b827b766",
+              "index": 2,
+              "text": "typing Input.\u003Cmember\u003E triggers member autocomplete same as other types",
+              "isDone": false
+            }
+          ],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-16T03:53:56.4999502+00:00",
+          "updatedAt": "2026-09-16T03:53:56.5001112+00:00"
+        }
+      ]
+    },
+    {
+      "id": "2b668c739ffe45aaa32fa229a7aff5ed",
+      "name": "Assets",
+      "branch": "assets",
+      "isArchive": false,
+      "isCollapsed": false,
+      "isSystem": false,
+      "isLocked": false,
+      "tasks": [
+        {
+          "id": "d40b2b97bebf4e25a9fbf8710a64348d",
+          "index": 81,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Asset browser icons regressed to no icons",
+          "task": "The asset browser previously showed real icons per asset type (folder/mesh/texture/etc, added recently), and they looked good, but they are now completely gone -- back to no icons at all.",
+          "tags": [
+            "bug"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [
+            {
+              "id": "33ad40669b204e57a1e5603ebc0a8ac8",
+              "index": 1,
+              "text": "asset browser tiles show their per-type icon again",
+              "isDone": false
+            }
+          ],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-16T03:53:56.789304+00:00",
+          "updatedAt": "2026-09-16T03:53:56.789465+00:00"
+        }
+      ]
+    },
+    {
+      "id": "14dbcb46c5b14e9e93f502f4c7f020dc",
+      "name": "Rendering",
+      "branch": "rendering",
+      "isArchive": false,
+      "isCollapsed": false,
+      "isSystem": false,
+      "isLocked": false,
+      "tasks": [
+        {
+          "id": "e2c684cb53534ebea626e244508499cf",
+          "index": 82,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Remove Scene View spin preview",
+          "task": "The \u0027Spin preview\u0027 checkbox/feature in the Scene View toolbar is unused and not useful. Remove it entirely.",
+          "tags": [],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [
+            {
+              "id": "ae111a9ae24a45aca587bb1e1cab787c",
+              "index": 1,
+              "text": "Spin preview checkbox and its behavior are removed from Scene View",
+              "isDone": false
+            }
+          ],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-16T03:53:57.0861978+00:00",
+          "updatedAt": "2026-09-16T03:53:57.0863407+00:00"
+        },
+        {
+          "id": "47b195f548ac4eac82b246edf5bd5018",
+          "index": 83,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Add light types to the Add menu",
+          "task": "The Add menu\u0027s Rendering submenu only has a generic Light entry (added as a Point light by default). Add one entry per light type so users don\u0027t have to add a Light then change its type.",
+          "tags": [],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [
+            {
+              "id": "785ea10617604e5f9c8b0143df89a34e",
+              "index": 1,
+              "text": "Add menu \u003E Rendering has Directional Light, Point Light, and Spot Light entries, each creating an actor with a Light component preset to that type",
+              "isDone": false
+            }
+          ],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-16T03:53:57.3913345+00:00",
+          "updatedAt": "2026-09-16T03:53:57.3914925+00:00"
+        },
+        {
+          "id": "b7dda56da5e14129bf8632af9adf51ad",
+          "index": 84,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Primitive shapes need independent size settings",
+          "task": "Mesh Renderer primitives (Cube, Sphere, Cylinder, Capsule, Plane, Quad) currently rely on the actor\u0027s Transform scale for sizing. Add explicit size fields to the component instead, since physics colliders will later need to size independently from a scale factor that also affects other things.",
+          "tags": [],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [
+            {
+              "id": "95c1406a182b493882bc2752f5e5aed4",
+              "index": 1,
+              "text": "each primitive shape has its own size setting(s) in the Mesh Renderer inspector (e.g. cube half-extents, sphere radius, cylinder/capsule radius\u002Bheight, plane/quad width\u002Bheight)",
+              "isDone": false
+            },
+            {
+              "id": "223eecb8e7684bb99ec8be62c80293d0",
+              "index": 2,
+              "text": "the mesh is generated/scaled from these size fields rather than solely from Transform.scale",
+              "isDone": false
+            }
+          ],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-16T03:53:57.6853469+00:00",
+          "updatedAt": "2026-09-16T03:53:57.6855578+00:00"
         }
       ]
     },
@@ -3292,6 +3490,44 @@
           "isCollapsed": false,
           "createdAt": "2026-09-11T07:21:59.4904551+00:00",
           "updatedAt": "2026-09-16T02:34:39.0387114+00:00"
+        },
+        {
+          "id": "7608f2b669544fc8a4a648709650a5df",
+          "index": 77,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Camera",
+          "task": "add a camera with a view frustrum gizmo. if the camera is present then game view renders the cameras view (scene view is still free view). Only 1 camera can be active at a time, if a new camera is activated it becomes the 1 active camera. if that camera becomes deactivated then it looks for a present camera and activates that",
+          "tags": [
+            "rendering",
+            "camera"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [
+            {
+              "id": "f87077e6971b452fa515f03eac80ad15",
+              "index": 1,
+              "text": "camera in place and usable",
+              "isDone": true
+            }
+          ],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": true,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-11T07:24:32.0883338+00:00",
+          "updatedAt": "2026-09-16T03:55:53.5494729+00:00"
         }
       ]
     }
