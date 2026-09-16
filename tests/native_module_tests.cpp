@@ -188,8 +188,15 @@ int main() {
 
         NativeClassRegistry::get().unloadNamespace(ns);
         CHECK(!NativeClassRegistry::get().isLoaded(ns));
-        CHECK(!ComponentRegistry::get().has("NmTestMover"));
-        std::printf("ok  unloadNamespace() removes the ComponentRegistry entry and frees the module\n");
+        // unloadNamespace() restores the INTERPRETED registration rather
+        // than removing the class outright -- see
+        // NativeClassRegistry.cpp's restoreInterpretedRegistration() and
+        // native_reflection_tests.cpp, which covers this specifically. The
+        // class must stay addable (running interpreted) after a Stop
+        // (Phase 7), not vanish from the Add-Component menu.
+        CHECK(ComponentRegistry::get().has("NmTestMover"));
+        std::printf("ok  unloadNamespace() frees the module and restores the interpreted "
+                    "registration (class stays addable)\n");
     }
 
     std::printf("ok  %d checks passed\n", g_checks);

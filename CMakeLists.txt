@@ -75,6 +75,7 @@ add_library(crate_core STATIC
     src/script/CodeGen.cpp
     src/script/NativeModule.cpp
     src/script/NativeClassRegistry.cpp
+    src/script/NativeScriptComponent.cpp
     src/script/Format.cpp
     src/script/ScriptComponent.cpp
     src/script/ScriptSystem.cpp
@@ -197,3 +198,9 @@ target_link_libraries(native_module_tests PRIVATE crate_core)
 target_compile_definitions(native_module_tests PRIVATE
     CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
 add_test(NAME native_module_tests COMMAND native_module_tests)
+
+add_executable(native_reflection_tests tests/native_reflection_tests.cpp)
+target_link_libraries(native_reflection_tests PRIVATE crate_core)
+target_compile_definitions(native_reflection_tests PRIVATE
+    CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
+add_test(NAME native_reflection_tests COMMAND native_reflection_tests)

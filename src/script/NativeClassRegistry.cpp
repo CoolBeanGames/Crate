@@ -1,71 +1,34 @@
 #include "script/NativeClassRegistry.h"
 
 #include "scene/ComponentRegistry.h"
+#include "script/NativeScriptComponent.h"
+#include "script/ScriptComponent.h"
 #include "script/ScriptSystem.h"
 
 namespace crate::script {
 namespace {
-
-// Bridges a native script class's extern "C" factory ABI (which requires
-// the owning Actor* up front, see CodeGen.cpp's CreateInstance_<Class>)
-// into crate::ComponentRegistry::Entry::make's zero-argument signature
-// (`std::function<std::unique_ptr<Component>()>`) -- the same "owner isn't
-// known yet at construction time" problem ScriptComponent already solves by
-// deferring actual instantiation to first use via Component::actor()
-// (inherited, set by Actor::addComponent AFTER this wrapper is constructed
-// and returned). Mirrors ScriptComponent::ensureObject()'s lazy-build
-// pattern exactly, one level up.
-//
-// This is a deliberately minimal placeholder for transpiration.txt Phase
-// 5's fuller NativeScriptComponent (which will ALSO own an interpreter-
-// backed ScriptObject for Inspector-during-Play sync). Kept private to this
-// .cpp so Phase 5 is free to replace it outright without any other code
-// depending on its shape.
-class NativeComponentShim : public crate::Component {
-public:
-    NativeComponentShim(ScriptContext* ctx, NativeClassExport exp) : ctx_(ctx), exp_(std::move(exp)) {}
-
-    ~NativeComponentShim() override {
-        if (native_ && exp_.destroy)
-            exp_.destroy(native_);
+// Re-registers `className` in ComponentRegistry against the INTERPRETED
+// ScriptComponent factory -- i.e. restores exactly what
+// ScriptSystem::registerComponent() already set up before any namespace was
+// ever built/loaded. Used by unloadNamespace()/unloadAll() so unloading a
+// namespace's DLL (Stop, or before a rebuild) returns the editor to normal
+// edit-time behavior (the class stays addable, running interpreted) rather
+// than vanishing from the Add-Component menu entirely, which would happen
+// if this only called ComponentRegistry::remove(). Falls back to an actual
+// remove() only if the class no longer exists in ScriptSystem at all (its
+// script file was deleted, not just its namespace's DLL unloaded).
+void restoreInterpretedRegistration(const std::string& className) {
+    auto typeIt = ScriptSystem::get().types().find(className);
+    if (typeIt == ScriptSystem::get().types().end()) {
+        ComponentRegistry::get().remove(className);
+        return;
     }
-
-    const char* typeName() const override { return exp_.className.c_str(); }
-
-    void start() override {
-        ensureNative();
-        if (native_)
-            native_->start();
-    }
-    void update(float dt) override {
-        ensureNative();
-        if (native_)
-            native_->update(dt);
-    }
-    void physicsUpdate(float dt) override {
-        ensureNative();
-        if (native_)
-            native_->physicsUpdate(dt);
-    }
-
-    std::unique_ptr<crate::Component> clone() const override {
-        // Matches ScriptComponent::clone(): a fresh, not-yet-instantiated
-        // wrapper -- current field values are not copied, exactly as today.
-        return std::make_unique<NativeComponentShim>(ctx_, exp_);
-    }
-
-private:
-    void ensureNative() {
-        if (native_ || !exp_.create)
-            return;
-        native_ = exp_.create(ctx_, actor());
-    }
-
-    ScriptContext* ctx_;
-    NativeClassExport exp_;
-    crate::Component* native_ = nullptr; // owned; destroyed via exp_.destroy, not `delete`
-};
-
+    ScriptContext* ctx = &ScriptSystem::get().context();
+    const ClassInfo* cls = typeIt->second.get();
+    ComponentRegistry::get().add(
+        className, "Scripts", [ctx, cls] { return std::make_unique<ScriptComponent>(ctx, cls); },
+        /*replace=*/true);
+}
 } // namespace
 
 NativeClassRegistry& NativeClassRegistry::get() {
@@ -85,14 +48,24 @@ bool NativeClassRegistry::loadNamespace(const std::string& namespaceName, const 
     for (const auto& exp : owned->exports()) {
         namespaceOfClass_[exp.className] = namespaceName;
         NativeClassExport captured = exp; // by-value capture: stable across further loads/unloads
+        // The interpreted ClassInfo* for this same class name always exists
+        // -- ScriptSystem::compile() runs for every loaded script
+        // regardless of namespace (Phase 1 only adds a metadata tag, it
+        // never changes what ScriptSystem itself compiles) -- and pointer
+        // identity is stable across recompiles/retirement forever (see
+        // ScriptSystem.cpp's compile()/retired_), so capturing it directly
+        // is exactly as safe as ScriptComponent already assumes.
+        auto typeIt = ScriptSystem::get().types().find(exp.className);
+        const ClassInfo* cls = typeIt != ScriptSystem::get().types().end() ? typeIt->second.get() : nullptr;
         ComponentRegistry::get().add(
             exp.className, "Scripts",
-            [captured]() -> std::unique_ptr<crate::Component> {
+            [captured, cls]() -> std::unique_ptr<crate::Component> {
                 // Same ScriptContext every native/interpreted script shares
                 // (ScriptSystem owns exactly one, see ScriptSystem::ctx_) --
                 // matches how ScriptSystem::registerComponent() captures
                 // `&ctx_` for ScriptComponent's own factory lambda.
-                return std::make_unique<NativeComponentShim>(&ScriptSystem::get().context(), captured);
+                return std::make_unique<NativeScriptComponent>(&ScriptSystem::get().context(), cls,
+                                                                captured);
             },
             /*replace=*/true);
     }
@@ -105,7 +78,7 @@ void NativeClassRegistry::unloadNamespace(const std::string& namespaceName) {
     if (it == modulesByNamespace_.end())
         return;
     for (const auto& exp : it->second->exports()) {
-        ComponentRegistry::get().remove(exp.className);
+        restoreInterpretedRegistration(exp.className);
         namespaceOfClass_.erase(exp.className);
     }
     modulesByNamespace_.erase(it); // ~NativeModule() FreeLibrary()s here

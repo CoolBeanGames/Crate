@@ -1035,15 +1035,53 @@ CodeGenResult generateClass(const ClassDecl& decl) {
 
     c << "} // namespace crate::script::generated\n\n";
 
-    // ---- extern "C" factory ABI (transpiration.txt Phase 4) ----
-    // Deliberately minimal at the boundary -- no STL types by value, no
-    // exceptions crossing it (constructors/destructors here don't throw in
-    // practice; field-initializer evaluation errors would come from
-    // Runtime::coerce/arith, which don't throw for the plain-value cases
-    // Phase 2 supports in initializers).
+    // ---- reflection table + extern "C" factory ABI (transpiration.txt
+    // Phase 4/5) ----
+    // Deliberately minimal at the boundary -- no STL types by value cross
+    // it via the three dllexport functions themselves (CompiledClassInfo is
+    // always passed by pointer); field/method accessor function pointers
+    // take `void*` rather than the generated type, keeping this header-free
+    // reflection surface usable from NativeScriptComponent.cpp without it
+    // ever needing to know the per-class generated type either.
     c << "namespace {\n";
+    for (const auto& f : decl.fields) {
+        c << "crate::script::Value get_" << exportSuffix << "_" << sanitize(f.name)
+          << "(void* p) { return static_cast<crate::script::generated::" << cls << "*>(p)->"
+          << fieldMember(f.name) << "; }\n";
+        c << "void set_" << exportSuffix << "_" << sanitize(f.name)
+          << "(void* p, const crate::script::Value& v) { static_cast<crate::script::generated::"
+          << cls << "*>(p)->" << fieldMember(f.name) << " = v; }\n";
+    }
+    if (!decl.fields.empty()) {
+        c << "const crate::script::FieldAccessor kFields_" << exportSuffix << "[] = {\n";
+        for (const auto& f : decl.fields)
+            c << "    { " << cppStringLiteral(f.name) << ", " << cppStringLiteral(f.type)
+              << ", &get_" << exportSuffix << "_" << sanitize(f.name) << ", &set_" << exportSuffix
+              << "_" << sanitize(f.name) << " },\n";
+        c << "};\n";
+    }
+    for (const auto& fn : decl.functions) {
+        c << "crate::script::Value invoke_" << exportSuffix << "_" << sanitize(fn.name)
+          << "(void* p, crate::script::ScriptContext*, std::vector<crate::script::Value> args) { "
+             "return static_cast<crate::script::generated::"
+          << cls << "*>(p)->" << methodName(fn.name) << "(std::move(args)); }\n";
+    }
+    if (!decl.functions.empty()) {
+        c << "const crate::script::MethodAccessor kMethods_" << exportSuffix << "[] = {\n";
+        for (const auto& fn : decl.functions)
+            c << "    { " << cppStringLiteral(fn.name) << ", &invoke_" << exportSuffix << "_"
+              << sanitize(fn.name) << " },\n";
+        c << "};\n";
+    }
+    c << "std::unordered_map<std::string, crate::script::Value>& overflow_" << exportSuffix
+      << "(void* p) { return static_cast<crate::script::generated::" << cls << "*>(p)->overflow_; }\n";
     c << "const crate::script::CompiledClassInfo kClassInfo_" << exportSuffix << " = {\n";
-    c << "    " << cppStringLiteral(decl.name) << ", \"\"\n";
+    c << "    " << cppStringLiteral(decl.name) << ", \"\",\n";
+    c << "    " << (decl.fields.empty() ? "nullptr" : ("kFields_" + exportSuffix)) << ", "
+      << decl.fields.size() << ",\n";
+    c << "    " << (decl.functions.empty() ? "nullptr" : ("kMethods_" + exportSuffix)) << ", "
+      << decl.functions.size() << ",\n";
+    c << "    &overflow_" << exportSuffix << "\n";
     c << "};\n";
     c << "} // namespace\n\n";
     c << "extern \"C\" __declspec(dllexport) crate::Component* CreateInstance_" << exportSuffix
