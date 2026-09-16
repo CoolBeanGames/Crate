@@ -51,6 +51,7 @@ void registerBuiltinComponents() {
     r.add("Fog", "Rendering", [] { return std::make_unique<FogComponent>(); });
     r.add("Volumetric Fog", "Rendering",
          [] { return std::make_unique<VolumetricFogComponent>(); });
+    r.add("Camera", "Rendering", [] { return std::make_unique<CameraComponent>(); });
     r.add("Spinner", "Debug", [] { return std::make_unique<SpinnerComponent>(); });
 }
 

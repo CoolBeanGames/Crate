@@ -70,6 +70,17 @@ void VolumetricFogComponent::drawInspector() {
     ImGui::TextDisabled("Only the first Volumetric Fog found in the scene is used.");
 }
 
+void CameraComponent::drawInspector() {
+    ImGui::DragFloat("Field of View", &fovY, 0.5f, 1.0f, 179.0f);
+    ImGui::DragFloat("Near", &nearZ, 0.01f, 0.001f, 1000.0f);
+    if (farZ < nearZ)
+        farZ = nearZ + 0.01f;
+    ImGui::DragFloat("Far", &farZ, 1.0f, 0.01f, 100000.0f);
+    ImGui::TextDisabled(enabled ? "Active: Game View renders from this camera."
+                                : "Inactive: right-click this component to make it active.");
+    ImGui::TextDisabled("Only one Camera in the scene is ever active at a time.");
+}
+
 void LightProbeComponent::drawInspector() {
     ImGui::TextDisabled(bakedValid ? "baked" : "not baked yet - Object > Bake Lightmaps");
     ImGui::ColorButton("##baked", ImVec4(bakedLight[0], bakedLight[1], bakedLight[2], 1.0f));

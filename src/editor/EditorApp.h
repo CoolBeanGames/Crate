@@ -17,6 +17,8 @@ struct ID3D11DeviceContext;
 
 namespace crate {
 
+class CameraComponent;
+
 // The editor shell. Owns the active Scene and draws every panel each frame.
 // Windowing is handled by the platform layer (see src/main.cpp); the D3D11
 // device is created there and handed in so the viewport renderer can share it.
@@ -84,6 +86,13 @@ private:
     void reparentToNewNode(Actor* a);
 
     void setPlaying(bool playing);
+
+    // Camera activation (task 77): enforces "only one CameraComponent in the
+    // scene is enabled at a time". activateCamera disables every other one;
+    // deactivateCamera disables `cam` and, if another CameraComponent exists
+    // anywhere in the tree, activates that one instead.
+    void activateCamera(CameraComponent& cam);
+    void deactivateCamera(CameraComponent& cam);
 
     // Delete whatever is currently selected: a scene actor, a material asset,
     // or an imported asset (in that priority order).

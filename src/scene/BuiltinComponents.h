@@ -99,6 +99,25 @@ public:
     float density = 0.35f; // 0 = invisible, 1 = fully opaque
 };
 
+// A viewpoint Game View can render from (task 77). Only one CameraComponent
+// in the whole scene is ever `enabled` at a time -- the editor enforces that
+// exclusivity whenever one is added or toggled (see EditorApp::activateCamera
+// / deactivateCamera), falling back to another present camera, if any, when
+// the active one is turned off. Game View shows the free Scene View camera's
+// placeholder text when no CameraComponent is enabled anywhere in the scene.
+class CameraComponent : public Component {
+public:
+    const char* typeName() const override { return "Camera"; }
+    void drawInspector() override;
+    std::unique_ptr<Component> clone() const override {
+        return std::make_unique<CameraComponent>(*this);
+    }
+
+    float fovY = 55.0f;
+    float nearZ = 0.01f;
+    float farZ = 500.0f;
+};
+
 // A fixed sample point for baked static lighting. Dynamic (moving) actors with
 // no bake of their own borrow the nearest probe's baked colour as extra
 // ambient each frame, so they still read as lit by static-only lights.

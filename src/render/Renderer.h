@@ -84,6 +84,13 @@ public:
     // the next call. Returns nullptr on failure or zero size.
     void* render(Scene& scene, const OrbitCamera& cam, int width, int height, const Options& opt);
 
+    // Same, but for an explicit view/projection instead of the free-roaming
+    // OrbitCamera (task 77: Game View renders from a CameraComponent's own
+    // actor transform + fovY/near/far, which don't fit OrbitCamera's
+    // yaw/pitch/distance shape).
+    void* render(Scene& scene, const Mat4& view, const Mat4& proj, const Vec3& eye, float nearZ,
+                float farZ, int width, int height, const Options& opt);
+
     // Explicit texture cache control (used by the asset importer).
     void* loadTexture(const std::string& path);
     void invalidateTexture(const std::string& path);

@@ -42,6 +42,27 @@ static Actor* findById(Actor& node, uint64_t id) {
     return nullptr;
 }
 
+// First CameraComponent found (depth-first), optionally skipping `exclude`
+// and/or requiring `enabled`. Backs both Game View's active-camera lookup and
+// the exclusive-activation bookkeeping below (task 77).
+static CameraComponent* findCamera(Actor& node, bool requireEnabled, CameraComponent* exclude) {
+    if (auto* cc = node.getComponent<CameraComponent>())
+        if (cc != exclude && (!requireEnabled || cc->enabled))
+            return cc;
+    for (const auto& c : node.children())
+        if (CameraComponent* hit = findCamera(*c, requireEnabled, exclude))
+            return hit;
+    return nullptr;
+}
+
+static void disableOtherCameras(Actor& node, CameraComponent* keep) {
+    if (auto* cc = node.getComponent<CameraComponent>())
+        if (cc != keep)
+            cc->enabled = false;
+    for (const auto& c : node.children())
+        disableOtherCameras(*c, keep);
+}
+
 EditorApp::EditorApp() : scene_(Scene::makeSample()) {
     registerBuiltinComponents();
     AssetDatabase::get().load(assetDir_);
@@ -306,6 +327,12 @@ void EditorApp::drawMenuBar() {
         if (ImGui::MenuItem("Create Mesh"))        scene_.select(spawn("mesh", p));
         if (ImGui::MenuItem("Create Sprite"))      scene_.select(spawn("sprite", p));
         if (ImGui::MenuItem("Create UI Control"))  scene_.select(spawn("ui", p));
+        if (ImGui::BeginMenu("Rendering")) {
+            if (ImGui::MenuItem("Camera"))         scene_.select(spawn("camera", p));
+            if (ImGui::MenuItem("Fog"))            scene_.select(spawn("fog", p));
+            if (ImGui::MenuItem("Volumetric Fog")) scene_.select(spawn("volumetricfog", p));
+            ImGui::EndMenu();
+        }
         ImGui::Separator();
         if (ImGui::MenuItem("Bake Lightmaps")) {
             renderer_.bakeLighting(scene_, assetDir_);
@@ -424,6 +451,12 @@ bool EditorApp::hierarchyContextMenu(Actor& a) {
         if (menu.item("Mesh"))        scene_.select(spawn("mesh", &a));
         if (menu.item("Sprite"))      scene_.select(spawn("sprite", &a));
         if (menu.item("UI Control"))  scene_.select(spawn("ui", &a));
+        if (menu.beginSub("Rendering")) {
+            if (menu.item("Camera"))         scene_.select(spawn("camera", &a));
+            if (menu.item("Fog"))            scene_.select(spawn("fog", &a));
+            if (menu.item("Volumetric Fog")) scene_.select(spawn("volumetricfog", &a));
+            menu.endSub();
+        }
         menu.endSub();
     }
     if (menu.item("Reparent To New Node")) reparentToNewNode(&a);
@@ -552,6 +585,12 @@ void EditorApp::drawHierarchy() {
                 if (addMenu.item("Mesh"))        scene_.select(spawn("mesh", p));
                 if (addMenu.item("Sprite"))      scene_.select(spawn("sprite", p));
                 if (addMenu.item("UI Control"))  scene_.select(spawn("ui", p));
+                if (addMenu.beginSub("Rendering")) {
+                    if (addMenu.item("Camera"))         scene_.select(spawn("camera", p));
+                    if (addMenu.item("Fog"))            scene_.select(spawn("fog", p));
+                    if (addMenu.item("Volumetric Fog")) scene_.select(spawn("volumetricfog", p));
+                    addMenu.endSub();
+                }
                 addMenu.end();
             }
         }
@@ -703,7 +742,17 @@ void EditorApp::drawInspector() {
                 comp->typeName(),
                 comp->inspectorOpen ? ImGuiTreeNodeFlags_DefaultOpen : 0);
             if (ImGui::BeginPopupContextItem("comp_ctx")) {
-                ImGui::Checkbox("Enabled", &comp->enabled);
+                if (auto* cc = dynamic_cast<CameraComponent*>(comp.get())) {
+                    bool camEn = cc->enabled;
+                    if (ImGui::Checkbox("Enabled", &camEn)) {
+                        if (camEn)
+                            activateCamera(*cc);
+                        else
+                            deactivateCamera(*cc);
+                    }
+                } else {
+                    ImGui::Checkbox("Enabled", &comp->enabled);
+                }
                 if (ImGui::MenuItem("Remove Component"))
                     toRemove = comp.get();
                 ImGui::EndPopup();
@@ -768,6 +817,8 @@ void EditorApp::drawInspector() {
                     Component* c = a->addComponent(ComponentRegistry::get().create(e.name));
                     if (c && playing_)
                         c->start();
+                    if (auto* cc = dynamic_cast<CameraComponent*>(c))
+                        activateCamera(*cc); // task 77: a newly added camera becomes the active one
                     CR_LOG("scene", "Added " + e.name + " to '" + a->name() + "'");
                 }
             }
@@ -853,13 +904,46 @@ void EditorApp::drawViewport() {
             }
             if (ImGui::BeginTabItem("Game View")) {
                 ImVec2 size = ImGui::GetContentRegionAvail();
-                ImVec2 p0 = ImGui::GetCursorScreenPos();
-                ImGui::GetWindowDrawList()->AddRectFilled(
-                    p0, ImVec2(p0.x + size.x, p0.y + size.y), IM_COL32_BLACK);
-                const char* msg = playing_ ? "GAME RUNNING" : "Press Play to run the game";
-                ImGui::GetWindowDrawList()->AddText(ImVec2(p0.x + 12, p0.y + 12),
-                                                    IM_COL32(0xF4, 0xF6, 0xFA, 0xFF), msg);
-                ImGui::Dummy(size);
+                int w = static_cast<int>(size.x), h = static_cast<int>(size.y);
+
+                // The active camera (task 77): the one enabled CameraComponent
+                // anywhere in the scene, if any. Scene View stays a free-roam
+                // OrbitCamera regardless.
+                CameraComponent* gameCam = nullptr;
+                for (const auto& child : scene_.root().children())
+                    if ((gameCam = findCamera(*child, /*requireEnabled=*/true, nullptr)))
+                        break;
+
+                void* srv = nullptr;
+                if (gameCam && renderer_.ready() && w > 0 && h > 0) {
+                    Transform world = gameCam->actor()->worldTransform();
+                    Mat4 rot = Mat4::rotationEuler(world.rotationEuler);
+                    Vec3 fwd = normalize(Vec3{rot.at(2, 0), rot.at(2, 1), rot.at(2, 2)});
+                    Vec3 up = normalize(Vec3{rot.at(1, 0), rot.at(1, 1), rot.at(1, 2)});
+                    Vec3 eye = world.position;
+                    Mat4 view = Mat4::lookAtLH(eye, eye + fwd, up);
+                    float aspect = float(w) / float(h);
+                    Mat4 proj = Mat4::perspectiveLH(gameCam->fovY, aspect, gameCam->nearZ,
+                                                   gameCam->farZ);
+                    Renderer::Options opt;
+                    opt.fogEnabled = fog_;
+                    opt.shadows = shadows_;
+                    srv = renderer_.render(scene_, view, proj, eye, gameCam->nearZ, gameCam->farZ,
+                                          w, h, opt);
+                }
+
+                if (srv) {
+                    ImGui::Image(reinterpret_cast<ImTextureID>(srv), size);
+                } else {
+                    ImVec2 p0 = ImGui::GetCursorScreenPos();
+                    ImGui::GetWindowDrawList()->AddRectFilled(
+                        p0, ImVec2(p0.x + size.x, p0.y + size.y), IM_COL32_BLACK);
+                    const char* msg = gameCam ? "Press Play to run the game"
+                                              : "No active Camera in the scene";
+                    ImGui::GetWindowDrawList()->AddText(ImVec2(p0.x + 12, p0.y + 12),
+                                                        IM_COL32(0xF4, 0xF6, 0xFA, 0xFF), msg);
+                    ImGui::Dummy(size);
+                }
                 ImGui::EndTabItem();
             }
             ImGuiTabItemFlags scriptsFlags =
@@ -982,6 +1066,29 @@ void EditorApp::drawViewportOverlays(float x, float y, float w, float h) {
                     line(s, s + fwd * 1.6f, lcol);
                 }
         }
+    }
+
+    // --- Camera gizmo (task 77): view frustum wireframe --------------------
+    if (auto* cc = sel->getComponent<CameraComponent>()) {
+        const ImU32 ccol =
+            cc->enabled ? IM_COL32(140, 255, 160, 220) : IM_COL32(150, 150, 150, 150);
+        float aspect = w / h;
+        float tanH = std::tan(radians(cc->fovY) * 0.5f);
+        // Drawn as a pyramid from the actor's own position to the far plane,
+        // not a true near-to-far frustum: at nearZ's usual tiny value (0.05),
+        // a separate near-plane rectangle sits imperceptibly close to the
+        // apex, which visually reads as a stray sliver right at the camera
+        // rather than any part of the visible volume worth drawing.
+        float farDraw = std::min(cc->farZ, 8.0f);
+        auto corner = [&](float dist, float sx, float sy) {
+            float hh = tanH * dist;
+            float hw = hh * aspect;
+            return o + fwd * dist + right * (sx * hw) + up * (sy * hh);
+        };
+        Vec3 f0 = corner(farDraw, -1, -1), f1 = corner(farDraw, 1, -1),
+             f2 = corner(farDraw, 1, 1), f3 = corner(farDraw, -1, 1);
+        line(f0, f1, ccol); line(f1, f2, ccol); line(f2, f3, ccol); line(f3, f0, ccol);
+        line(o, f0, ccol); line(o, f1, ccol); line(o, f2, ccol); line(o, f3, ccol);
     }
 }
 
@@ -1714,6 +1821,21 @@ void EditorApp::setPlaying(bool playing) {
     }
 }
 
+void EditorApp::activateCamera(CameraComponent& cam) {
+    for (const auto& child : scene_.root().children())
+        disableOtherCameras(*child, &cam);
+    cam.enabled = true;
+}
+
+void EditorApp::deactivateCamera(CameraComponent& cam) {
+    cam.enabled = false;
+    for (const auto& child : scene_.root().children())
+        if (CameraComponent* next = findCamera(*child, /*requireEnabled=*/false, &cam)) {
+            next->enabled = true;
+            return;
+        }
+}
+
 Actor* EditorApp::spawn(const char* kind, Actor* parent) {
     std::unique_ptr<Actor> a;
     std::string k = kind;
@@ -1726,12 +1848,23 @@ Actor* EditorApp::spawn(const char* kind, Actor* parent) {
         a = std::make_unique<SpriteActor>("Sprite");
     } else if (k == "ui") {
         a = std::make_unique<UIControlActor>("UI Control");
+    } else if (k == "camera") {
+        a = std::make_unique<Actor3D>("Camera");
+        a->addComponent(std::make_unique<CameraComponent>());
+    } else if (k == "fog") {
+        a = std::make_unique<Actor3D>("Fog");
+        a->addComponent(std::make_unique<FogComponent>());
+    } else if (k == "volumetricfog") {
+        a = std::make_unique<Actor3D>("Volumetric Fog");
+        a->addComponent(std::make_unique<VolumetricFogComponent>());
     } else {
         a = std::make_unique<Actor>("Actor");
     }
 
     std::string name = a->name();
     Actor* added = scene_.add(std::move(a), parent);
+    if (auto* cc = added->getComponent<CameraComponent>())
+        activateCamera(*cc); // task 77: a newly added camera becomes the active one
     CR_LOG("scene", "Spawned " + name + (parent ? " under '" + parent->name() + "'" : ""));
     return added;
 }

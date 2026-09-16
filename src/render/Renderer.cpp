@@ -1111,6 +1111,13 @@ void Renderer::drawVolumeFogs(const Mat4& viewProj, const Vec3& cameraPos, float
 
 void* Renderer::render(Scene& scene, const OrbitCamera& cam, int width, int height,
                        const Options& opt) {
+    float aspect = height > 0 ? float(width) / float(height) : 1.0f;
+    return render(scene, cam.view(), cam.proj(aspect), cam.eye(), cam.nearZ, cam.farZ, width,
+                 height, opt);
+}
+
+void* Renderer::render(Scene& scene, const Mat4& view, const Mat4& proj, const Vec3& eye,
+                       float nearZ, float farZ, int width, int height, const Options& opt) {
     if (!ready() || !ensureTargets(width, height))
         return nullptr;
 
@@ -1175,11 +1182,10 @@ void* Renderer::render(Scene& scene, const OrbitCamera& cam, int width, int heig
     if (shadowActive_)
         ctx_->PSSetShaderResources(1, 1, &shadowSrv_);
 
-    float aspect = height > 0 ? float(width) / float(height) : 1.0f;
-    Mat4 viewProj = cam.view() * cam.proj(aspect);
+    Mat4 viewProj = view * proj;
     for (const auto& child : scene.root().children())
         drawActor(*child, viewProj, resolved, /*shadowPass=*/false);
-    drawVolumeFogs(viewProj, cam.eye(), cam.nearZ, cam.farZ, resolved);
+    drawVolumeFogs(viewProj, eye, nearZ, farZ, resolved);
 
     // Unbind so the colour SRV (and shadow SRV) can be re-bound next frame.
     ID3D11RenderTargetView* nullRtv = nullptr;

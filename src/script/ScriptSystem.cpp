@@ -47,6 +47,16 @@ ScriptSystem::ScriptSystem() {
                 auto o = std::make_shared<ScriptObject>();
                 o->builtin = "Fog";
                 o->nativePtr = fc;
+                o->owner = a;
+                return o;
+            }
+        }
+        if (typeName == "Camera") {
+            if (auto* cc = a->getComponent<CameraComponent>()) {
+                auto o = std::make_shared<ScriptObject>();
+                o->builtin = "Camera";
+                o->nativePtr = cc;
+                o->owner = a;
                 return o;
             }
         }
@@ -428,6 +438,9 @@ void ScriptSystem::rebuildTypeDocs() {
     // get_component(type_of(Fog)). Listed so its members show up in
     // completions once you're chained off that call.
     add("Fog", "", false, {"color", "start", "end", "height_range"});
+    // "Camera" is also reachable as a bare global for Camera.main (task 77):
+    // the scene's one active camera, readable and assignable to switch it.
+    add("Camera", "", false, {"main", "fov", "near", "far", "active"});
 
     for (const auto& [name, ci] : types_) {
         std::vector<std::string> members;
@@ -444,7 +457,8 @@ std::vector<std::string> ScriptSystem::completions(const std::string& prefix) co
                                      "switch", "case",   "default", "do",     "do_async", "true",
                                      "false",  "null",   "static", "abstract", "this",  "base",
                                      "break",  "continue"};
-    static const char* globals[] = {"print", "type_of", "Vector2", "Vector3", "transform", "actor"};
+    static const char* globals[] = {"print", "type_of", "Vector2", "Vector3",
+                                    "transform", "actor", "Camera"};
 
     std::vector<std::string> out;
     auto consider = [&](const std::string& s) {
