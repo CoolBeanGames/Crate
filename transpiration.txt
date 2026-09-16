@@ -652,6 +652,327 @@ sign-off).
     Script Editor is editable again and the scene reverts via the existing
     playBackup_ mechanism exactly as before this feature existed.
 
+===========================================================================
+PHASE 9 -- FULL LANGUAGE PARITY (added after the user reviewed Phases 0-8
+and confirmed: "this task is not done until it is literally 1:1 parity
+with the interpreted version... references, drag and drop, input,
+globals, get_component, everything" -- with an explicit follow-up
+reminder "dont forget signals". Phases 0-8 shipped a WORKING but
+DELIBERATELY SCOPED-DOWN compiler (see CodeGen.h's own doc comment and
+every "(Phase 5)"-tagged refusal message throughout CodeGen.cpp) --
+get_component, this.base, signals, static classes, and general cross-
+object member/method access were all explicitly refused, not silently
+broken. Phase 9 removes every one of those refusals for real. This is
+comparable in size to ALL of Phases 2-7 combined -- treat it with the
+same per-sub-phase rigor (plan, implement, test exhaustively, build real
+DLLs, verify in the live editor, commit, push) rather than rushing.
+===========================================================================
+
+STARTING-POINT BUG FOUND DURING THE AUDIT (fix as part of 9a, not a
+separate task): re-reading Interpreter.cpp's evalMember/evalCall in full
+to build this phase's gap list surfaced a real, PRE-EXISTING bug in the
+INTERPRETER itself, unrelated to native compilation: ScriptSystem.cpp's
+`ctx_.getComponent` lambda only ever does
+`dynamic_cast<ScriptComponent*>(c.get())` when scanning an Actor's
+components for get_component() -- it has NO CASE for
+`NativeScriptComponent*` at all. Once ANY component on an Actor is
+native-backed (post-Phase-7, this happens the instant Play starts and a
+namespace is loaded), `get_component()` silently fails to find it, from
+BOTH interpreted AND native calling code. Confirmed via direct code
+reading (Value.h/ScriptSystem.cpp), not assumed. Must be fixed here
+regardless of anything else in this phase.
+
+THE UNIFYING DESIGN (read this before touching any code -- almost every
+sub-phase below reuses the SAME core mechanism)
+-----------------------------------------------------------------------
+Add `const CompiledClassInfo* compiledInfo = nullptr;` to ScriptObject
+(Value.h), alongside its existing `nativePtr`. This generalizes the
+EXISTING "live view onto a native pointer" pattern (today used only for
+Fog/Camera BuiltinComponents, matched purely by `builtin` string) to also
+cover a native COMPILED SCRIPT instance: when `nativePtr` AND
+`compiledInfo` are both set, field/method access goes through
+`compiledInfo`'s FieldAccessor/MethodAccessor/overflow tables (Phase 5)
+instead of the `fields` map. A ScriptObject is now exactly one of FOUR
+kinds, symmetric and uniform:
+  1. `cls != nullptr`                          -> interpreted script instance (fields map)
+  2. `nativePtr != nullptr, compiledInfo == nullptr, builtin != ""` -> BuiltinComponent live view (Fog/Camera, existing)
+  3. `nativePtr != nullptr, compiledInfo != nullptr` -> compiled script instance live view (NEW)
+  4. none of the above, `builtin != ""`, cls==nullptr, nativePtr==nullptr -> a plain aggregate (Vector2/Vector3, InputButton -- existing)
+
+New shared free functions (crate_script_runtime -- see below for why
+Interpreter.cpp itself moves into crate_script_runtime to make this
+possible) dispatch generically over all four kinds:
+  Value getObjectMember(const std::shared_ptr<ScriptObject>& obj, const std::string& name, int line);
+  bool trySetObjectMember(const std::shared_ptr<ScriptObject>& obj, const std::string& name, const Value& v);
+  Value callObjectMethod(ScriptContext* ctx, const std::shared_ptr<ScriptObject>& obj, const std::string& method, std::vector<Value> args, int line);
+Kind 1 (interpreted) routes through a REAL `Interpreter(ctx, obj)` --
+which is why Interpreter.cpp needs to become buildable inside a script
+DLL too (confirmed clean: it only ever touches engine state through
+`ctx_`, exactly like Runtime.cpp already does -- no singleton access,
+verified by re-reading its full #include list). Kind 2/3 route through
+the reflection table (compiledInfo) or the existing getNativeField/
+setNativeField Fog/Camera table. This ONE mechanism is what makes
+get_component's result usable (call/read on whatever it returns,
+regardless of whether the target happens to be interpreted or compiled),
+what makes a Callable/signal invokable regardless of its bound target's
+kind, and what makes this.base.method() safe (see 9f).
+
+Interpreter.cpp's OWN evalMember/evalCall/assign get a small, surgical
+extension: everywhere they currently only handle `obj.obj->cls` (an
+interpreted target) for a general object reference, ALSO try the new
+compiledInfo path via the shared helpers above. This is not a new
+capability for the INTERPRETER conceptually (it already treats
+nativePtr-backed Fog/Camera specially) -- it's closing the exact gap the
+starting-point bug describes, generalized to any compiled class, not
+just Fog/Camera.
+
+SUB-PHASES (do in this order -- each has its own build+test+commit+push,
+matching every earlier phase's discipline)
+-----------------------------------------------------------------------
+
+9a. FOUNDATION: generalized cross-object dispatch.
+    - Value.h: add ScriptObject::compiledInfo.
+    - CMakeLists.txt: add src/script/Interpreter.cpp to the
+      crate_script_runtime target (it can already build standalone --
+      verify by re-checking its #includes: core/Math.h, script/Runtime.h,
+      scene/Actor.h, scene/BuiltinComponents.h, none of which touch
+      Console::get()/ComponentRegistry::get()/ScriptSystem::get()/
+      AssetDatabase::get()). Remove it from crate_core's OWN source list
+      the same way Value.cpp/Runtime.cpp/Actor.cpp were moved in Phase 0
+      (crate_core still gets it transitively via crate_script_runtime).
+    - New src/script/ObjectDispatch.h/.cpp (crate_script_runtime):
+      getObjectMember/trySetObjectMember/callObjectMethod as designed
+      above.
+    - ScriptSystem.cpp: fix ctx_.getComponent to ALSO
+      `dynamic_cast<NativeScriptComponent*>` each component, returning a
+      compiledInfo-backed live view (nativePtr = the native instance
+      pointer NativeScriptComponent owns, compiledInfo = its
+      CompiledClassInfo*, owner = a) when found. Needs a small accessor
+      added to NativeScriptComponent (e.g. `void* nativeInstance() const`
+      + `const CompiledClassInfo* compiledInfo() const`) since ctx_ lives
+      in ScriptSystem, which doesn't currently reach into
+      NativeScriptComponent's private state.
+    - Interpreter.cpp: extend evalMember (member read on a general Object
+      with `obj.obj->cls == nullptr && obj.obj->compiledInfo`) and
+      evalCall's general-object-method-call branch, and assign(), to
+      route through the new ObjectDispatch helpers instead of only
+      handling `obj.obj->cls`.
+    - Tests: this phase is UNIT-TESTABLE in isolation (no CodeGen changes
+      yet) -- write a dedicated tests/object_dispatch_tests.cpp
+      exercising getObjectMember/trySetObjectMember/callObjectMethod
+      directly against all four ScriptObject kinds, PLUS a regression
+      test proving the starting-point bug is fixed: an Actor with a
+      NativeScriptComponent attached, get_component() from an
+      INTERPRETED script on ANOTHER actor finds it and can read/write a
+      field and call a method on it.
+
+9b. get_component + type_of(AnyClass) + general cross-object access, in
+    CodeGen.
+    - CodeGen.cpp: accept `type_of(SomeScriptClassName)` for ANY class
+      name currently known to ScriptSystem::types() at codegen time (not
+      just the current class / the fixed builtin list) -- generateClass()
+      needs read access to the full type table, not just its own
+      ClassDecl, so its call site (ScriptBuild::buildNamespace) must pass
+      the known-class-name set in.
+    - CodeGen.cpp: implement get_component(...) / this.get_component(...)
+      / actor.get_component(...) by emitting a call to
+      `ctx_->getComponent(ownerActorPtr, typeNameString)`, wrapping the
+      result Value::Obj(...) exactly like the interpreter's own
+      evalCall's get_component branches.
+    - CodeGen.cpp: replace the blanket "method/member not supported yet
+      on a general expression" refusals with real calls into
+      crate::script::callObjectMethod / getObjectMember /
+      trySetObjectMember (9a) for any receiver that isn't one of the
+      already-special-cased forms (this.field, transform/actor, Math/
+      Input, array .length/.add/.str()).
+    - Tests: extend codegen_tests.cpp with new must-compile scenarios
+      (get_component + calling a method on the result, reading a field on
+      a get_component result, type_of on another known class). New
+      end-to-end tests (extending native_reflection_tests.cpp's parity
+      pattern) covering all 4 combinations: interpreted caller ->
+      interpreted target, interpreted -> native, native -> interpreted,
+      native -> native, each doing get_component + a method call + a
+      field read/write, asserting identical results across the
+      interpreted-vs-compiled CALLER axis.
+
+9c. Camera.main completeness.
+    - CodeGen.cpp: `Camera.main` read (TypeRef member access, currently
+      unhandled in Gen::expr's Member case) -- emit a call to
+      crate::script::mainCameraFrom(owner_) + wrap as a Camera-builtin
+      nativePtr live view, mirroring Interpreter::evalMember's TypeRef
+      "Camera"+"main" branch exactly.
+    - CodeGen.cpp: `Camera.main = someCamera;` assignment -- mirror
+      Interpreter::assign's TypeRef "Camera"+"main" branch (calls
+      activateMainCamera).
+    - Tests: extend codegen_tests.cpp + a parity test (read Camera.main,
+      switch it, verify both interpreted and compiled scripts see the
+      same active camera afterward).
+
+9d. First-class function references + signals.
+    - CodeGen.cpp: allow a bare own-method name to compile to
+      `Value::Fn(selfView_, name)` instead of refusing it (a NEW
+      `selfView_` member every generated class gets: a
+      compiledInfo-backed ScriptObject constructed once, pointing at
+      `this`/`compiledInfo_for_this_class`/`owner_` -- the SAME shape
+      get_component would hand back for this instance from the OUTSIDE,
+      just held internally so `this` can hand out valid Callables/
+      SignalRefs about itself).
+    - CodeGen.cpp: `signal foo();` declarations -- generated class gets
+      `std::unordered_map<std::string, std::vector<Value>> connections_;`
+      directly (mirrors ScriptObject::connections) -- but for `this.foo`
+      to produce a `Value::SignalRef` pointing at something with THAT
+      connections map, route it through `selfView_` too, i.e. make
+      `selfView_` the canonical thing signal/callable Values reference,
+      and give ScriptObject a way to reach the RIGHT connections map for
+      a compiledInfo-backed live view (either: (a) compiledInfo grows a
+      `connections(void*) -> unordered_map<string,vector<Value>>&`
+      accessor function pointer, mirroring the `overflow` accessor
+      exactly, OR (b) simpler -- since `selfView_` is a REAL
+      heap-allocated ScriptObject already, just let IT own the
+      connections map directly (ScriptObject::connections already
+      exists) and have signalCall/emitSignal use THAT unmodified --
+      prefer (b), it reuses Interpreter.cpp's EXISTING signalCall/
+      emitSignal/invokeCallable logic verbatim with zero changes, since
+      those already just operate on `sig.obj->connections`/
+      `fn.wobj.lock()` generically over ANY ScriptObject regardless of
+      what it's a live-view of.
+    - CodeGen.cpp: this.emit_signal(...)/connect(...)/disconnect(...)/
+      is_connected(...)/get_connections(), and the bare emit_signal(...)
+      global form, compiled to call the SAME Interpreter.cpp signal
+      logic (now reachable from a DLL since Interpreter.cpp moved into
+      crate_script_runtime in 9a) via selfView_.
+    - InputButton signals (Input.get_button(name).just_pressed.connect(...)
+      etc.) should work AUTOMATICALLY once bare SignalRef.connect/
+      disconnect/emit/is_connected on an arbitrary Value::T::Signal is
+      supported in codegen, since ctx_->inputButton(...) already returns
+      a plain, kind-4 ScriptObject regardless of caller -- verify this
+      explicitly with a dedicated test, don't just assume it falls out.
+    - Tests: extend do_async-style parity tests with a signals-specific
+      parity suite -- declare+connect+emit+disconnect+is_connected on a
+      native class, an InputButton signal connected from a native script,
+      a Callable passed as a bare function reference and invoked, all
+      compared against the identical interpreted behavior.
+
+9e. Static classes compiled natively.
+    - CodeGen.cpp: remove the "static classes are not supported yet"
+      refusal. A static class's generated type does NOT inherit
+      crate::Component at all (no owner Actor, ever) -- it's a bare
+      class with the SAME field/method/reflection-table shape, but its
+      lifecycle is start()/update(dt)/physicsUpdate(dt) called directly
+      by ScriptSystem's startStatics/tickStatics/physicsStatics, not by
+      Component virtual dispatch through an Actor.
+    - New extern "C" ABI variant for a static class (no `owner` parameter
+      in CreateInstance, since there is none) -- decide the exact export
+      names now and document them (e.g. CreateStatic_<Name>/
+      DestroyStatic_<Name>, distinct from CreateInstance_<Name>, so a
+      class can never be accidentally instantiated the wrong way).
+    - ScriptSystem.cpp's rebuildStatic()/startStatics()/tickStatics()/
+      physicsStatics() need a native-aware path (mirroring
+      NativeClassRegistry's role for Components) -- likely a small
+      NativeStaticRegistry or an extension of NativeClassRegistry.
+    - ctx_.getStatic needs the same compiledInfo-live-view treatment as
+      ctx_.getComponent got in 9a, for a native static's singleton to be
+      reachable via StaticClassName.method()/.field from ANY caller.
+    - Tests: parity tests for a static class's start/update ticking,
+      cross-script access via bare class name from both an interpreted
+      and a native caller.
+
+9f. this.base.method() + real script-to-script inheritance (HARDEST,
+    HIGHEST-RISK sub-phase -- do it LAST, after everything else above is
+    solid, so a real setback here doesn't block already-working parity
+    elsewhere).
+    - CodeGen.cpp: accept ANY other currently-known script class name as
+      a valid `base` (not just Actor/Actor2D/Actor3D), REMOVING that
+      refusal.
+    - CHOSEN APPROACH (per the ALREADY-approved plan's own Phase 3 notes,
+      which flagged this exact fork and named real inheritance as the
+      PRIMARY design, composition-by-name-lookup only as a documented
+      fallback -- re-read that section of this file before starting):
+      REAL C++ inheritance across the DLL boundary when base and derived
+      live in different namespaces. `class Derived_Native : public
+      Base_Native` literally, requiring Derived's namespace to
+      `#include` Base's generated header and link against Base's
+      generation-versioned import library (.lib). WHY real inheritance
+      and not composition: cScript field/method access on `this` compiles
+      to DIRECT C++ member access for performance (`this->field_x`, not a
+      name-indexed lookup) -- under a composition (no-inheritance) model,
+      a base class's method body invoked against an unrelated derived
+      instance's memory would be undefined behavior, since there's no
+      guaranteed layout compatibility. Real inheritance is the only way
+      that stays both fast (direct member access preserved) AND safe.
+    - ScriptBuild.cpp: computeRebuildSet() stops being the identity
+      function -- build the REAL namespace dependency graph (edge A->B if
+      any class in namespace A has ClassInfo::baseClass resolving to a
+      class in namespace B, A != B), take the transitive closure over the
+      dirty set, and topologically sort so buildNamespace() is called for
+      every dependency BEFORE its dependents (a base namespace must exist
+      -- built AND its .lib available -- before a derived namespace's
+      compile step runs). EditorApp::setPlaying() must build namespaces
+      in the returned ORDER, not an unordered set/loop as it does today.
+    - buildNamespace() needs new parameters/logic: for a namespace with
+      cross-namespace base classes, add `-I<baseNamespaceGenDir>` to the
+      cl.exe invocation and the base namespace's `.lib` to the link.exe
+      invocation, and the derived class's generated header must
+      `#include "<BaseNamespace>/<Base>_Native.gen.h"` and declare `class
+      Derived_Native : public crate::script::generated::Base_Native`.
+    - `this.base.method()` then compiles to a literal, direct C++ call:
+      `this->Base_Native::fn_<method>(args)` (or similar direct-base-call
+      syntax) -- genuinely trivial ONCE real inheritance is in place,
+      exactly as fast/simple as the interpreter's own base-chain
+      findFunction() dispatch, just resolved at compile time instead of
+      per-call.
+    - Field initialization order (base fields first, then derived, so
+      derived overrides win -- matching Interpreter::constructFields()
+      exactly) needs care in the generated constructor: call the base
+      class's constructor first (via the C++ member-initializer list),
+      then apply the DERIVED class's own field initializers only for
+      fields it re-declares, exactly mirroring constructFields()'s
+      chain-walk-then-overwrite behavior.
+    - SAME-NAMESPACE inheritance (base and derived in the same DLL) is
+      the easy subset of this -- do it FIRST as a stepping stone before
+      attempting cross-namespace, since it needs none of the
+      ScriptBuild.cpp dependency-graph work, just CodeGen.cpp emitting
+      real inheritance syntax within a single generated .cpp/.gen.h set.
+    - Tests: same-namespace inheritance parity test first (simplest);
+      then cross-namespace (two namespaces, one deriving from the other,
+      exercising ScriptBuild's new dependency-order build); this.base.
+      method() parity; a base-class field override parity test;
+      confirm computeDirtyNamespaces + the new dependency closure
+      correctly rebuilds a DERIVED namespace when only its BASE
+      namespace's source changed (this is the exact scenario Phase 3's
+      "known existing gap" note about the interpreter warned would become
+      a hard crash instead of a benign staleness bug once compiled -- this
+      sub-phase is what actually closes that gap for real).
+    - IF real cross-DLL inheritance proves too fragile in practice
+      (ABI/build issues that can't be resolved with reasonable effort):
+      fall back to the plan's documented alternative (composition +
+      by-name this.base dispatch through NativeClassRegistry, with EVERY
+      field access on `this` within a class that HAS a script base
+      rewritten to go through name-based accessors instead of direct
+      member access, to stay safe under composition) -- but only after a
+      genuine, documented attempt at real inheritance first, and only
+      with a clear note here explaining why the fallback was needed.
+
+GENERAL VERIFICATION BAR FOR EVERY 9x SUB-PHASE (same as every earlier
+phase, restated because this is the highest-value place to check it
+given "everything" is the literal bar the user set):
+  - Full existing test suite (everything through Phase 8, 16+ targets)
+    stays green after every sub-phase.
+  - New parity tests compare INTERPRETED vs COMPILED behavior directly,
+    not just "compiles" or "doesn't crash" -- exact value/field
+    assertions, matching native_reflection_tests.cpp's and
+    do_async_native_tests.cpp's established pattern.
+  - Build via the real toolchain (scripts/build.ps1) and run the real
+    generated DLLs through cl.exe/link.exe -- a feature isn't done until
+    ACTUAL compiled code has been exercised, not just CodeGen's text
+    output inspected.
+  - After 9d (signals) and 9f (inheritance) especially, do a MANUAL pass
+    in the live editor (scripts/ac_ctl.ps1), not just automated tests --
+    Phase 7's relative-path bug proved automated tests alone can miss
+    real-world-only failure modes.
+  - Commit + push after each sub-phase completes and is verified, exactly
+    as every phase before this one did.
+
 VERIFICATION EXPECTED AFTER EVERY PHASE
 -----------------------------------------
 0. Exhaustive coverage per the TESTING MANDATE above: every new function has
@@ -1752,9 +2073,46 @@ entries — this is a running history, not a status snapshot.)
   This closes out the approved 8-phase plan in full.
 
 ===========================================================================
-"TRANSPLATION" -- ALL 8 PHASES COMPLETE. Per the ORIGINAL Zen task card's
-own notes, this implementation work now STOPS here and waits for the
-user's explicit review/approval before being considered done, before the
-Zen card is archived, or before any further/different task begins. Do not
-proceed further autonomously past this point.
+"TRANSPLATION" -- ALL 8 PHASES COMPLETE (as originally planned). Per the
+ORIGINAL Zen task card's own notes, this implementation work stopped here
+and waited for the user's explicit review/approval, per the earlier
+entries above.
+===========================================================================
+
+2026-09-16 — User reviewed and responded: "right this task is not done
+  until it is literally 1:1 parity with the interpreted version, so yes
+  thats the next phase. I want it all working, references, drag and drop,
+  input, globals, get_component, everything" -- followed immediately by
+  "dont forget signals". This directly supersedes the "8 phases complete"
+  closing note above: the task is NOT done. Re-audited Interpreter.cpp in
+  full (fresh read, not from memory) to build a precise, complete gap
+  list against everything CodeGen.cpp currently refuses (every
+  "(Phase 5)"-tagged error message in CodeGen.cpp as of this entry is a
+  stale promise -- Phase 5 shipped narrower than those messages implied;
+  none of them were actually addressed by the Phase 5 that shipped).
+  Found, ALONGSIDE the audit, a real pre-existing bug: ScriptSystem.cpp's
+  ctx_.getComponent never recognizes a NativeScriptComponent (only
+  dynamic_casts to ScriptComponent), so get_component() has been silently
+  broken for any native-backed component since Phase 4/7 shipped -- from
+  BOTH interpreted and native calling code. Designed a unifying mechanism
+  (ScriptObject::compiledInfo, generalizing the existing nativePtr live-
+  view pattern from Fog/Camera-only to also cover compiled script
+  instances; shared getObjectMember/trySetObjectMember/callObjectMethod
+  dispatch functions reused by both the interpreter and generated code;
+  moving Interpreter.cpp itself into crate_script_runtime so generated
+  DLLs can construct real Interpreter instances for the "target happens
+  to be interpreted" case rather than reimplementing dispatch a second
+  time) and wrote the full PHASE 9 plan above (search "PHASE 9 -- FULL
+  LANGUAGE PARITY" earlier in this file) covering, in dependency order:
+  9a) the foundational dispatch mechanism + the getComponent bugfix,
+  9b) get_component + type_of(AnyClass) + general cross-object access in
+  CodeGen, 9c) Camera.main completeness, 9d) first-class function
+  references + signals (explicitly including InputButton signals per the
+  user's reminder), 9e) static classes, 9f) this.base.method() + real
+  cross-DLL script-to-script inheritance (hardest, done last, with a
+  documented composition-based fallback if real inheritance proves too
+  fragile). This is comparable in size to Phases 2-7 combined. Not yet
+  started implementing -- see the PHASE 9 section above for the full
+  design before writing any code, and continue logging progress below,
+  one sub-phase at a time, exactly like every phase before it.
 ===========================================================================
