@@ -1093,3 +1093,142 @@ entries — this is a running history, not a status snapshot.)
   predates the ABI design being finalized in the approved plan. Re-read
   CodeGen.h's own doc comment and the approved plan's Phase 4/5 sections
   before starting.
+
+2026-09-16 — PHASE 4 COMPLETE AND VERIFIED.
+  DESIGN DECISION NOT FULLY SPECIFIED BY THE APPROVED PLAN, RESOLVED HERE
+  (documented since a fresh agent needs the reasoning, not just the
+  result): the plan's Phase 4 ABI text and its ComponentRegistry-
+  integration text are in tension -- CreateInstance_<Class> is specified to
+  take (ScriptContext*, Actor* owner) explicitly, but
+  crate::ComponentRegistry::Entry::make is `std::function<unique_ptr
+  <Component>()>` -- ZERO arguments, no owner available at factory-call
+  time (Actor::addComponent sets Component::actor_ AFTER construction,
+  exactly like ScriptComponent already works around via lazily deferring to
+  actor() on first use rather than taking an owner in its own constructor).
+  Resolution: kept CreateInstance_X's signature taking an explicit owner
+  (matches the plan verbatim, and lets Phase 4's own test drive a native
+  instance directly without any wrapper), and bridged the mismatch with
+  ComponentRegistry via a small private wrapper, `NativeComponentShim`
+  (defined inside NativeClassRegistry.cpp only, not exposed in any header)
+  that defers calling CreateInstance_X until its OWN first start()/update()/
+  physicsUpdate() call -- by which point Component::actor() is valid --
+  mirroring ScriptComponent::ensureObject()'s lazy-build pattern one level
+  up. This is EXPLICITLY a placeholder for Phase 5's real NativeScriptComponent
+  (which the plan itself describes as also owning an interpreter-backed
+  ScriptObject for Inspector-during-Play sync) -- Phase 5 should replace
+  NativeComponentShim outright rather than extend it; nothing outside
+  NativeClassRegistry.cpp depends on its shape.
+  Extended src/script/CodeGen.cpp (Phase 2) so a generated class now:
+    - Inherits `public crate::Component` (previously a bare struct).
+    - Only overrides start()/update(float)/physicsUpdate(float) when the
+      cScript class actually DECLARES that hook (isOwnFunc check at codegen
+      time) -- otherwise Component's own inherited no-op virtual applies,
+      exactly matching ScriptComponent::runHook()'s "missing hook is a
+      silent no-op" behavior. Each emitted override wraps its fn_<hook>()
+      call in try/catch, reporting via the held ScriptContext::warn rather
+      than letting an exception escape into engine frame-loop code -- the
+      same safety property ScriptComponent::runHook()'s try/catch provides,
+      though without runHook()'s persistent "stop calling after first
+      error" latch (that richer UX is left for Phase 5's
+      NativeScriptComponent to add, not required for Phase 4's own scope).
+    - Implements typeName() (returns the original cScript class name, not
+      the "_Native"-suffixed C++ type) and clone() (fresh instance via
+      (ctx_, owner_), matching ScriptComponent::clone()'s existing "does not
+      copy current field values" behavior).
+    - Emits, after the class body, three `extern "C" __declspec(dllexport)`
+      functions per class -- CreateInstance_<OriginalName>,
+      DestroyInstance_<OriginalName>, GetClassInfo_<OriginalName> -- and a
+      file-local `const CompiledClassInfo kClassInfo_<Name>` instance
+      GetClassInfo_X returns a pointer to. Exported symbol names use the
+      ORIGINAL cScript class name (not the "_Native" C++ identifier), since
+      NativeModule/NativeClassRegistry resolve exports by the script class
+      name the rest of the engine already knows a script by.
+  New src/script/CompiledClassInfo.h: intentionally MINIMAL for Phase 4 --
+  only className/baseClassName. Phase 5 extends this struct with field/
+  method accessor tables; safe to do since every script DLL is always
+  rebuilt from the currently-running engine's CodeGen.cpp (ScriptBuild
+  never reuses a DLL built by a different engine build), so there is never
+  a version-skewed struct layout floating around.
+  New src/script/NativeModule.h/.cpp: move-only RAII wrapper around
+  LoadLibraryA/GetProcAddress/FreeLibrary. NativeModule::load(dllPath,
+  classNames) resolves CreateInstance_/DestroyInstance_/GetClassInfo_ for
+  EVERY name in classNames, and only succeeds (ok()==true) if ALL exports
+  for ALL requested classes resolve -- never a partially-resolved module
+  (a load failure immediately FreeLibrarys and returns an empty, ok()==false
+  instance). Destructor FreeLibrary()s.
+  New src/script/NativeClassRegistry.h/.cpp: the Phase 4 ComponentRegistry
+  integration point. loadNamespace(name, dllPath, classNames) loads via
+  NativeModule and, for each resolved class, registers a NativeComponentShim
+  factory into crate::ComponentRegistry with replace=true (so the Add-
+  Component menu / ComponentRegistry::create(name) / everything already
+  calling that keeps working with ZERO changes elsewhere in the codebase,
+  exactly as the plan promised). unloadNamespace()/unloadAll() remove the
+  ComponentRegistry entries and FreeLibrary the module.
+  *** CRITICAL ORDERING HAZARD DISCOVERED AND DOCUMENTED (relevant to Phase
+  7): a native component's vtable and code live INSIDE its DLL. If that
+  DLL is FreeLibrary'd (via NativeClassRegistry::unloadNamespace/unloadAll)
+  WHILE a NativeComponentShim (or, later, a NativeScriptComponent) holding
+  one of its instances is still alive somewhere (e.g. still attached to an
+  Actor in a live Scene), destroying that instance afterward is a
+  use-after-free of unloaded code -- likely a crash, possibly a silent
+  corruption. This is NOT hypothetical: native_module_tests.cpp's own
+  ComponentRegistry-integration sub-test originally would have hit exactly
+  this if the test's Scene (holding the native component) weren't
+  explicitly scoped to be destroyed BEFORE the test's cleanup calls
+  unloadNamespace() -- fixed by wrapping that portion in its own nested `{
+  }` scope block, with an explicit comment explaining why. Phase 7 (Stop
+  handling) MUST tear down every native component (i.e., discard/replace
+  scene_ back to playBackup_, which happens BEFORE any DLL unloading step)
+  before ever calling NativeClassRegistry::unloadAll() / rebuilding a
+  namespace whose DLL is still referenced by a live instance. Do not skip
+  this ordering when implementing Phase 7. ***
+  New test: tests/native_module_tests.cpp -- 20 checks, two halves: (1) the
+  RAW ABI driven directly (NativeModule::load, GetClassInfo correctness,
+  CreateInstance -> repeatedly call update(dt) -> verify the real Actor's
+  transform.rotation.y moved exactly as a Mover-style script would (mirrors
+  script_integration_tests.cpp's existing Mover pattern, since Phase 4 has
+  no generic field-reflection way to check arbitrary field values yet --
+  that's Phase 5) -> DestroyInstance -> NativeModule teardown, confirming no
+  crash at every step; (2) the SAME script driven through
+  NativeClassRegistry::loadNamespace() -> ComponentRegistry::create() ->
+  Actor::addComponent() -> real Scene::startPlay()/tick() loop, verifying
+  BOTH paths produce the identical observable rotation change, then
+  unloadNamespace() removing both the ComponentRegistry entry and the
+  loaded module. Confirmed fully repeatable across 3 consecutive runs.
+  Skips gracefully (not a failure) without a discoverable MSVC toolchain,
+  matching script_build_tests.cpp's convention.
+  Verification performed: `powershell -ExecutionPolicy Bypass -File
+  scripts\build.ps1 Debug` built clean; ran all 14 test executables
+  directly (native_module_tests included) -- all passed, zero regressions,
+  confirmed native_module_tests repeatable across 3 consecutive runs:
+    native_module_tests: ok 20 checks passed
+    script_build_tests: ok 19 / codegen_tests: ok 84 / runtime_tests: ok 287
+    / script_metadata_tests: ok 28 / script_tests: ok 52 / script_bug_tests,
+    script_integration_tests, actor_tests (60), mesh_tests,
+    lighting_bake_tests, asset_db_tests, image_tests (11), fbx_tests: all
+    ok, unchanged.
+  Files touched this phase: src/script/CodeGen.cpp (modified: Component
+  inheritance, lifecycle overrides, extern "C" ABI emission), src/script/
+  CompiledClassInfo.h (new), src/script/NativeModule.h (new), src/script/
+  NativeModule.cpp (new), src/script/NativeClassRegistry.h (new), src/
+  script/NativeClassRegistry.cpp (new), tests/native_module_tests.cpp (new),
+  CMakeLists.txt (modified: NativeModule.cpp/NativeClassRegistry.cpp added
+  to crate_core's sources, new native_module_tests target).
+  NOT YET COMMITTED to git as of writing this entry -- see next action.
+  Next step: git commit Phase 4, then continue to Phase 5 (reflection/
+  accessor table: CompiledClassInfo gains field get/set + method invoke
+  tables; new NativeScriptComponent replaces NativeComponentShim as the
+  thing ComponentRegistry actually constructs, additionally owning an
+  interpreter-backed ScriptObject so drawInspector() -- copy-pasted
+  unmodified from ScriptComponent::drawInspector() -- keeps working during
+  Play; ScriptObject gains a `compiledInfo` pointer alongside its existing
+  nativePtr) since the user has said to keep going without waiting for
+  review between phases. This is explicitly called out in the approved plan
+  as "THE MOST IMPORTANT PHASE for behavior parity" -- budget real care for
+  it, and remember its own test (native_reflection_tests.cpp, running
+  IDENTICAL .cscript source through both the interpreter and the compiled
+  path asserting byte-identical results) is the single strongest
+  correctness guarantee this whole feature has for "everything works
+  exactly as it does now." Also remember Phase 5 needs to replace
+  NativeComponentShim (NativeClassRegistry.cpp, private/anonymous-namespace
+  today) rather than leave two competing wrapper classes around.

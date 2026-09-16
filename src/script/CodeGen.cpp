@@ -904,8 +904,23 @@ CodeGenResult generateClass(const ClassDecl& decl) {
 
     const std::string cls = sanitize(decl.name) + "_Native";
     r.className = cls;
+    // Exported ABI symbol suffix uses the ORIGINAL cScript class name (not
+    // the "_Native"-suffixed C++ type name), since NativeModule/
+    // NativeClassRegistry (Phase 4) resolve exports by the script class
+    // name the rest of the engine already knows it by (e.g. "Mover", not
+    // "Mover_Native").
+    const std::string exportSuffix = sanitize(decl.name);
 
     Gen gen(decl);
+
+    // Only override a lifecycle hook when the cScript class actually
+    // declares it -- otherwise Component's own default no-op virtual
+    // (Component.h: `virtual void start() {}` etc.) is inherited as-is,
+    // exactly mirroring ScriptComponent::runHook()'s "missing hook is a
+    // silent no-op, not an error" behavior.
+    const bool hasStart = gen.isOwnFunc("start");
+    const bool hasUpdate = gen.isOwnFunc("update");
+    const bool hasPhysicsUpdate = gen.isOwnFunc("physics_update");
 
     // ---- header ----
     std::ostringstream h;
@@ -913,12 +928,24 @@ CodeGenResult generateClass(const ClassDecl& decl) {
     h << "#include \"script/Runtime.h\"\n";
     h << "#include \"script/Interpreter.h\"\n";
     h << "#include \"scene/Actor.h\"\n";
+    h << "#include \"scene/Component.h\"\n";
     h << "#include \"core/Math.h\"\n\n";
-    h << "#include <string>\n#include <unordered_map>\n#include <vector>\n\n";
+    h << "#include <memory>\n#include <string>\n#include <unordered_map>\n#include <vector>\n\n";
     h << "namespace crate::script::generated {\n\n";
-    h << "class " << cls << " {\n";
+    h << "class " << cls << " : public crate::Component {\n";
     h << "public:\n";
     h << "    " << cls << "(crate::script::ScriptContext* ctx, crate::Actor* owner);\n\n";
+    h << "    const char* typeName() const override { return " << cppStringLiteral(decl.name)
+      << "; }\n";
+    if (hasStart)
+        h << "    void start() override;\n";
+    if (hasUpdate)
+        h << "    void update(float dt) override;\n";
+    if (hasPhysicsUpdate)
+        h << "    void physicsUpdate(float dt) override;\n";
+    h << "    std::unique_ptr<crate::Component> clone() const override {\n";
+    h << "        return std::make_unique<" << cls << ">(ctx_, owner_);\n";
+    h << "    }\n\n";
     for (const auto& fn : decl.functions)
         h << "    crate::script::Value " << methodName(fn.name)
           << "(std::vector<crate::script::Value> args);\n";
@@ -936,7 +963,8 @@ CodeGenResult generateClass(const ClassDecl& decl) {
 
     // ---- source ----
     std::ostringstream c;
-    c << "#include \"" << cls << ".gen.h\"\n\n";
+    c << "#include \"" << cls << ".gen.h\"\n";
+    c << "#include \"script/CompiledClassInfo.h\"\n\n";
     c << "namespace crate::script::generated {\n\n";
     c << cls << "::" << cls << "(crate::script::ScriptContext* ctx, crate::Actor* owner)\n";
     c << "    : ctx_(ctx), owner_(owner) {\n";
@@ -977,7 +1005,59 @@ CodeGenResult generateClass(const ClassDecl& decl) {
         c << "}\n\n";
     }
 
-    c << "} // namespace crate::script::generated\n";
+    // Lifecycle overrides: each forwards to its own fn_<hook>() and swallows
+    // any RuntimeError/exception (reporting via ctx_->warn) rather than
+    // letting it escape into engine frame-loop code -- mirroring
+    // ScriptComponent::runHook()'s try/catch, which exists specifically so
+    // one broken script can't crash the whole engine. Unlike runHook(), this
+    // does not latch a persistent error state that suppresses future calls
+    // (that richer UX is Phase 5's NativeScriptComponent's job); every frame
+    // gets a fresh attempt.
+    auto emitHook = [&](const char* cppName, const char* scriptMethod, bool hasDt) {
+        c << "void " << cls << "::" << cppName << "(" << (hasDt ? "float dt" : "") << ") {\n";
+        c << "    try {\n";
+        c << "        " << methodName(scriptMethod) << "(std::vector<crate::script::Value>{";
+        if (hasDt)
+            c << "crate::script::Value::Float((double)dt)";
+        c << "});\n";
+        c << "    } catch (const std::exception& ex) {\n";
+        c << "        if (ctx_ && ctx_->warn) ctx_->warn(std::string(" << cppStringLiteral(decl.name)
+          << ") + \".\" + " << cppStringLiteral(scriptMethod) << " + \": \" + ex.what());\n";
+        c << "    }\n";
+        c << "}\n\n";
+    };
+    if (hasStart)
+        emitHook("start", "start", false);
+    if (hasUpdate)
+        emitHook("update", "update", true);
+    if (hasPhysicsUpdate)
+        emitHook("physicsUpdate", "physics_update", true);
+
+    c << "} // namespace crate::script::generated\n\n";
+
+    // ---- extern "C" factory ABI (transpiration.txt Phase 4) ----
+    // Deliberately minimal at the boundary -- no STL types by value, no
+    // exceptions crossing it (constructors/destructors here don't throw in
+    // practice; field-initializer evaluation errors would come from
+    // Runtime::coerce/arith, which don't throw for the plain-value cases
+    // Phase 2 supports in initializers).
+    c << "namespace {\n";
+    c << "const crate::script::CompiledClassInfo kClassInfo_" << exportSuffix << " = {\n";
+    c << "    " << cppStringLiteral(decl.name) << ", \"\"\n";
+    c << "};\n";
+    c << "} // namespace\n\n";
+    c << "extern \"C\" __declspec(dllexport) crate::Component* CreateInstance_" << exportSuffix
+      << "(crate::script::ScriptContext* ctx, crate::Actor* owner) {\n";
+    c << "    return new crate::script::generated::" << cls << "(ctx, owner);\n";
+    c << "}\n\n";
+    c << "extern \"C\" __declspec(dllexport) void DestroyInstance_" << exportSuffix
+      << "(crate::Component* instance) {\n";
+    c << "    delete instance;\n";
+    c << "}\n\n";
+    c << "extern \"C\" __declspec(dllexport) const crate::script::CompiledClassInfo* GetClassInfo_"
+      << exportSuffix << "() {\n";
+    c << "    return &kClassInfo_" << exportSuffix << ";\n";
+    c << "}\n";
     r.source = c.str();
 
     r.ok = true;
