@@ -204,3 +204,9 @@ target_link_libraries(native_reflection_tests PRIVATE crate_core)
 target_compile_definitions(native_reflection_tests PRIVATE
     CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
 add_test(NAME native_reflection_tests COMMAND native_reflection_tests)
+
+add_executable(do_async_native_tests tests/do_async_native_tests.cpp)
+target_link_libraries(do_async_native_tests PRIVATE crate_core)
+target_compile_definitions(do_async_native_tests PRIVATE
+    CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
+add_test(NAME do_async_native_tests COMMAND do_async_native_tests)

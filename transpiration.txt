@@ -1397,3 +1397,176 @@ entries — this is a running history, not a status snapshot.)
   Phase 6 needs to detect which do_async statements are at a function's own
   top level and give ONLY those the real frame-stepped switch-based
   treatment, leaving nested ones exactly as they are now.
+
+2026-09-16 — PHASE 6 COMPLETE AND VERIFIED (do_async codegen).
+  KEY DESIGN FINDING BEFORE WRITING ANY CODE (re-reading Interpreter.cpp
+  carefully, as planned): resumable (frame-stepped) treatment is NOT a
+  property of "this function has a do_async at its own top level" in
+  general -- it is a property of HOW the function was INVOKED.
+  `Interpreter::call()` (ScriptComponent::runHook's entry point) is the
+  ONLY call site that ever passes `resumable=true` into runFunction(); the
+  this.foo()/bare foo() path (callMethodOn -> runFunction with the default
+  resumable=false) NEVER gets frame-stepped treatment, even for a function
+  whose own top-level statements include a do_async -- such a function,
+  reached only via an internal call, runs its do_async as an ordinary
+  synchronous loop, exactly like Phase 2's existing nested-do_async
+  handling. Since Phase 2 already refuses static classes (the only other
+  thing ever invoked "top-level" via Interpreter::call()-equivalent paths,
+  through ScriptSystem::startStatics/tickStatics/physicsStatics) and refuses
+  get_component/this.base/signals (the only ways a Callable/cross-object
+  call could reach a function some OTHER way that might also count as
+  "top-level"), the ONLY functions that can ever be invoked as a hook in
+  Phase 2/6's current scope are exactly {start, update, physics_update} --
+  so CodeGen.cpp's per-function loop now special-cases ONLY those three
+  names (kResumableHooks) to use the new Gen::emitHookBody(), while every
+  other declared function keeps using block() completely unchanged, exactly
+  matching this invocation-path-based distinction rather than a purely
+  syntactic "is there a do_async at this function's own top level" one.
+  TWO REAL BUGS FOUND AND FIXED WHILE DESIGNING THE do_async STATE MACHINE
+  (both PRE-EXISTING in Phase 2's switch/loop codegen, unrelated to
+  do_async specifically, but found by tracing through exactly how a
+  goto-based resumable body would need to interact with break/continue):
+    1. The synchronous-loop codegen (DoWhile / nested DoAsync) placed its
+       1,000,000-iteration guard check AFTER the loop body, matching the
+       ORIGINAL text but NOT actually matching Interpreter::execStmt's
+       real order of operations closely enough: since a native C++
+       `continue;` jumps straight to the loop's condition re-check,
+       skipping any code between the continue and the closing brace, a
+       cscript `continue;` inside such a loop's body was silently
+       SKIPPING the guard-check every single time -- an infinite-loop
+       safety-net bypass. Fixed by moving the guard check to the TOP of
+       the loop body (before user statements), so it unconditionally runs
+       exactly once per iteration attempt regardless of how that iteration
+       ends.
+    2. Interpreter::execStmt's Switch case catches ONLY BreakSignal, never
+       ContinueSignal -- meaning a cscript `continue;` written inside a
+       switch case, when that switch sits inside a loop, must skip PAST
+       the switch entirely and continue the ENCLOSING loop. But Phase 2's
+       switch codegen wraps each switch in its own `do { } while(false)`
+       specifically so a native `break;` inside a case correctly targets
+       just the switch -- and a native C++ `continue;` written inside that
+       SAME do-while ALSO targets it (native continue/break always target
+       the syntactically nearest loop/switch, with no way to "see through"
+       one from the inside) -- so a user's `continue;` inside a switch case
+       was incorrectly only exiting the switch's own do-while(false)
+       wrapper (behaving like a break) instead of actually continuing the
+       real enclosing loop, silently running fewer loop iterations than
+       intended and skipping whatever code came after the switch for that
+       pass. Fixed by replacing ad hoc native break/continue with two
+       explicit FnCtx stacks (breakTargets/continueTargets): every loop
+       (native synchronous OR Phase 6's resumable do_async) pushes onto
+       BOTH, with continue ALWAYS compiling to a `goto` to a label placed
+       at the very end of that loop's own body (reachable through any
+       number of nested switches, since a forward goto out of nested
+       blocks is legal, ordinary C++); a Switch pushes onto breakTargets
+       ONLY (break still native, unchanged, correctly targets the switch),
+       deliberately leaving continueTargets exactly as the nearest
+       enclosing loop already left it, so continue "sees through" any
+       number of intervening switches to whichever loop actually encloses
+       them. This also directly supplied the exact break/continue-
+       targeting primitive Phase 6's own resumable do_async bodies needed
+       (a `goto` to an end-of-body label, with break additionally setting a
+       "broke" flag so the yield logic can tell "aborted, don't yield" from
+       "continued or fell through normally, DO yield" apart) -- the SAME
+       mechanism serves both the bug fix and the new feature.
+  New Gen::emitHookBody() (CodeGen.cpp): if a hook function's body has no
+  TOP-LEVEL DoAsync statement, behaves identically to block() (Phase 2,
+  unchanged). Otherwise emits `int __resumeAt = (asyncResumeFn_ == "<hook>")
+  ? asyncResumeIndex_ : -1;` then `switch (__resumeAt<0 ? 0 : __resumeAt+1)`
+  with case 0 = "start fresh" (also naturally covers "asyncResumeFn_ names a
+  DIFFERENT hook", collapsing to -1) and case (ordinal+1) = that specific
+  top-level do_async's own resume point -- a plain switch/case dispatch is
+  exactly "jump directly into segment N, skipping everything before it" for
+  free, matching Interpreter::runFunction's startStmt computation with no
+  manual jump table needed. Regular statements between do_asyncs need no
+  case label of their own (only do_async statements themselves are ever
+  resume TARGETS) -- each one's case block is simply left open for
+  subsequent code until the next do_async closes it and opens the next
+  case, connected by `[[fallthrough]];` so falling through in the SAME call
+  (cond false, or broke) naturally proceeds into subsequent segments.
+  Each do_async's own case block: `if ((cond).truthy()) { bool __brokeN =
+  false; { <body, break/continue goto a shared end-label> } __doAsyncEndN:;
+  if (!__brokeN) { asyncResumeFn_="<hook>"; asyncResumeIndex_=N; return
+  Value::Null_(); } }` -- exactly reproducing
+  catch(BreakSignal){++asyncOrd;continue;} (broke -> no yield, fall through
+  to next segment) vs. the fall-through/catch(ContinueSignal){} path (yield
+  at this ordinal) distinction. `return` statements anywhere inside a
+  do_async's body are left as ORDINARY native `return`s (no lambda
+  wrapping anywhere in this design, deliberately, specifically to avoid
+  needing an outcome-enum-returning-lambda scheme that would have broken
+  return's normal whole-function-escaping scope) -- they correctly escape
+  the whole function exactly as they already did before Phase 6, matching
+  Interpreter::runFunction's ReturnSignal short-circuiting the entire
+  frame-stepped loop from any nesting depth.
+  Added `asyncResumeFn_`/`asyncResumeIndex_` members to every generated
+  class (public, alongside overflow_), mirroring
+  ScriptObject::asyncResumeFn/asyncResumeIndex exactly -- unused (zero
+  overhead beyond two small members) for any class with no resumable
+  do_async anywhere.
+  New test: tests/do_async_native_tests.cpp -- 82 checks across 8 scenarios,
+  each driving BOTH an interpreted and a compiled instance of the identical
+  script frame-by-frame and asserting field parity throughout (not just at
+  the end): (1) the existing script_tests.cpp do_async case ported verbatim;
+  (2) a do_async nested inside an if runs synchronously to completion in
+  ONE call (not covered by any test before this phase); (3) break inside a
+  top-level do_async aborts without yielding; (4) continue inside a
+  top-level do_async still yields (same as normal completion); (5) two
+  top-level do_asyncs in sequence, proving a resumed call never re-executes
+  ANY earlier segment (including a counter incremented once at the very top
+  of the function, asserted to never increment again across 5 further
+  calls); (6) & (7) direct regression tests for the switch/continue bug
+  above, one with the enclosing loop being an ordinary synchronous loop and
+  one being a top-level resumable do_async, each asserting the exact
+  numeric result that would differ if the bug were still present (sum=12
+  not 15, an "x" not appended when it should be skipped); (8) calling a
+  different hook (start()) while another (update()) is suspended does not
+  clear update()'s resume state, and update() correctly resumes from where
+  it left off afterward. All 8 scenarios passed on the FIRST run (a strong
+  signal the design/invariants were reasoned through correctly beforehand
+  rather than debugged into correctness after the fact); confirmed
+  repeatable across 3 consecutive full runs.
+  Verification performed: `powershell -ExecutionPolicy Bypass -File
+  scripts\build.ps1 Debug` built clean; ran all 16 test executables
+  directly (do_async_native_tests included) -- all passed, zero
+  regressions, confirmed do_async_native_tests repeatable across 3
+  consecutive runs:
+    do_async_native_tests: ok 82 checks passed (8/8 scenarios correct)
+    native_reflection_tests: ok 24 / native_module_tests: ok 20 /
+    script_build_tests: ok 19 / codegen_tests: ok 84 (all existing switch/
+    loop/break/continue scenarios still pass under the restructured
+    targeting logic) / runtime_tests: ok 287 / script_metadata_tests: ok 28
+    / script_tests: ok 52 / script_bug_tests, script_integration_tests,
+    actor_tests (60), mesh_tests, lighting_bake_tests, asset_db_tests,
+    image_tests (11), fbx_tests: all ok, unchanged.
+  Files touched this phase: src/script/CodeGen.cpp (modified: FnCtx gains
+  breakTargets/continueTargets, DoWhile/DoAsync-nested and Switch cases
+  restructured around them plus the guard-check-position fix, new
+  Gen::emitHookBody(), asyncResumeFn_/asyncResumeIndex_ members added to
+  every generated class, per-function loop special-cases the three hook
+  names), tests/do_async_native_tests.cpp (new), CMakeLists.txt (modified:
+  new do_async_native_tests target).
+  NOT YET COMMITTED to git as of writing this entry -- see next action.
+  Next step: continue to Phase 7 (EditorApp::setPlaying() integration:
+  force-save all scripts, compute+build dirty namespaces, abort Play
+  entirely with a Console error on any compile failure, load native
+  modules, block Script Editor saves while Play is running) since the user
+  has said to keep going without waiting for review between phases. Before
+  starting, re-read EditorApp.cpp's current setPlaying() (~line 1922-1948
+  as of Phase 4's notes, though line numbers have likely shifted by now --
+  search for it fresh) and ScriptEditor.h/.cpp's saveCurrent()/saveAll()/
+  pushToSystem(). Remember the exact user-specified flow from the top of
+  this document's DECISIONS section: force-save on Play press, compute
+  dirty namespaces via ScriptBuild::computeRebuildSet(computeDirtyNamespaces
+  (dir), dir), build each via ScriptBuild::buildNamespace(), on ANY failure
+  log via CR_ERROR("script", ...) and leave playing_ == false (Play never
+  visibly starts) rather than partially starting, on success call
+  NativeClassRegistry::get().loadNamespace() for each rebuilt namespace
+  BEFORE proceeding with the existing play-start logic, and give
+  ScriptEditor a playing_ flag that makes saveCurrent()/saveAll()/
+  pushToSystem() no-op while true (with Save button/Ctrl+S visibly
+  disabled). Also remember: on Stop, NativeClassRegistry::get().unloadAll()
+  must run AFTER scene_ has already been replaced by playBackup_ (i.e.
+  after every live native component from the just-ended Play session is
+  already gone), never before -- see the ordering-hazard note from Phase 4
+  and the do_async_native_tests.cpp Harness destructor for a concrete
+  worked example of getting this ordering right.

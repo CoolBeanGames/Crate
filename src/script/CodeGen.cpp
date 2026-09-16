@@ -113,6 +113,38 @@ struct FnCtx {
                 return true;
         return false;
     }
+
+    // Break/Continue targeting. TWO INDEPENDENT stacks, because a Switch and
+    // a loop (native DoWhile/DoAsync-as-synchronous, or a Phase-6 resumable
+    // top-level do_async) behave differently: Interpreter::execStmt's
+    // Switch case catches ONLY BreakSignal, never ContinueSignal (see
+    // Interpreter.cpp) -- so a cscript `continue;` written inside a switch
+    // case must skip PAST the switch entirely and target whatever loop
+    // actually encloses it, while `break;` there terminates just the
+    // switch. Every loop pushes onto BOTH stacks; a Switch pushes onto
+    // breakTargets ONLY, leaving continueTargets exactly as the nearest
+    // enclosing loop left it, so a Continue "sees through" any number of
+    // intervening switches to the real loop.
+    //
+    // Every entry always uses a `goto <label>` (never a bare native
+    // break;/continue;) -- necessary because a native break/continue
+    // targets the SYNTACTICALLY nearest enclosing C++ loop/switch, which
+    // would incorrectly stop at a switch's own do{}while(false) wrapper for
+    // Continue (see transpiration.txt Phase 6's write-up: this was a real,
+    // pre-existing bug in Phase 2's switch-inside-a-loop codegen, found and
+    // fixed here). `brokeFlagVar` is only set (and only checked by the
+    // emitter) for a resumable do_async's own break target, which needs to
+    // distinguish "aborted via break" (skip the yield) from "continue or
+    // fell off the end" (yield) -- native loops leave it empty.
+    struct BreakTarget {
+        std::string gotoLabel;
+        std::string brokeFlagVar; // empty for a native loop's break target
+    };
+    struct ContinueTarget {
+        std::string gotoLabel;
+    };
+    std::vector<BreakTarget> breakTargets;
+    std::vector<ContinueTarget> continueTargets;
 };
 
 class Gen {
@@ -136,6 +168,20 @@ public:
 
     bool stmt(const Stmt& s, FnCtx& fc, std::ostringstream& out, int indent);
     bool block(const std::vector<StmtPtr>& body, FnCtx& fc, std::ostringstream& out, int indent);
+
+    // Emits a hook function's body (Phase 6, do_async codegen). If `body`
+    // has no TOP-LEVEL DoAsync statement, this is identical to block() --
+    // only start()/update()/physicsUpdate() ever call this (see
+    // generateClass()), matching the interpreter's own rule that only a
+    // function invoked via Interpreter::call() (i.e. a hook) gets
+    // resumable=true; every other function (helpers reached via
+    // this.foo()/bare foo()) always uses runFunction's non-resumable path,
+    // so its do_asyncs -- even ones at ITS OWN top level -- are plain
+    // synchronous loops, unchanged from Phase 2's block()/stmt() handling.
+    // `hookMethodName` is the cScript method name ("start"/"update"/
+    // "physics_update"), compared against/stamped onto asyncResumeFn_.
+    bool emitHookBody(const FunctionDecl& fn, FnCtx& fc, const std::string& hookMethodName,
+                      std::ostringstream& out);
 
     std::string freshTemp(const char* base) { return std::string("__") + base + std::to_string(tempCounter_++); }
 
@@ -713,6 +759,129 @@ bool Gen::assignTo(const Expr& target, const std::string& valueExpr, FnCtx& fc, 
     return false;
 }
 
+bool Gen::emitHookBody(const FunctionDecl& fn, FnCtx& fc, const std::string& hookMethodName,
+                       std::ostringstream& out) {
+    // Only statements directly in fn.body (the function's OWN top level)
+    // count -- a do_async nested inside an if/while/switch/another
+    // do_async is found by the recursive block()/stmt() walk below just
+    // like Phase 2 always compiled it (an ordinary synchronous loop), NOT
+    // by this scan, exactly matching Interpreter::runFunction's own
+    // top-level-only scan of fn.body.
+    std::vector<size_t> asyncIdx;
+    for (size_t k = 0; k < fn.body.size(); ++k)
+        if (fn.body[k]->kind == StmtKind::DoAsync)
+            asyncIdx.push_back(k);
+
+    if (asyncIdx.empty())
+        return block(fn.body, fc, out, 1); // Phase 2 behavior, unchanged
+
+    // switch(resumeAt<0 ? 0 : resumeAt+1): case 0 is "start fresh" (also
+    // reached if asyncResumeFn_ names a DIFFERENT hook, or no do_async
+    // statement exists at that ordinal anymore -- both collapse to
+    // resumeAt=-1); case (ordinal+1) is that do_async's own resume point.
+    // A switch (rather than an if/else-if chain or nested gotos) is the
+    // natural fit here because "jump directly into the Nth segment,
+    // skipping everything before it" is EXACTLY what switch/case dispatch
+    // already does -- no manual jump table needed.
+    const std::string resumeAtVar = freshTemp("resumeAt");
+    out << ind(1) << "int " << resumeAtVar << " = (asyncResumeFn_ == "
+        << cppStringLiteral(hookMethodName) << ") ? asyncResumeIndex_ : -1;\n";
+    out << ind(1) << "switch (" << resumeAtVar << " < 0 ? 0 : " << resumeAtVar << " + 1) {\n";
+
+    fc.push(); // one shared scope for the whole function body, matching how
+              // block(fn.body, fc, out, 1) would have pushed exactly once
+              // for the same statement list in the no-do_async case above.
+    out << ind(1) << "case 0: {\n";
+    bool ok = true;
+    size_t ord = 0;
+    for (size_t k = 0; k < fn.body.size(); ++k) {
+        const Stmt& s = *fn.body[k];
+        if (s.kind != StmtKind::DoAsync) {
+            if (!stmt(s, fc, out, 1)) {
+                ok = false;
+                break;
+            }
+            continue;
+        }
+
+        // --- a TOP-LEVEL do_async: emit its resume-point case ----------
+        std::string condExpr = expr(*s.cond, fc);
+        if (!this->ok()) {
+            ok = false;
+            break;
+        }
+        out << ind(1) << "}\n"; // close the previous (still-open) case
+        out << ind(1) << "[[fallthrough]];\n";
+        out << ind(1) << "case " << (ord + 1) << ": {\n"; // this do_async's own resume point
+
+        std::string brokeVar = freshTemp("broke");
+        std::string endLabel = freshTemp("doAsyncEnd");
+        out << ind(2) << "if ((" << condExpr << ").truthy()) {\n";
+        out << ind(3) << "bool " << brokeVar << " = false;\n";
+        out << ind(3) << "{\n";
+        // Inside this body, Break sets brokeVar and jumps to endLabel
+        // (aborting the do_async -- proceed to the NEXT segment in the
+        // SAME call, no yield); Continue jumps to endLabel WITHOUT setting
+        // it (ends this one-shot iteration exactly like falling off the
+        // end of the body does -- both cases below just yield), precisely
+        // matching Interpreter::runFunction's own
+        // catch(BreakSignal){++asyncOrd;continue;} vs.
+        // catch(ContinueSignal){} (falls through to the SAME yield code)
+        // distinction.
+        fc.breakTargets.push_back({endLabel, brokeVar});
+        fc.continueTargets.push_back({endLabel});
+        bool bodyOk = block(s.body, fc, out, 4);
+        fc.continueTargets.pop_back();
+        fc.breakTargets.pop_back();
+        if (!bodyOk) {
+            ok = false;
+            break;
+        }
+        out << ind(3) << "}\n";
+        out << ind(3) << endLabel << ":;\n";
+        out << ind(3) << "if (!" << brokeVar << ") {\n";
+        out << ind(4) << "asyncResumeFn_ = " << cppStringLiteral(hookMethodName) << ";\n";
+        out << ind(4) << "asyncResumeIndex_ = " << ord << ";\n";
+        out << ind(4) << "return crate::script::Value::Null_();\n";
+        out << ind(3) << "}\n";
+        // broke, OR cond was false to begin with -- fall through (still
+        // inside this same case block) to whatever comes after this
+        // do_async in the source, exactly like Interpreter::runFunction's
+        // `++asyncOrd;` cond-false path and its BreakSignal-caught
+        // `++asyncOrd; continue;` path both proceed to the next fn.body
+        // index within the SAME call.
+        out << ind(2) << "}\n";
+
+        ++ord;
+        // Leave this case's brace OPEN: subsequent regular statements
+        // (the segment between this do_async and the next one, or the end
+        // of the function) belong inside it, exactly as analyzed in
+        // transpiration.txt -- only do_async statements themselves need
+        // their own case label; the code between them does not.
+    }
+    out << ind(1) << "}\n"; // close whichever case was left open
+    fc.pop();
+    out << ind(1) << "}\n"; // close switch
+    if (!ok)
+        return false;
+
+    // Not yielded (we fell all the way through, or the function returned
+    // earlier via a plain `return` statement -- native return already
+    // exits before reaching this point, exactly matching
+    // Interpreter::runFunction's ReturnSignal short-circuiting the whole
+    // frame-stepped loop): if THIS hook's name is still the resume target,
+    // clear it -- mirrors Interpreter::call()'s
+    // `else if (self_->asyncResumeFn == method) { clear(); }` (never
+    // touches a DIFFERENT hook's suspension, matching the documented
+    // single-resume-slot-per-object, whichever-hook-yielded-last-wins
+    // behavior).
+    out << ind(1) << "if (asyncResumeFn_ == " << cppStringLiteral(hookMethodName) << ") {\n";
+    out << ind(2) << "asyncResumeFn_.clear();\n";
+    out << ind(2) << "asyncResumeIndex_ = 0;\n";
+    out << ind(1) << "}\n";
+    return true;
+}
+
 bool Gen::block(const std::vector<StmtPtr>& body, FnCtx& fc, std::ostringstream& out, int indent) {
     fc.push();
     for (const auto& s : body) {
@@ -784,18 +953,49 @@ bool Gen::stmt(const Stmt& s, FnCtx& fc, std::ostringstream& out, int indent) {
             // iteration, i.e. a while-loop, not a true do-while). Top-level
             // do_async frame-stepped resumption is Phase 6.
             std::string guard = freshTemp("guard");
+            std::string contLabel = freshTemp("loopContinue");
             out << ind(indent) << "{\n";
             out << ind(indent + 1) << "int " << guard << " = 0;\n";
             std::string c = expr(*s.cond, fc);
             if (!ok())
                 return false;
             out << ind(indent + 1) << "while ((" << c << ").truthy()) {\n";
-            if (!block(s.body, fc, out, indent + 2))
-                return false;
+            // Guard check FIRST, at the top of every iteration -- NOT after
+            // the body -- so it always runs exactly once per iteration
+            // regardless of whether the body falls off the end normally or
+            // takes an early `goto` via a Continue statement (a native
+            // `continue;`/post-body guard-check would be silently SKIPPED
+            // by such a goto, since it jumps straight to contLabel: below,
+            // bypassing any code between the goto and the label -- this
+            // ordering was specifically chosen to avoid that, matching
+            // Interpreter.cpp's own runFunction/execStmt guard placement,
+            // which likewise counts every iteration attempt exactly once).
             out << ind(indent + 2) << "if (++" << guard << " > 1000000)\n";
             out << ind(indent + 3)
                 << "throw crate::script::RuntimeError(\"loop exceeded 1,000,000 iterations\", "
                 << s.line << ");\n";
+            // break; targets this loop natively (a Switch nested inside
+            // catches break itself, per Interpreter::execStmt's Switch
+            // case, so break "through" a switch already works via C++'s
+            // own nearest-enclosing-construct rule -- no goto needed here).
+            // continue; CANNOT be native: if a Switch is nested inside this
+            // loop's body, a native `continue;` written inside the switch's
+            // own do{}while(false) wrapper would target THAT wrapper
+            // instead of this loop (Switch does not catch ContinueSignal in
+            // the interpreter, so continue must skip past it) -- so every
+            // Continue always `goto`s contLabel, placed at the very end of
+            // this loop's body, which is textually reachable from anywhere
+            // inside it (including through any number of nested switches)
+            // and falls straight through to the closing brace = the same
+            // place a native continue; would have landed.
+            fc.breakTargets.push_back({"", ""});
+            fc.continueTargets.push_back({contLabel});
+            bool okBody = block(s.body, fc, out, indent + 2);
+            fc.continueTargets.pop_back();
+            fc.breakTargets.pop_back();
+            if (!okBody)
+                return false;
+            out << ind(indent + 2) << contLabel << ":;\n";
             // The `while (...)` header's condition text is embedded once,
             // above; C++ itself re-evaluates that expression before every
             // iteration, matching execStmt's own re-`eval(*s.cond)` per pass
@@ -829,42 +1029,80 @@ bool Gen::stmt(const Stmt& s, FnCtx& fc, std::ostringstream& out, int indent) {
             std::string subjVar = freshTemp("subj");
             out << ind(indent) << "do {\n";
             out << ind(indent + 1) << "crate::script::Value " << subjVar << " = (" << subj << ");\n";
+            // A cscript `break;` inside any case body below must target
+            // THIS switch (native, matching Interpreter::execStmt's Switch
+            // case, which catches BreakSignal itself) even if an
+            // ENCLOSING do_async would otherwise want it to `goto` its own
+            // end label -- push a native marker so Break's emission sees
+            // this switch, not whatever's further out. continueTargets is
+            // deliberately left untouched (see the big comment on
+            // FnCtx::continueTargets / the DoWhile/DoAsync case above): a
+            // `continue;` here must skip past this switch to whatever loop
+            // actually encloses it.
+            fc.breakTargets.push_back({"", ""});
+            bool caseOk = true;
             for (const auto& c : s.cases) {
                 if (!c.value) {
                     // default: always matches once control reaches it (i.e.
                     // nothing earlier in source order already matched and
                     // broken out) -- no condition, no temp needed.
                     out << ind(indent + 1) << "{\n";
-                    if (!block(c.body, fc, out, indent + 2))
-                        return false;
+                    if (!block(c.body, fc, out, indent + 2)) {
+                        caseOk = false;
+                        break;
+                    }
                     out << ind(indent + 2) << "break;\n";
                     out << ind(indent + 1) << "}\n";
                     continue;
                 }
                 std::string cv = expr(*c.value, fc);
-                if (!ok())
-                    return false;
+                if (!ok()) {
+                    caseOk = false;
+                    break;
+                }
                 std::string cvVar = freshTemp("case");
                 out << ind(indent + 1) << "{\n";
                 out << ind(indent + 2) << "crate::script::Value " << cvVar << " = (" << cv << ");\n";
                 out << ind(indent + 2) << "if ((" << cvVar << ".str() == " << subjVar
                     << ".str()) || (" << cvVar << ".isNumeric() && " << subjVar
                     << ".isNumeric() && " << cvVar << ".num() == " << subjVar << ".num())) {\n";
-                if (!block(c.body, fc, out, indent + 3))
-                    return false;
+                if (!block(c.body, fc, out, indent + 3)) {
+                    caseOk = false;
+                    break;
+                }
                 out << ind(indent + 3) << "break;\n";
                 out << ind(indent + 2) << "}\n";
                 out << ind(indent + 1) << "}\n";
             }
+            fc.breakTargets.pop_back();
+            if (!caseOk)
+                return false;
             out << ind(indent) << "} while (false);\n";
             return true;
         }
-        case StmtKind::Break:
-            out << ind(indent) << "break;\n";
+        case StmtKind::Break: {
+            if (fc.breakTargets.empty()) {
+                fail("'break' outside of any loop", s.line);
+                return false;
+            }
+            const auto& t = fc.breakTargets.back();
+            if (t.gotoLabel.empty()) {
+                out << ind(indent) << "break;\n";
+            } else {
+                if (!t.brokeFlagVar.empty())
+                    out << ind(indent) << t.brokeFlagVar << " = true;\n";
+                out << ind(indent) << "goto " << t.gotoLabel << ";\n";
+            }
             return true;
-        case StmtKind::Continue:
-            out << ind(indent) << "continue;\n";
+        }
+        case StmtKind::Continue: {
+            if (fc.continueTargets.empty()) {
+                fail("'continue' outside of any loop", s.line);
+                return false;
+            }
+            out << ind(indent) << "goto " << fc.continueTargets.back().gotoLabel << ";\n";
             return true;
+        }
     }
     fail("unsupported statement", s.line);
     return false;
@@ -953,7 +1191,12 @@ CodeGenResult generateClass(const ClassDecl& decl) {
     for (const auto& f : decl.fields)
         h << "    crate::script::Value " << fieldMember(f.name) << ";\n";
     h << "    // Undeclared-field auto-vivification (mirrors Interpreter::lvalue()).\n";
-    h << "    std::unordered_map<std::string, crate::script::Value> overflow_;\n\n";
+    h << "    std::unordered_map<std::string, crate::script::Value> overflow_;\n";
+    h << "    // do_async frame-stepped resumption state (Phase 6), mirrors\n";
+    h << "    // crate::script::ScriptObject::asyncResumeFn/asyncResumeIndex: which\n";
+    h << "    // top-level do_async of which hook is currently paused, if any.\n";
+    h << "    std::string asyncResumeFn_;\n";
+    h << "    int asyncResumeIndex_ = 0;\n\n";
     h << "private:\n";
     h << "    crate::script::ScriptContext* ctx_;\n";
     h << "    crate::Actor* owner_;\n";
@@ -983,6 +1226,16 @@ CodeGenResult generateClass(const ClassDecl& decl) {
     }
     c << "}\n\n";
 
+    // Only start/update/physics_update ever get resumable (frame-stepped)
+    // do_async treatment -- exactly matching Interpreter::call()'s own
+    // restriction, since that is the ONLY entry point that sets
+    // resumable=true when invoking runFunction(); every other function
+    // (reached via this.foo()/bare foo(), never a hook) always goes
+    // through callMethodOn's non-resumable runFunction() call, so its
+    // do_asyncs -- even ones at ITS OWN top level -- are plain synchronous
+    // loops via block()/stmt(), completely unaffected by Phase 6.
+    static const std::unordered_set<std::string> kResumableHooks = {"start", "update",
+                                                                     "physics_update"};
     for (const auto& fn : decl.functions) {
         c << "crate::script::Value " << cls << "::" << methodName(fn.name)
           << "(std::vector<crate::script::Value> args) {\n";
@@ -996,7 +1249,10 @@ CodeGenResult generateClass(const ClassDecl& decl) {
             fc.declare(fn.params[i].name);
         }
         std::ostringstream body;
-        if (!gen.block(fn.body, fc, body, 1)) {
+        bool bodyOk = kResumableHooks.count(fn.name)
+                         ? gen.emitHookBody(fn, fc, fn.name, body)
+                         : gen.block(fn.body, fc, body, 1);
+        if (!bodyOk) {
             r.error = gen.error();
             return r;
         }
