@@ -218,6 +218,12 @@ public:
 	Coordinates GetCursorPosition() const { return GetActualCursorCoordinates(); }
 	void SetCursorPosition(const Coordinates& aPosition);
 
+	// Screen-space position just below the cursor's current line, as of the
+	// last Render() call -- for placing something (e.g. an autocomplete
+	// popup) so it doesn't cover the cursor instead of guessing a fixed
+	// offset from the widget's corner.
+	ImVec2 GetCursorScreenPos() const;
+
 	// True if the editor's own child window had focus as of the last Render()
 	// call. Unlike ImGui::IsItemFocused() on the item that follows Render(),
 	// this is accurate for a manually-drawn widget like this one: nothing
@@ -379,6 +385,7 @@ private:
 	bool mColorizerEnabled;
 	float mTextStart;                   // position (in pixels) where a code line starts relative to the left of the TextEditor.
 	int  mLeftMargin;
+	ImVec2 mContentOrigin = ImVec2(0, 0); // screen pos of line 0's start, as of the last Render() (see GetCursorScreenPos)
 	bool mCursorPositionChanged;
 	int mColorRangeMin, mColorRangeMax;
 	SelectionMode mSelectionMode;

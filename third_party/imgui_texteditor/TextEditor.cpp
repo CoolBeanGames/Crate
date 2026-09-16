@@ -877,6 +877,7 @@ void TextEditor::Render()
 	}
 
 	ImVec2 cursorScreenPos = ImGui::GetCursorScreenPos();
+	mContentOrigin = cursorScreenPos; // for GetCursorScreenPos(), read back after Render()
 	auto scrollX = ImGui::GetScrollX();
 	auto scrollY = ImGui::GetScrollY();
 
@@ -2132,6 +2133,16 @@ std::string TextEditor::GetCurrentLineText()const
 	return GetText(
 		Coordinates(mState.mCursorPosition.mLine, 0),
 		Coordinates(mState.mCursorPosition.mLine, lineLength));
+}
+
+ImVec2 TextEditor::GetCursorScreenPos() const
+{
+	int lineNo = mState.mCursorPosition.mLine;
+	float cx = TextDistanceToLineStart(mState.mCursorPosition);
+	// One line below the cursor's own line, not the cursor's own top edge --
+	// callers (e.g. the autocomplete popup) want to sit under the cursor,
+	// not have their top edge flush with it.
+	return ImVec2(mContentOrigin.x + mTextStart + cx, mContentOrigin.y + (lineNo + 1) * mCharAdvance.y);
 }
 
 void TextEditor::ProcessInputs()

@@ -26,6 +26,16 @@ public:
     bool castShadows = true;
     bool receiveShadows = true;
 
+    // Primitive sizing (task 84), independent of the actor's Transform.scale:
+    // a physics collider will need to size itself from these same numbers
+    // later without also inheriting whatever scale the transform is used for
+    // elsewhere. Only the field(s) matching `primitive`'s shape apply; the
+    // renderer picks among them by name (see Renderer::drawActor).
+    float boxSize[3] = {1.0f, 1.0f, 1.0f}; // Cube: full width/height/depth
+    float radius = 0.5f;                    // Sphere/Cylinder/Capsule
+    float height = 1.0f;                    // Cylinder/Capsule
+    float planeSize[2] = {1.0f, 1.0f};      // Plane/Quad: width, depth (or height)
+
     // Baked contribution of static lights (task 59), filled by "Bake Lightmaps".
     // Sampled with an up-facing normal at the object's position - a coarse
     // per-object bake rather than a real per-texel lightmap.

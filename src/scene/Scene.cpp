@@ -173,20 +173,20 @@ Scene Scene::makeSample() {
 
     auto crate = std::make_unique<Actor3D>("Crate");
     crate->transform().position = {0.0f, 0.75f, 0.0f};
-    crate->transform().scale = {1.5f, 1.5f, 1.5f};
     {
         auto mr = std::make_unique<MeshRenderer>();
         mr->primitive = "Cube";
         mr->texturePath = "assets/uv_check.bmp";
+        mr->boxSize[0] = mr->boxSize[1] = mr->boxSize[2] = 1.5f;
         crate->addComponent(std::move(mr));
     }
     s.add(std::move(crate), set);
 
     auto floor = std::make_unique<Actor3D>("Floor");
-    floor->transform().scale = {6.0f, 1.0f, 6.0f};
     {
         auto mr = std::make_unique<MeshRenderer>();
         mr->primitive = "Plane";
+        mr->planeSize[0] = mr->planeSize[1] = 6.0f;
         floor->addComponent(std::move(mr));
     }
     s.add(std::move(floor), set);

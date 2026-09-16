@@ -652,7 +652,26 @@ void Renderer::drawActor(Actor& actor, const Mat4& viewProj, const Options& opt,
         return;
 
     Transform w = actor.worldTransform();
-    Mat4 model = Mat4::scale(w.scale) * Mat4::rotationEuler(w.rotationEuler) *
+    // Primitives are sized from the component's own fields (task 84), not
+    // Transform.scale, so a later physics collider can read the same numbers
+    // without also inheriting whatever the transform's scale is used for
+    // elsewhere. Imported models have no such fields yet and keep using
+    // Transform.scale as before.
+    Vec3 meshScale = w.scale;
+    if (mr->usePrimitive) {
+        const std::string& p = mr->primitive;
+        if (p == "Sphere")
+            meshScale = Vec3{mr->radius * 2.0f, mr->radius * 2.0f, mr->radius * 2.0f};
+        else if (p == "Cylinder" || p == "Capsule")
+            meshScale = Vec3{mr->radius * 2.0f, mr->height, mr->radius * 2.0f};
+        else if (p == "Plane")
+            meshScale = Vec3{mr->planeSize[0], 1.0f, mr->planeSize[1]};
+        else if (p == "Quad")
+            meshScale = Vec3{mr->planeSize[0], mr->planeSize[1], 1.0f};
+        else // Cube
+            meshScale = Vec3{mr->boxSize[0], mr->boxSize[1], mr->boxSize[2]};
+    }
+    Mat4 model = Mat4::scale(meshScale) * Mat4::rotationEuler(w.rotationEuler) *
                  Mat4::translation(w.position);
     Mat4 mvp = model * viewProj;
 

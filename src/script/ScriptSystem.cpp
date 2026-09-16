@@ -441,6 +441,12 @@ void ScriptSystem::rebuildTypeDocs() {
     // "Camera" is also reachable as a bare global for Camera.main (task 77):
     // the scene's one active camera, readable and assignable to switch it.
     add("Camera", "", false, {"main", "fov", "near", "far", "active"});
+    // Global namespace reached as Input.<method>(...), handled directly in
+    // Interpreter::evalCall rather than through get_component -- listed here
+    // purely so its methods show up in autocomplete (task: "Input global
+    // missing from script autocomplete").
+    add("Input", "", false,
+       {"get_button", "get_axis", "is_pressed", "is_just_pressed", "is_just_released"});
 
     for (const auto& [name, ci] : types_) {
         std::vector<std::string> members;
@@ -458,7 +464,7 @@ std::vector<std::string> ScriptSystem::completions(const std::string& prefix) co
                                      "false",  "null",   "static", "abstract", "this",  "base",
                                      "break",  "continue"};
     static const char* globals[] = {"print", "type_of", "Vector2", "Vector3",
-                                    "transform", "actor", "Camera"};
+                                    "transform", "actor", "Camera", "Input"};
 
     std::vector<std::string> out;
     auto consider = [&](const std::string& s) {

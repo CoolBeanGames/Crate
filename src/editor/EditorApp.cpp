@@ -192,10 +192,6 @@ void EditorApp::onFrame() {
         selectedAsset_.clear();
     }
 
-    // "Spin preview" slowly orbits the camera so a lone object reads as 3D.
-    if (spinPreview_ && !playing_ && !ImGui::IsMouseDragging(ImGuiMouseButton_Left))
-        camera_.yaw += dt * 18.0f;
-
     // Play mode: tick components (frame update + fixed-step physics).
     if (playing_) {
         Input::get().poll();
@@ -328,9 +324,12 @@ void EditorApp::drawMenuBar() {
         if (ImGui::MenuItem("Create Sprite"))      scene_.select(spawn("sprite", p));
         if (ImGui::MenuItem("Create UI Control"))  scene_.select(spawn("ui", p));
         if (ImGui::BeginMenu("Rendering")) {
-            if (ImGui::MenuItem("Camera"))         scene_.select(spawn("camera", p));
-            if (ImGui::MenuItem("Fog"))            scene_.select(spawn("fog", p));
-            if (ImGui::MenuItem("Volumetric Fog")) scene_.select(spawn("volumetricfog", p));
+            if (ImGui::MenuItem("Camera"))            scene_.select(spawn("camera", p));
+            if (ImGui::MenuItem("Directional Light")) scene_.select(spawn("light_directional", p));
+            if (ImGui::MenuItem("Point Light"))       scene_.select(spawn("light_point", p));
+            if (ImGui::MenuItem("Spot Light"))        scene_.select(spawn("light_spot", p));
+            if (ImGui::MenuItem("Fog"))               scene_.select(spawn("fog", p));
+            if (ImGui::MenuItem("Volumetric Fog"))    scene_.select(spawn("volumetricfog", p));
             ImGui::EndMenu();
         }
         ImGui::Separator();
@@ -452,9 +451,12 @@ bool EditorApp::hierarchyContextMenu(Actor& a) {
         if (menu.item("Sprite"))      scene_.select(spawn("sprite", &a));
         if (menu.item("UI Control"))  scene_.select(spawn("ui", &a));
         if (menu.beginSub("Rendering")) {
-            if (menu.item("Camera"))         scene_.select(spawn("camera", &a));
-            if (menu.item("Fog"))            scene_.select(spawn("fog", &a));
-            if (menu.item("Volumetric Fog")) scene_.select(spawn("volumetricfog", &a));
+            if (menu.item("Camera"))            scene_.select(spawn("camera", &a));
+            if (menu.item("Directional Light")) scene_.select(spawn("light_directional", &a));
+            if (menu.item("Point Light"))       scene_.select(spawn("light_point", &a));
+            if (menu.item("Spot Light"))        scene_.select(spawn("light_spot", &a));
+            if (menu.item("Fog"))               scene_.select(spawn("fog", &a));
+            if (menu.item("Volumetric Fog"))    scene_.select(spawn("volumetricfog", &a));
             menu.endSub();
         }
         menu.endSub();
@@ -586,9 +588,12 @@ void EditorApp::drawHierarchy() {
                 if (addMenu.item("Sprite"))      scene_.select(spawn("sprite", p));
                 if (addMenu.item("UI Control"))  scene_.select(spawn("ui", p));
                 if (addMenu.beginSub("Rendering")) {
-                    if (addMenu.item("Camera"))         scene_.select(spawn("camera", p));
-                    if (addMenu.item("Fog"))            scene_.select(spawn("fog", p));
-                    if (addMenu.item("Volumetric Fog")) scene_.select(spawn("volumetricfog", p));
+                    if (addMenu.item("Camera"))            scene_.select(spawn("camera", p));
+                    if (addMenu.item("Directional Light")) scene_.select(spawn("light_directional", p));
+                    if (addMenu.item("Point Light"))       scene_.select(spawn("light_point", p));
+                    if (addMenu.item("Spot Light"))        scene_.select(spawn("light_spot", p));
+                    if (addMenu.item("Fog"))               scene_.select(spawn("fog", p));
+                    if (addMenu.item("Volumetric Fog"))    scene_.select(spawn("volumetricfog", p));
                     addMenu.endSub();
                 }
                 addMenu.end();
@@ -839,8 +844,6 @@ void EditorApp::drawViewport() {
     if (ImGui::Begin("Viewport")) {
         if (ImGui::BeginTabBar("viewport_tabs")) {
             if (ImGui::BeginTabItem("Scene View")) {
-                ImGui::Checkbox("Spin preview", &spinPreview_);
-                ImGui::SameLine();
                 if (ImGui::RadioButton("Move", gizmoOp_ == 0)) gizmoOp_ = 0;
                 ImGui::SameLine();
                 if (ImGui::RadioButton("Rotate", gizmoOp_ == 1)) gizmoOp_ = 1;
@@ -1967,6 +1970,16 @@ Actor* EditorApp::spawn(const char* kind, Actor* parent) {
     } else if (k == "camera") {
         a = std::make_unique<Actor3D>("Camera");
         a->addComponent(std::make_unique<CameraComponent>());
+    } else if (k == "light_directional" || k == "light_point" || k == "light_spot") {
+        LightComponent::Type type = k == "light_directional" ? LightComponent::Type::Directional
+                                    : k == "light_point"      ? LightComponent::Type::Point
+                                                              : LightComponent::Type::Spot;
+        a = std::make_unique<Actor3D>(k == "light_directional" ? "Directional Light"
+                                     : k == "light_point"       ? "Point Light"
+                                                                : "Spot Light");
+        auto lc = std::make_unique<LightComponent>();
+        lc->type = type;
+        a->addComponent(std::move(lc));
     } else if (k == "fog") {
         a = std::make_unique<Actor3D>("Fog");
         a->addComponent(std::make_unique<FogComponent>());

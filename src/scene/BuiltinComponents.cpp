@@ -21,6 +21,19 @@ void MeshRenderer::drawInspector() {
                     primitive = p;
             ImGui::EndCombo();
         }
+        // Sized independently of the actor's Transform.scale (task 84) so a
+        // later physics collider can read the same numbers without also
+        // picking up whatever the transform's scale is used for elsewhere.
+        if (primitive == "Sphere") {
+            ImGui::DragFloat("Radius", &radius, 0.05f, 0.001f, 1000.0f);
+        } else if (primitive == "Cylinder" || primitive == "Capsule") {
+            ImGui::DragFloat("Radius", &radius, 0.05f, 0.001f, 1000.0f);
+            ImGui::DragFloat("Height", &height, 0.05f, 0.001f, 1000.0f);
+        } else if (primitive == "Plane" || primitive == "Quad") {
+            ImGui::DragFloat2("Size", planeSize, 0.05f, 0.001f, 1000.0f);
+        } else { // Cube
+            ImGui::DragFloat3("Size", boxSize, 0.05f, 0.001f, 1000.0f);
+        }
     }
     // Model / Texture / Material are edited by the editor as asset-picker
     // fields (the component can't reach the asset libraries).

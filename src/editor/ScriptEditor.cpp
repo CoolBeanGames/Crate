@@ -406,11 +406,10 @@ void ScriptEditor::updateAutocomplete() {
     if (!acOpen_)
         return;
 
-    // popup near the caret
-    ImVec2 pos = ImGui::GetItemRectMin();
-    pos.y = ImGui::GetMousePos().y; // rough; TextEditor lacks a caret-screen-pos API
-    ImGui::SetNextWindowPos(ImVec2(ImGui::GetItemRectMin().x + 60, ImGui::GetItemRectMin().y + 40),
-                            ImGuiCond_Appearing);
+    // Just below the cursor's own line, not a fixed guess from the widget's
+    // corner -- that could as easily land the popup right on top of the
+    // cursor as below it, depending on which line you're actually on.
+    ImGui::SetNextWindowPos(editor_.GetCursorScreenPos(), ImGuiCond_Appearing);
     ImGui::SetNextWindowSize(ImVec2(240, 180), ImGuiCond_Appearing);
     if (ImGui::Begin("##autocomplete", nullptr,
                      ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |

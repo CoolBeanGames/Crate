@@ -122,7 +122,6 @@ private:
     ui::Popup renamePopup_;
     AssetPicker assetPicker_;
     bool openScriptsTab_ = false; // one-shot: select the viewport Scripts tab
-    bool spinPreview_ = true;
 
     // Viewport transform gizmo (ImGuizmo). op: 0=translate 1=rotate 2=scale.
     int gizmoOp_ = 0;
