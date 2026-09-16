@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "projectId": "8afe2a0217d7419db234ceda7ecb9dff",
   "name": "Crate",
-  "nextCardIndex": 86,
+  "nextCardIndex": 88,
   "latestExePath": "build-Release/Crate.exe",
   "latestReleasePath": "build-Release/Crate.exe",
   "tagCatalog": [
@@ -151,7 +151,86 @@
       "color": "#8C553E"
     }
   ],
-  "customCardTypes": [],
+  "customCardTypes": [
+    {
+      "id": "e361978d91d9447f97033586db3c87b0",
+      "name": "Job",
+      "instructions": "this task is a specific job on a specifc feature, if there is a flag called \u0022wait\u0022 set to true on the task, stop execution upon finishing and mark it for my attention. put any notes in the notes section, and follow the commit/build/release/merge flags as gospel. The type flag will tell you what kind of project this is",
+      "cardColor": "#1D222C",
+      "outlineColor": "#2A303D",
+      "headerTextColor": "#8992A5",
+      "mainTextColor": "#F4F6FA",
+      "textBoxColor": "#0E1117",
+      "outlineWidth": 1,
+      "shrinkExpandedToContent": false,
+      "shrinkCompactToContent": false,
+      "fields": [
+        {
+          "id": "c474f092663247ebb286cc5b978853d3",
+          "name": "Name",
+          "type": "text",
+          "defaultValue": "",
+          "options": [],
+          "showOnExpanded": true,
+          "showOnCollapsed": true,
+          "x": 12,
+          "y": 12,
+          "width": 216,
+          "height": 60,
+          "expandedX": 12,
+          "expandedY": 12,
+          "expandedWidth": 204,
+          "expandedHeight": 60,
+          "compactX": 12,
+          "compactY": 12,
+          "compactWidth": 168,
+          "compactHeight": 48
+        },
+        {
+          "id": "77f8b466f2874429a253d2256f62c42a",
+          "name": "Description",
+          "type": "text",
+          "defaultValue": "",
+          "options": [],
+          "showOnExpanded": true,
+          "showOnCollapsed": true,
+          "x": 12,
+          "y": 84,
+          "width": 564,
+          "height": 144,
+          "expandedX": 12,
+          "expandedY": 84,
+          "expandedWidth": 204,
+          "expandedHeight": 60,
+          "compactX": 12,
+          "compactY": 48,
+          "compactWidth": 168,
+          "compactHeight": 48
+        },
+        {
+          "id": "0bd42f02c9ae40469818cbbd6986994f",
+          "name": "Notes",
+          "type": "list",
+          "defaultValue": "List item\nAnother item",
+          "options": [],
+          "showOnExpanded": true,
+          "showOnCollapsed": true,
+          "x": 12,
+          "y": 240,
+          "width": 324,
+          "height": 144,
+          "expandedX": 12,
+          "expandedY": 108,
+          "expandedWidth": 204,
+          "expandedHeight": 60,
+          "compactX": 12,
+          "compactY": 48,
+          "compactWidth": 168,
+          "compactHeight": 48
+        }
+      ]
+    }
+  ],
   "branches": [
     {
       "id": "main",
@@ -161,7 +240,40 @@
       "isCollapsed": false,
       "isSystem": true,
       "isLocked": false,
-      "tasks": []
+      "tasks": [
+        {
+          "id": "21f67bfb08044648a1fc3041527f5e71",
+          "index": 87,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "ignore me",
+          "task": "",
+          "tags": [],
+          "files": [],
+          "customTypeId": "e361978d91d9447f97033586db3c87b0",
+          "customValues": {
+            "c474f092663247ebb286cc5b978853d3": "",
+            "77f8b466f2874429a253d2256f62c42a": "",
+            "0bd42f02c9ae40469818cbbd6986994f": "List item\nAnother item"
+          },
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-16T04:53:20.7503928+00:00",
+          "updatedAt": "2026-09-16T04:53:20.7504346+00:00"
+        }
+      ]
     },
     {
       "id": "9463e19afcbe4cd18681afff19b840a9",
@@ -191,7 +303,36 @@
       "isCollapsed": false,
       "isSystem": false,
       "isLocked": false,
-      "tasks": []
+      "tasks": [
+        {
+          "id": "c7f4820a842f4a4fa1bef703571ff58f",
+          "index": 86,
+          "kind": "merge",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "",
+          "task": "",
+          "tags": [],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-16T04:51:07.9237798+00:00",
+          "updatedAt": "2026-09-16T04:51:07.92378+00:00"
+        }
+      ]
     },
     {
       "id": "archive",
