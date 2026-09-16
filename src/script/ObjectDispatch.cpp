@@ -10,6 +10,44 @@
 #include <algorithm>
 
 namespace crate::script {
+namespace {
+// Base-chain walk for a Kind-3 (compiled) instance's fields/methods/signals
+// (Phase 9f): unlike `overflow`/`selfView` (whose OWN per-class wrapper
+// function already reaches inherited storage correctly via ordinary C++
+// member access -- static_cast<Derived*>(p)->overflow_ finds an INHERITED
+// overflow_ exactly like an own one, no walk needed), a derived class's OWN
+// kFields_<suffix>/kMethods_<suffix>/kSignals_<suffix> deliberately list
+// ONLY its own newly-declared/overridden members (mirroring how
+// ClassDecl::fields/functions/signals are also own-only, see Ast.h) -- an
+// INHERITED-but-not-overridden name is only discoverable by walking to the
+// ancestor's OWN table via ci->baseClassInfo, exactly like
+// ClassInfo::findFunction()/hasSignal() walk ClassInfo::baseClass for the
+// interpreted side. The ancestor's OWN accessor function pointers remain
+// correct to call with a DERIVED instance's void* (single, non-virtual
+// inheritance: a derived object's address IS its unique base subobject's
+// address, so static_cast<Base*>(derivedVoidPtr) is safe and correct).
+const FieldAccessor* findCompiledField(const CompiledClassInfo* ci, const std::string& name) {
+    for (; ci; ci = ci->baseClassInfo)
+        for (size_t i = 0; i < ci->fieldCount; ++i)
+            if (name == ci->fields[i].name)
+                return &ci->fields[i];
+    return nullptr;
+}
+const MethodAccessor* findCompiledMethod(const CompiledClassInfo* ci, const std::string& name) {
+    for (; ci; ci = ci->baseClassInfo)
+        for (size_t i = 0; i < ci->methodCount; ++i)
+            if (name == ci->methods[i].name)
+                return &ci->methods[i];
+    return nullptr;
+}
+bool compiledHasSignal(const CompiledClassInfo* ci, const std::string& name) {
+    for (; ci; ci = ci->baseClassInfo)
+        for (size_t i = 0; i < ci->signalCount; ++i)
+            if (name == ci->signalNames[i])
+                return true;
+    return false;
+}
+} // namespace
 
 Value getObjectMember(const std::shared_ptr<ScriptObject>& obj, const std::string& name, int line) {
     if (!obj)
@@ -28,12 +66,14 @@ Value getObjectMember(const std::shared_ptr<ScriptObject>& obj, const std::strin
         return Value::SignalRef(obj, name);
 
     // Kind 3: compiled script instance live view. Checked before the
-    // `fields` map since these objects don't use `fields` at all.
+    // `fields` map since these objects don't use `fields` at all. Field/
+    // method/signal lookups walk the base-class chain (Phase 9f) via the
+    // helpers above, so an inherited-but-not-overridden name (declared by
+    // an ancestor, not obj->compiledInfo's own class) still resolves.
     if (obj->nativePtr && obj->compiledInfo) {
         const CompiledClassInfo* ci = obj->compiledInfo;
-        for (size_t i = 0; i < ci->fieldCount; ++i)
-            if (name == ci->fields[i].name)
-                return ci->fields[i].get(obj->nativePtr);
+        if (const FieldAccessor* fa = findCompiledField(ci, name))
+            return fa->get(obj->nativePtr);
         if (ci->overflow) {
             auto& ovf = ci->overflow(obj->nativePtr);
             auto it = ovf.find(name);
@@ -48,12 +88,10 @@ Value getObjectMember(const std::shared_ptr<ScriptObject>& obj, const std::strin
         // (see CompiledClassInfo::selfView's doc comment), so its
         // `connections` map is the SAME one every other reference to this
         // instance shares.
-        for (size_t i = 0; i < ci->signalCount; ++i)
-            if (name == ci->signalNames[i])
-                return Value::SignalRef(obj, name);
-        for (size_t i = 0; i < ci->methodCount; ++i)
-            if (name == ci->methods[i].name)
-                return Value::Fn(obj, name); // bound Callable, invoked via callObjectMethod
+        if (compiledHasSignal(ci, name))
+            return Value::SignalRef(obj, name);
+        if (findCompiledMethod(ci, name))
+            return Value::Fn(obj, name); // bound Callable, invoked via callObjectMethod
         throw RuntimeError("no member '" + name + "'", line);
     }
 
@@ -97,11 +135,12 @@ bool trySetObjectMember(const std::shared_ptr<ScriptObject>& obj, const std::str
 
     if (obj->nativePtr && obj->compiledInfo) {
         const CompiledClassInfo* ci = obj->compiledInfo;
-        for (size_t i = 0; i < ci->fieldCount; ++i)
-            if (name == ci->fields[i].name) {
-                ci->fields[i].set(obj->nativePtr, v);
-                return true;
-            }
+        // Base-chain walk (Phase 9f) -- see findCompiledField's own doc
+        // comment above.
+        if (const FieldAccessor* fa = findCompiledField(ci, name)) {
+            fa->set(obj->nativePtr, v);
+            return true;
+        }
         if (ci->overflow) {
             ci->overflow(obj->nativePtr)[name] = v;
             return true;
@@ -158,15 +197,11 @@ Value callObjectMethod(ScriptContext* ctx, const std::shared_ptr<ScriptObject>& 
 
     const bool isScriptInstance = obj->cls || (obj->nativePtr && obj->compiledInfo);
     if (isScriptInstance) {
-        bool hasOwnMethod =
-            obj->cls ? obj->cls->findFunction(method) != nullptr
-                    : [&] {
-                          const CompiledClassInfo* ci = obj->compiledInfo;
-                          for (size_t i = 0; i < ci->methodCount; ++i)
-                              if (ci->methods[i].name == method)
-                                  return true;
-                          return false;
-                      }();
+        // Kind-agnostic, base-chain-aware (Phase 9f for the compiled side --
+        // ClassInfo::findFunction already walked its own base chain since
+        // before this session).
+        bool hasOwnMethod = obj->cls ? obj->cls->findFunction(method) != nullptr
+                                     : findCompiledMethod(obj->compiledInfo, method) != nullptr;
         // Godot-3 style signal API + get_component escape hatch, available
         // on ANY script instance (interpreted or compiled) that doesn't
         // declare its own method of that name -- consolidated here (Phase
@@ -195,10 +230,8 @@ Value callObjectMethod(ScriptContext* ctx, const std::shared_ptr<ScriptObject>& 
     }
 
     if (obj->nativePtr && obj->compiledInfo) {
-        const CompiledClassInfo* ci = obj->compiledInfo;
-        for (size_t i = 0; i < ci->methodCount; ++i)
-            if (method == ci->methods[i].name)
-                return ci->methods[i].invoke(obj->nativePtr, ctx, std::move(args));
+        if (const MethodAccessor* ma = findCompiledMethod(obj->compiledInfo, method))
+            return ma->invoke(obj->nativePtr, ctx, std::move(args));
         throw RuntimeError("method '" + method + "' not found", line);
     }
 

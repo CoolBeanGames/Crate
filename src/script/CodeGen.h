@@ -1,5 +1,6 @@
 #pragma once
 #include "script/Ast.h"
+#include "script/ClassInfo.h"
 
 #include <string>
 #include <unordered_set>
@@ -21,14 +22,17 @@ namespace crate::script {
 // dynamic overflow map, exactly mirroring Interpreter::lvalue()),
 // transform/actor access, Math.*, Input.*, and print()/type_of()/str().
 //
-// Only classes based directly on Actor/Actor2D/Actor3D are accepted --
-// script-to-script inheritance needs the cross-class registry (Phase 4/5)
-// and is refused for now. Constructs needing that registry --
-// get_component(...), this.base.<method>(), signals (declare/connect/
-// emit), and bare method/signal references used as first-class values --
-// are refused with a clear CodeGenResult::error rather than silently
-// emitting incorrect code. Static and abstract classes are refused too
-// (they don't map onto a single concrete native Component instance).
+// Classes based on Actor/Actor2D/Actor3D, OR on another script class
+// compiled into the SAME namespace/module (Phase 9f: real C++ inheritance,
+// `class Derived_Native : public Base_Native`), are accepted. A script base
+// living in a DIFFERENT namespace is not wired up yet -- ScriptBuild.cpp
+// refuses that case explicitly (see its own comments) rather than this
+// function, since CodeGen itself has no notion of namespaces at all; the
+// generated inheritance syntax here is namespace-agnostic; only the BUILD
+// orchestration (include paths / import libs / topological build order)
+// differs for a cross-namespace base, and that part remains future work
+// (see transpiration.txt Phase 9f). Abstract classes are refused (they
+// don't map onto a single concrete native Component/static instance).
 struct CodeGenResult {
     bool ok = false;
     std::string className; // sanitized identifier base used for <ClassName>_Native etc.
@@ -37,13 +41,18 @@ struct CodeGenResult {
     std::string error;     // set iff !ok (first problem found, with a line number if known)
 };
 
+// Takes the full ClassInfo (not just its owned ClassDecl), not just for its
+// `decl` -- Phase 9f needs `baseClass` (the resolved script base's own
+// ClassInfo*, or null) to walk the inheritance chain for field/method/
+// signal resolution and to know the base's generated C++ type name.
+//
 // `knownClassNames` (Phase 9b): every script class name ScriptSystem knows
 // about at build time (across ALL namespaces, not just this one), so
 // `type_of(SomeOtherScriptClass)` resolves to a real TypeRef instead of
 // falling through to the dynamic-overflow-map guess Identifier's fallback
 // makes for an unrecognized bare name. Defaults to empty for callers (tests)
 // that only care about this class's own name / the fixed builtin list.
-CodeGenResult generateClass(const ClassDecl& decl,
+CodeGenResult generateClass(const ClassInfo& classInfo,
                             const std::unordered_set<std::string>& knownClassNames = {});
 
 } // namespace crate::script

@@ -295,14 +295,18 @@ std::unordered_set<std::string> computeDirtyNamespaces(const std::string& script
 
 std::unordered_set<std::string> computeRebuildSet(const std::unordered_set<std::string>& dirty,
                                                   const std::string& /*scriptsDir*/) {
-    // See ScriptBuild.h: no cross-namespace dependency edges can exist while
-    // generateClass() refuses every base but Actor/Actor2D/Actor3D, so the
-    // transitive closure over "namespace B depends on namespace A" is
-    // always empty today -- this is the identity function until Phase 4/5
-    // add script-to-script inheritance support, at which point the edge
-    // computation (scan each namespace's classes' ClassInfo::baseClass for
-    // one resolving into a *different* namespace) slots in here without
-    // needing to change any caller.
+    // Phase 9f added REAL script-to-script inheritance -- but SAME-
+    // NAMESPACE only so far (see buildNamespace()'s own explicit refusal
+    // below for a cross-namespace base). Since a namespace's own classes
+    // can only depend on OTHER classes already compiled into that SAME
+    // namespace/DLL, "namespace B depends on namespace A, A != B" is
+    // still always empty -- this stays the identity function until
+    // cross-namespace inheritance is wired up (the true dependency-graph/
+    // topological-sort logic this function is named for), at which point
+    // the edge computation (scan each namespace's classes'
+    // ClassInfo::baseClass for one resolving into a *different*
+    // namespace) slots in here without needing to change any caller. See
+    // transpiration.txt Phase 9f's own notes on what's left.
     return dirty;
 }
 
@@ -371,7 +375,25 @@ BuildResult buildNamespace(const std::string& namespaceName, const std::string& 
 
     std::vector<std::string> cppFiles;
     for (const auto* ci : classes) {
-        script::CodeGenResult cg = script::generateClass(*ci->decl, knownClassNames);
+        // Phase 9f: real C++ inheritance across the DLL boundary (a base
+        // in a DIFFERENT namespace, needing its own -I<genDir>/.lib and a
+        // topologically-ordered build across namespaces -- see
+        // computeRebuildSet's comment above) isn't wired up yet -- refuse
+        // explicitly and clearly here, at the ONE place that knows both a
+        // class's resolved script base (ci->baseClass) AND its namespace
+        // (sys.namespaceOf), rather than at CodeGen.cpp, which has no
+        // notion of namespaces at all (its own generated inheritance
+        // syntax is namespace-agnostic and works today for a SAME-
+        // namespace base, reached below).
+        if (ci->baseClass && sys.namespaceOf(ci->baseClass->name) != namespaceName) {
+            r.error = ci->name + ": base class '" + ci->baseClass->name + "' is in namespace '" +
+                     sys.namespaceOf(ci->baseClass->name) +
+                     "', not '" + namespaceName +
+                     "' -- cross-namespace script inheritance is not supported yet (put both "
+                     "classes in the same namespace)";
+            return r;
+        }
+        script::CodeGenResult cg = script::generateClass(*ci, knownClassNames);
         if (!cg.ok) {
             r.error = ci->name + ": " + cg.error;
             return r;

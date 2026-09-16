@@ -2802,3 +2802,252 @@ entries above.
   real C++ inheritance vs a composition fallback, before starting any
   code).
 ===========================================================================
+
+2026-09-16 — SUB-PHASE 9f PART 1 COMPLETE AND VERIFIED: SAME-NAMESPACE
+  script-to-script inheritance, real C++ inheritance (the plan's chosen
+  approach, not the composition fallback -- real inheritance worked, no
+  fallback needed). CROSS-NAMESPACE inheritance is explicitly NOT done --
+  see the clearly-marked continuation point at the end of this entry. The
+  user approved proceeding into this sub-phase given remaining session
+  budget; this is a natural, fully-tested checkpoint to pause at or
+  continue from.
+  DESIGN: CodeGen.cpp's generated inheritance syntax (`class Derived_Native
+  : public Base_Native`, `#include "Base_Native.gen.h"`) is deliberately
+  NAMESPACE-AGNOSTIC -- it has no idea whether Base and Derived end up in
+  the same or different namespaces, and works identically either way. The
+  cross-namespace RESTRICTION lives entirely in ScriptBuild.cpp's
+  buildNamespace(), the one place that knows both a class's resolved
+  script base (ClassInfo::baseClass) AND its namespace
+  (ScriptSystem::namespaceOf) -- it refuses cleanly with a clear error
+  ("cross-namespace script inheritance is not supported yet") rather than
+  silently doing something wrong. Same-namespace needed ZERO ScriptBuild.cpp
+  build-command changes beyond that guard: `#include "Base_Native.gen.h"`
+  (a QUOTED include) resolves via cl.exe's own same-directory search rule
+  (both classes' generated files already land in the identical genDir),
+  and the existing link step already links every namespace member's .obj
+  together into one DLL.
+  Gen (CodeGen.cpp's internal per-class generator) now takes the full
+  ClassInfo (not just its owned ClassDecl) specifically for
+  classInfo.baseClass, and computes FOUR name sets instead of two: own
+  fields (ownFieldNames_, decide what to EMIT), ancestor fields
+  (ancestorFieldNames_, walked via the FULL baseClass chain -- a name in
+  BOTH own and ancestor sets is an OVERRIDE), accessible fields (fieldNames_
+  = own + ancestor union, what isField() uses for `this.x` dispatch), and
+  the same own/ancestor/accessible split for methods (isOwnFunc vs
+  isCallable) and signals (signalNames_ is accessible-only, no separate
+  own-only set needed since signal declarations have no storage/layout
+  implications the way fields do). isOwnFunc stayed narrow (own-only) for
+  header emission and hasStart/hasUpdate/hasPhysicsUpdate hook-override
+  detection -- inherited hooks work automatically via ordinary C++ virtual
+  dispatch (Derived_Native : public Base_Native inherits Base's `void
+  start() override` even when Derived doesn't redeclare it), needing zero
+  special-casing. isCallable (own+inherited) is used at the 3 call-dispatch
+  sites (bare identifier call, bare identifier used as a Callable value,
+  this.<method>() fast path) so an INHERITED method is reachable exactly
+  like an own one -- `this->fn_X(...)` is valid, unqualified C++ either
+  way, ordinary member lookup finds it through the base class.
+  FIELD OVERRIDE SEMANTICS (the trickiest correctness point): a derived
+  class that redeclares a field with the SAME NAME as an ancestor's does
+  NOT get its own separate field_X member (that would SHADOW the
+  ancestor's, giving the ancestor's OWN compiled methods a DIFFERENT
+  storage location than the derived class's methods see for the "same"
+  field -- a real correctness bug, since Interpreter::constructFields()
+  uses one flat fields[] map where a derived redeclaration simply
+  overwrites the single shared entry). Instead: the header simply doesn't
+  declare field_X again (inherited, already exists), and the constructor
+  still runs the SAME per-own-field coerce+assign loop as every class
+  already had -- `field_X = coerce(derivedInit, type)` -- which correctly
+  targets the INHERITED member via ordinary unqualified access, achieving
+  identical "base sets the default, then derived's constructor
+  overwrites it" ordering as the interpreter's own base-to-derived
+  chain walk, verified end-to-end by inheritance_parity_tests.cpp (health:
+  base default 100 never seen, derived override 50 -> +10 via an
+  INHERITED method call -> 60, matching both interpreted and compiled).
+  selfView_/overflow_/asyncResumeFn_/asyncResumeIndex_ are now declared
+  EXACTLY ONCE per hierarchy, by the root-most (non-script-base) class
+  only -- every derived class inherits them (same reasoning: one shared
+  do_async resume slot / one shared overflow map / one canonical
+  ScriptObject per OBJECT, not per class in the hierarchy). A derived
+  class's constructor delegates to its base's constructor via the C++
+  member-init list (`Derived_Native(ctx, owner) :
+  Base_Native(ctx, owner), ctx_(ctx), owner_(owner) { ... }` -- yes, each
+  class in a chain still independently owns/initializes its OWN ctx_/
+  owner_ members, a small amount of accepted per-level duplication that
+  keeps every class's own fn_<method> bodies referencing its OWN private
+  members with zero cross-class visibility concerns) -- after that
+  delegation, the base constructor has ALREADY built selfView_ (with
+  nativePtr/owner correct, since `this` inside a base subobject's own
+  constructor, while constructing a DERIVED instance, already refers to
+  the FULL derived object) and initialized every ancestor's own fields;
+  the derived constructor's only remaining job is re-pointing
+  `selfView_->compiledInfo` from whatever the base ctor set (the BASE's
+  own kClassInfo_<base>) to ITS OWN kClassInfo_<derived>, so signal/
+  method/get_component lookups on the instance see its ACTUAL
+  most-derived type.
+  CompiledClassInfo.h gained `const CompiledClassInfo* baseClassInfo;`
+  (non-null for a class with a script base compiled into the same
+  module). getObjectMember/trySetObjectMember/callObjectMethod's Kind-3
+  branches (ObjectDispatch.cpp) now walk this chain via three small new
+  helpers (findCompiledField/findCompiledMethod/compiledHasSignal) when a
+  name isn't in the immediate class's own field/method/signal tables --
+  exactly mirroring ClassInfo::findFunction()/hasSignal()'s own recursive
+  walk for the interpreted side. Critically, this did NOT require
+  duplicating any accessor entries across the hierarchy: a derived class's
+  OWN kFields_<suffix>/kMethods_<suffix> tables still list ONLY its own
+  new/overridden members (exactly like ClassDecl::fields/functions/signals
+  are already own-only in the AST) -- an ancestor's OWN existing accessor
+  function pointers (e.g. get_Base_health, static_cast<Base_Native*>(p)->
+  field_health) remain correct to call with a DERIVED instance's void*
+  under single, non-virtual inheritance (a derived object's address IS its
+  unique base subobject's address), so `overflow`/`selfView` needed ZERO
+  chain-walk logic at all -- their own per-class wrapper function already
+  reaches inherited storage correctly via ordinary C++ member access, no
+  different from an own member.
+  this.base.method() (Phase 9f's other headline construct) compiles to a
+  literal, qualified C++ call: `this->crate::script::generated::
+  Base_Native::fn_<method>(args)` -- bypasses any override in between,
+  exactly matching Interpreter::callMethodOn(..., viaBase=true)'s own
+  base-chain-starting-point behavior, resolved and validated at CODEGEN
+  TIME (Gen::scriptBase()->findFunction(method)) rather than the
+  interpreter's runtime check, since CodeGen has full static type info
+  available. Refuses clearly if there's no script base, or if the base
+  doesn't have that method.
+  A REAL CROSS-TU LINKAGE BUG FOUND AND FIXED WHILE IMPLEMENTING THIS (not
+  by review -- by the FIRST attempt to reference a base's kClassInfo from
+  a derived class's own generated code): each class compiles as its OWN
+  translation unit (a namespace's classes are compiled to separate .obj
+  files, then linked together, NOT merged into one .cpp) -- kClassInfo_
+  <suffix> had ALWAYS lived inside an anonymous namespace (deliberately,
+  for encapsulation, since Phase 4/5), which gives EVERY member internal
+  (TU-local) linkage NO MATTER WHAT, `extern` or not -- so a derived
+  class's TU had literally no way to reference an ancestor's kClassInfo_
+  by address at all, compile error notwithstanding (this would have been
+  a LINK error -- unresolved external -- not a compile error, so it was
+  caught by design review during implementation, before ever attempting a
+  real build, rather than by a build failure). Fixed by moving JUST
+  kClassInfo_<suffix> itself OUTSIDE its class's anonymous namespace
+  block, with an EXPLICIT `extern` (a plain top-level `const` still
+  defaults to INTERNAL linkage in C++, unlike C, unless marked extern too
+  -- both changes were required together) -- everything else (the get_X_Y/
+  set_X_Y/kFields_X/invoke_X_Y/kMethods_X/overflow_X/kSignals_X/
+  selfView_X helper functions) stayed anonymous-namespace-private,
+  unaffected, since only kClassInfo_<suffix>'s OWN address ever needs to
+  cross a TU boundary. This resolves at ordinary intra-DLL LINK time (no
+  dllexport/dllimport needed) since same-namespace classes' .obj files all
+  get linked into the SAME DLL -- a cross-namespace base would need actual
+  dllexport/dllimport (or the existing GetClassInfo_<suffix>() extern "C"
+  accessor) instead, since THAT crosses an actual DLL boundary, which is
+  exactly why this specific piece of plumbing doesn't extend to
+  cross-namespace inheritance without more work (see below).
+  New tests:
+  - tests/codegen_tests.cpp: added a ClassInfo-returning parseOne() variant
+    (Phase 9f needs the full ClassInfo, not just ClassDecl, for
+    baseClass/indexFunctions()) and a writeGeneratedFiles() helper (writes
+    but doesn't compile a class's files -- used to pre-seed a BASE class's
+    generated header so a DERIVED class's #include resolves during the
+    cl.exe /c-only compile check, mirroring what buildNamespace() does for
+    a whole namespace). 4 new scenarios using a real Base+Derived pair:
+    inherits-unchanged (field + method + signal all purely inherited,
+    zero redeclaration), override (field override + method override +
+    this.base.<method>() to reach the base's own version), inherited
+    signal used from a derived instance, and this.base.<method>() refused
+    for a method the base genuinely doesn't have. codegen_tests.cpp now at
+    137 checks (was 123) -- also updated the now-inaccurate "script-to-
+    script inheritance is refused" error-message text (still refuses an
+    UNKNOWN base name, just with updated wording) and relabeled "this.base
+    is refused" to "...when there is no script base" (still correctly
+    refused in that specific scenario, unrelated to the new capability).
+  - tests/inheritance_parity_tests.cpp (NEW, per 9f's own plan text --
+    "same-namespace inheritance parity test first (simplest)"): a real
+    Base+Derived class pair, BOTH namespace-N classes compiled TOGETHER
+    into one DLL via the actual ScriptBuild/NativeClassRegistry pipeline
+    (not just a cl.exe /c compile check), covering field override (base
+    default 100, derived override 50), an INHERITED method call
+    (heal(10)), an INHERITED field write (untouched), this.base.method()
+    (describe() calling this.base.describe()), and an INHERITED signal
+    (declared on the base, connected/emitted from the derived instance) --
+    interpreted vs native, byte-identical results (health=60,
+    untouched=6, lastDescribe='base+derived', lastCause='fell'). 20
+    checks. Registered in CMakeLists.txt. Confirmed repeatable across 4
+    runs.
+  Verification performed: `powershell -ExecutionPolicy Bypass -File
+  scripts\build.ps1 Debug` built clean; ran all 22 test executables
+  directly -- all passed, zero regressions; re-ran
+  inheritance_parity_tests.cpp 3 additional times (4 total) given it's the
+  riskiest new capability this sub-phase adds -- consistent, clean exit
+  every time.
+  Files touched this sub-phase: src/script/CompiledClassInfo.h (modified:
+  baseClassInfo added), src/script/ObjectDispatch.cpp (modified:
+  findCompiledField/findCompiledMethod/compiledHasSignal chain-walk
+  helpers, used in getObjectMember/trySetObjectMember/callObjectMethod's
+  Kind-3 branches), src/script/CodeGen.h (modified: generateClass() takes
+  ClassInfo, not ClassDecl), src/script/CodeGen.cpp (modified: Gen's own/
+  ancestor/accessible name-set split; header/constructor emission branches
+  on hasScriptBase; this.base.method() real codegen; kClassInfo_<suffix>
+  moved outside its anonymous namespace with explicit extern),
+  src/editor/ScriptBuild.cpp (modified: cross-namespace base explicitly
+  refused; generateClass() call site passes the full ClassInfo),
+  tests/codegen_tests.cpp (modified: ClassInfo-based harness + 4 new
+  inheritance scenarios), tests/inheritance_parity_tests.cpp (new),
+  CMakeLists.txt (modified: new inheritance_parity_tests target).
+
+  ============================================================
+  EXPLICIT CONTINUATION POINT -- CROSS-NAMESPACE INHERITANCE NOT DONE YET
+  ============================================================
+  What's left for Phase 9f to be FULLY complete (a base and derived class
+  allowed to live in DIFFERENT namespaces, per the original plan's full
+  scope):
+  1. ScriptBuild.cpp: computeRebuildSet() stops being the identity
+     function -- build the real namespace dependency graph (edge A->B if
+     any class in namespace A has ClassInfo::baseClass resolving into a
+     DIFFERENT namespace B), take the transitive closure over the dirty
+     set, topologically sort so a base namespace is always built before
+     any namespace that depends on it. EditorApp::setPlaying() must build
+     namespaces in the RETURNED ORDER (currently loops over an unordered
+     set).
+  2. buildNamespace() needs new logic for a class whose base is in a
+     DIFFERENT (already-built) namespace: add `-I<baseNamespaceGenDir>`
+     to the derived namespace's cl.exe invocation (so `#include
+     "Base_Native.gen.h"` resolves -- CodeGen.cpp's include text is
+     ALREADY namespace-agnostic, this is purely a build-command change)
+     and the base namespace's generation-versioned `.lib` to the
+     link.exe invocation (so the cross-DLL symbol references resolve).
+  3. THE ACTUAL HARD PART: kClassInfo_<suffix>'s cross-TU-but-same-DLL
+     `extern` trick (this entry, above) does NOT extend to a genuinely
+     different DLL -- an intra-module `extern` only resolves within ONE
+     link step. A cross-namespace base's kClassInfo_<Base> needs REAL
+     dllexport (from the base namespace's DLL) and dllimport (or an
+     equivalent __declspec(dllimport) forward declaration) in the derived
+     namespace's DLL, OR resolving it lazily via the base's ALREADY-
+     dllexported GetClassInfo_<Base>() extern "C" function instead of a
+     raw symbol reference -- likely the safer choice, called ONCE
+     (memoized) rather than relied on for static initialization order
+     (which is unspecified ACROSS DLLs, a well-known pitfall -- calling
+     GetClassInfo_<Base>() lazily on first real use, e.g. inside the
+     derived class's OWN constructor instead of as part of a static
+     initializer, sidesteps this entirely). The `class Derived_Native :
+     public Base_Native` C++ inheritance syntax itself, and the
+     `#include`, remain exactly as already implemented -- ONLY the
+     kClassInfo_<Base> address needs a different resolution strategy
+     cross-DLL.
+  4. Remove the "cross-namespace script inheritance is not supported yet"
+     refusal in buildNamespace() once 1-3 are done.
+  5. Tests: a cross-namespace variant of inheritance_parity_tests.cpp
+     (two SEPARATE namespaces, one deriving from the other); confirm
+     computeDirtyNamespaces + the new dependency closure correctly
+     rebuilds a DERIVED namespace when only its BASE namespace's source
+     changed -- this is the exact scenario Phase 3's "known existing gap"
+     note (see this file, search "known existing gap") warned would
+     become a hard CRASH instead of a benign staleness bug once compiled;
+     THIS is what actually closes that gap for real, and is worth an
+     explicit regression test.
+  Given cross-namespace inheritance is a genuinely separate, substantial
+  piece of work (dependency-graph/topological-sort infrastructure +
+  cross-DLL symbol resolution, not just "more of the same" as
+  same-namespace), and the user's own directive was to proceed as far as
+  session budget reasonably allows -- this was deliberately left as a
+  clean, explicit stopping point rather than attempted partially. A future
+  session picking this up should start by re-reading this whole
+  "EXPLICIT CONTINUATION POINT" section, then implement 1-2-3-4-5 in that
+  order (each is meaningfully testable on its own before the next).
+===========================================================================

@@ -149,22 +149,65 @@ struct FnCtx {
 
 class Gen {
 public:
-    Gen(const ClassDecl& decl, const std::unordered_set<std::string>& knownClassNames)
-        : decl_(decl), knownClassNames_(knownClassNames) {
+    Gen(const ClassInfo& classInfo, const std::unordered_set<std::string>& knownClassNames)
+        : classInfo_(classInfo), decl_(*classInfo.decl), knownClassNames_(knownClassNames) {
+        // Own names (THIS class's own AST declarations) -- decide what
+        // needs to be EMITTED (field member declarations, method bodies,
+        // hasStart/hasUpdate/hasPhysicsUpdate hook-override detection).
         for (const auto& f : decl_.fields)
-            fieldNames_.insert(f.name);
+            ownFieldNames_.insert(f.name);
         for (const auto& f : decl_.functions)
             funcNames_.insert(f.name);
-        for (const auto& s : decl_.signals)
-            signalNames_.insert(s.name);
+        // Ancestor names (Phase 9f), walking classInfo.baseClass -- a
+        // FIELD in this set that ISN'T also in ownFieldNames_ is purely
+        // inherited (no member to declare, already exists via C++
+        // inheritance); one that's in BOTH is an OVERRIDE (this class
+        // redeclares it -- inherited storage, but re-initialized by this
+        // class's own constructor, exactly mirroring
+        // Interpreter::constructFields()'s base-then-derived chain walk
+        // where a same-named derived declaration simply overwrites the
+        // single shared fields[] entry).
+        for (const ClassInfo* c = classInfo_.baseClass; c; c = c->baseClass) {
+            if (!c->decl)
+                continue;
+            for (const auto& f : c->decl->fields)
+                ancestorFieldNames_.insert(f.name);
+            for (const auto& f : c->decl->functions)
+                ancestorFuncNames_.insert(f.name);
+        }
+        // Accessible/callable names: own + every ancestor's -- `this->
+        // field_X`/`this->fn_X` is valid, unqualified C++ for an INHERITED
+        // member too (ordinary member lookup finds it via the base class),
+        // so CodeGen must recognize these names exist AT ALL, not just
+        // this class's own, when deciding whether `this.name` / bare
+        // `name(...)` is a real field/method reference vs the dynamic-
+        // overflow-map/unknown-function fallback.
+        fieldNames_ = ownFieldNames_;
+        fieldNames_.insert(ancestorFieldNames_.begin(), ancestorFieldNames_.end());
+        callableNames_ = funcNames_;
+        callableNames_.insert(ancestorFuncNames_.begin(), ancestorFuncNames_.end());
+        for (const ClassInfo* c = &classInfo_; c; c = c->baseClass) {
+            if (!c->decl)
+                continue;
+            for (const auto& s : c->decl->signals)
+                signalNames_.insert(s.name);
+        }
     }
 
     bool ok() const { return err_.empty(); }
     const std::string& error() const { return err_; }
 
+    // Accessible (own OR inherited) -- see the constructor's comment.
     bool isField(const std::string& n) const { return fieldNames_.count(n) != 0; }
-    bool isOwnFunc(const std::string& n) const { return funcNames_.count(n) != 0; }
+    bool isCallable(const std::string& n) const { return callableNames_.count(n) != 0; }
     bool isSignal(const std::string& n) const { return signalNames_.count(n) != 0; }
+    // THIS class's own declarations only -- see the constructor's comment.
+    bool isOwnFunc(const std::string& n) const { return funcNames_.count(n) != 0; }
+    bool isOverrideField(const std::string& n) const { return ancestorFieldNames_.count(n) != 0; }
+
+    // Non-null when this class has a SCRIPT base (Phase 9f) -- the
+    // resolved base's own ClassInfo, exactly like classInfo.baseClass.
+    const ClassInfo* scriptBase() const { return classInfo_.baseClass; }
 
     // Returns a C++ expression of type crate::script::Value, or "" (check
     // ok()/error() afterward) on an unsupported construct.
@@ -223,11 +266,16 @@ private:
     std::string identifierCallDispatch(const std::string& name, const std::vector<std::string>& args,
                                        int line, bool dynamicFallback);
 
+    const ClassInfo& classInfo_;
     const ClassDecl& decl_;
     const std::unordered_set<std::string>& knownClassNames_;
-    std::unordered_set<std::string> fieldNames_;
-    std::unordered_set<std::string> funcNames_;
-    std::unordered_set<std::string> signalNames_;
+    std::unordered_set<std::string> fieldNames_;       // own + inherited
+    std::unordered_set<std::string> ownFieldNames_;    // this class's own decl_.fields only
+    std::unordered_set<std::string> ancestorFieldNames_; // declared by an ancestor (may overlap ownFieldNames_ = an override)
+    std::unordered_set<std::string> callableNames_;    // own + inherited
+    std::unordered_set<std::string> funcNames_;        // this class's own decl_.functions only
+    std::unordered_set<std::string> ancestorFuncNames_;
+    std::unordered_set<std::string> signalNames_;      // own + inherited
     std::string err_;
     int tempCounter_ = 0;
 };
@@ -312,7 +360,10 @@ std::string Gen::identifierCallDispatch(const std::string& name, const std::vect
         o << ind(0) << "}()";
         return o.str();
     }
-    if (isOwnFunc(name)) {
+    if (isCallable(name)) {
+        // Own OR inherited (Phase 9f) -- this->fn_<name>(...) is valid,
+        // unqualified C++ either way (ordinary member lookup finds an
+        // inherited method through the base class automatically).
         std::string out = "this->" + methodName(name) + "(std::vector<crate::script::Value>{";
         for (size_t i = 0; i < args.size(); ++i) {
             if (i)
@@ -397,7 +448,7 @@ std::string Gen::expr(const Expr& e, FnCtx& fc) {
             // captured this way keeps working even if `this` itself is
             // later freed while something else still holds the reference
             // (a weak_ptr, exactly like the interpreter's own Callable).
-            if (isOwnFunc(n))
+            if (isCallable(n)) // own OR inherited (Phase 9f)
                 return "crate::script::Value::Fn(this->selfView_, " + cppStringLiteral(n) + ")";
             // Anything else falls back to the dynamic overflow map at
             // RUNTIME, exactly mirroring Interpreter::eval's Identifier case
@@ -552,10 +603,41 @@ std::string Gen::expr(const Expr& e, FnCtx& fc) {
 
                 if (objExpr.kind == ExprKind::Member && objExpr.strVal == "base" &&
                     objExpr.a->kind == ExprKind::This) {
-                    fail("this.base.<method>(...) is not supported yet (Phase 5 / script-to-script "
-                         "inheritance)",
-                         e.line);
-                    return "";
+                    // this.base.method(...) (Phase 9f): a direct, qualified
+                    // C++ call to the base class's OWN fn_<method> --
+                    // bypasses any override this class (or any class
+                    // between it and wherever <method> is actually
+                    // defined) might have, exactly matching
+                    // Interpreter::callMethodOn(..., viaBase=true), which
+                    // starts its search at obj->cls->baseClass, not
+                    // obj->cls itself. Resolved and checked at CODEGEN
+                    // TIME here (classInfo_.baseClass->findFunction()),
+                    // unlike the interpreter's runtime check, since
+                    // CodeGen has full static type info available.
+                    if (!scriptBase()) {
+                        fail("this.base.<method>(...) requires a script base class", e.line);
+                        return "";
+                    }
+                    if (!scriptBase()->findFunction(method)) {
+                        fail("base class has no method '" + method + "'", e.line);
+                        return "";
+                    }
+                    std::vector<std::string> args;
+                    for (const auto& a : e.items) {
+                        args.push_back(expr(*a, fc));
+                        if (!ok())
+                            return "";
+                    }
+                    std::string baseCls = sanitize(scriptBase()->name) + "_Native";
+                    std::string out = "this->crate::script::generated::" + baseCls +
+                                      "::" + methodName(method) + "(std::vector<crate::script::Value>{";
+                    for (size_t i = 0; i < args.size(); ++i) {
+                        if (i)
+                            out += ", ";
+                        out += "(" + args[i] + ")";
+                    }
+                    out += "})";
+                    return out;
                 }
 
                 if (objExpr.kind == ExprKind::Identifier && objExpr.strVal == "Math" && !fc.has("Math") &&
@@ -611,7 +693,7 @@ std::string Gen::expr(const Expr& e, FnCtx& fc) {
                 }
 
                 if (objExpr.kind == ExprKind::This) {
-                    if (isOwnFunc(method)) {
+                    if (isCallable(method)) { // own OR inherited (Phase 9f) -- direct call fast path
                         std::vector<std::string> args;
                         for (const auto& a : e.items) {
                             args.push_back(expr(*a, fc));
@@ -712,7 +794,12 @@ std::string Gen::expr(const Expr& e, FnCtx& fc) {
                 if (isSignal(name))
                     return "crate::script::Value::SignalRef(this->selfView_, " + cppStringLiteral(name) +
                            ")";
-                fail("this." + name + " is not a declared field (this.base needs Phase 5)", e.line);
+                // A bare `this.base` (not immediately followed by
+                // `.method(...)`, which is handled entirely in the Call
+                // case above) isn't specially handled by the interpreter
+                // either (see evalMember's own header comment) -- left
+                // unsupported here too, matching that.
+                fail("this." + name + " is not a declared field", e.line);
                 return "";
             }
 
@@ -1269,25 +1356,35 @@ bool Gen::stmt(const Stmt& s, FnCtx& fc, std::ostringstream& out, int indent) {
 
 } // namespace
 
-CodeGenResult generateClass(const ClassDecl& decl,
+CodeGenResult generateClass(const ClassInfo& classInfo,
                             const std::unordered_set<std::string>& knownClassNames) {
     CodeGenResult r;
+    const ClassDecl& decl = *classInfo.decl;
 
     if (decl.isAbstract) {
         r.error = "abstract classes are not compiled to native code (they are never instantiated "
                   "directly)";
         return r;
     }
+    // A script base (Phase 9f): real C++ inheritance, `class
+    // Derived_Native : public Base_Native`. Not extended to static classes
+    // (a static's `base` stays vestigial, as before Phase 9f -- the plan
+    // never asked for static-class inheritance, and ClassInfo::
+    // resolveBases() only ever resolves classInfo.baseClass to a non-null
+    // ClassInfo when `base` actually names another known script class, so
+    // an ordinary static class -- whose `base` defaults to "Actor", not a
+    // script class -- is completely unaffected either way).
+    const bool hasScriptBase = !decl.isStatic && classInfo.baseClass != nullptr;
     // A static class's `base` is vestigial (defaults to "Actor" even
     // though a static singleton is never instantiated as any kind of
     // Actor at all -- Interpreter::instantiate(ctx, cls, owner=nullptr)
     // never consults it) -- skip the base check entirely for one (Phase
-    // 9e); only a Component-shaped class needs a real Actor/Actor2D/
-    // Actor3D base.
-    if (!decl.isStatic && decl.base != "Actor" && decl.base != "Actor2D" && decl.base != "Actor3D") {
+    // 9e); a Component-shaped class needs either a real Actor/Actor2D/
+    // Actor3D base OR a script base (Phase 9f).
+    if (!decl.isStatic && !hasScriptBase && decl.base != "Actor" && decl.base != "Actor2D" &&
+        decl.base != "Actor3D") {
         r.error = "class '" + decl.name + "' has base '" + decl.base +
-                  "' -- only a direct Actor/Actor2D/Actor3D base is supported yet (script-to-script "
-                  "inheritance needs Phase 4/5's cross-class registry)";
+                  "' -- '" + decl.base + "' is neither Actor/Actor2D/Actor3D nor a known script class";
         return r;
     }
     for (const auto& fn : decl.functions) {
@@ -1306,8 +1403,10 @@ CodeGenResult generateClass(const ClassDecl& decl,
     // name the rest of the engine already knows it by (e.g. "Mover", not
     // "Mover_Native").
     const std::string exportSuffix = sanitize(decl.name);
+    const std::string baseCls = hasScriptBase ? sanitize(classInfo.baseClass->name) + "_Native" : "";
+    const std::string baseExportSuffix = hasScriptBase ? sanitize(classInfo.baseClass->name) : "";
 
-    Gen gen(decl, knownClassNames);
+    Gen gen(classInfo, knownClassNames);
 
     // Only override a lifecycle hook when the cScript class actually
     // declares it -- otherwise Component's own default no-op virtual
@@ -1347,6 +1446,13 @@ CodeGenResult generateClass(const ClassDecl& decl,
     h << "#include \"scene/Actor.h\"\n";
     h << "#include \"scene/Component.h\"\n";
     h << "#include \"core/Math.h\"\n\n";
+    if (hasScriptBase)
+        // Same-namespace only for now (Phase 9f): both classes' generated
+        // headers live in the same gen dir, so a plain relative include
+        // resolves via the SAME -I the whole namespace already compiles
+        // with -- no extra include path needed. Cross-namespace inheritance
+        // (a different -I / a base namespace's .lib) is not wired up yet.
+        h << "#include \"" << baseCls << ".gen.h\"\n";
     h << "#include <memory>\n#include <string>\n#include <unordered_map>\n#include <vector>\n\n";
     h << "namespace crate::script::generated {\n\n";
     if (decl.isStatic) {
@@ -1354,7 +1460,8 @@ CodeGenResult generateClass(const ClassDecl& decl,
         h << "public:\n";
         h << "    explicit " << cls << "(crate::script::ScriptContext* ctx);\n\n";
     } else {
-        h << "class " << cls << " : public crate::Component {\n";
+        h << "class " << cls << " : public "
+          << (hasScriptBase ? baseCls : "crate::Component") << " {\n";
         h << "public:\n";
         h << "    " << cls << "(crate::script::ScriptContext* ctx, crate::Actor* owner);\n\n";
         h << "    const char* typeName() const override { return " << cppStringLiteral(decl.name)
@@ -1373,21 +1480,39 @@ CodeGenResult generateClass(const ClassDecl& decl,
         h << "    crate::script::Value " << methodName(fn.name)
           << "(std::vector<crate::script::Value> args);\n";
     h << "\n";
+    // Own fields only, and only the ones NOT already declared by an
+    // ancestor (Phase 9f): an override field re-uses the INHERITED
+    // storage (re-initialized by this class's own constructor, see
+    // below), never a separate, shadowing member -- shadowing would give
+    // this class's own methods a DIFFERENT field_X than the ancestor's
+    // methods see, breaking the single-shared-value semantics
+    // Interpreter::constructFields()'s flat fields[] map has.
     for (const auto& f : decl.fields)
-        h << "    crate::script::Value " << fieldMember(f.name) << ";\n";
-    h << "    // Undeclared-field auto-vivification (mirrors Interpreter::lvalue()).\n";
-    h << "    std::unordered_map<std::string, crate::script::Value> overflow_;\n";
-    h << "    // do_async frame-stepped resumption state (Phase 6), mirrors\n";
-    h << "    // crate::script::ScriptObject::asyncResumeFn/asyncResumeIndex: which\n";
-    h << "    // top-level do_async of which hook is currently paused, if any.\n";
-    h << "    std::string asyncResumeFn_;\n";
-    h << "    int asyncResumeIndex_ = 0;\n";
-    h << "    // The canonical ScriptObject wrapper for THIS instance (Phase 9d),\n";
-    h << "    // constructed once (see the constructor) -- signals/first-class\n";
-    h << "    // method references/get_component() ALL resolve to this SAME\n";
-    h << "    // object, never a fresh one, so a connection made through one\n";
-    h << "    // reference is visible to an emit through another.\n";
-    h << "    std::shared_ptr<crate::script::ScriptObject> selfView_;\n\n";
+        if (!gen.isOverrideField(f.name))
+            h << "    crate::script::Value " << fieldMember(f.name) << ";\n";
+    if (!hasScriptBase) {
+        // Declared exactly ONCE per hierarchy, by the root-most class --
+        // every derived class inherits these (Phase 9f) rather than
+        // redeclaring them, so there's exactly one overflow map / one
+        // do_async resume slot / one canonical selfView_ per OBJECT,
+        // matching the single flat ScriptObject the interpreter uses
+        // regardless of how deep the class hierarchy is.
+        h << "    // Undeclared-field auto-vivification (mirrors Interpreter::lvalue()).\n";
+        h << "    std::unordered_map<std::string, crate::script::Value> overflow_;\n";
+        h << "    // do_async frame-stepped resumption state (Phase 6), mirrors\n";
+        h << "    // crate::script::ScriptObject::asyncResumeFn/asyncResumeIndex: which\n";
+        h << "    // top-level do_async of which hook is currently paused, if any.\n";
+        h << "    std::string asyncResumeFn_;\n";
+        h << "    int asyncResumeIndex_ = 0;\n";
+        h << "    // The canonical ScriptObject wrapper for THIS instance (Phase 9d),\n";
+        h << "    // constructed once (see the constructor) -- signals/first-class\n";
+        h << "    // method references/get_component() ALL resolve to this SAME\n";
+        h << "    // object, never a fresh one, so a connection made through one\n";
+        h << "    // reference is visible to an emit through another.\n";
+        h << "    std::shared_ptr<crate::script::ScriptObject> selfView_;\n\n";
+    } else {
+        h << "\n";
+    }
     h << "private:\n";
     h << "    crate::script::ScriptContext* ctx_;\n";
     h << "    crate::Actor* owner_ = nullptr;\n";
@@ -1455,8 +1580,27 @@ CodeGenResult generateClass(const ClassDecl& decl,
     }
     c << "std::shared_ptr<crate::script::ScriptObject> selfView_" << exportSuffix
       << "(void* p) { return static_cast<crate::script::generated::" << cls << "*>(p)->selfView_; }\n";
-    c << "const crate::script::CompiledClassInfo kClassInfo_" << exportSuffix << " = {\n";
-    c << "    " << cppStringLiteral(decl.name) << ", \"\",\n";
+    c << "} // namespace\n\n";
+    // kClassInfo_<suffix> itself is deliberately declared OUTSIDE the
+    // anonymous namespace above, with an explicit `extern` (Phase 9f):
+    // each class compiles as its OWN translation unit (a namespace's
+    // classes are compiled+linked together, not merged into one .cpp), so
+    // a DERIVED class's TU needs to reference an ANCESTOR's kClassInfo_
+    // by address across that TU boundary for baseClassInfo below --
+    // impossible if it stayed inside an unnamed namespace, since THOSE
+    // members always have internal (TU-local) linkage no matter what,
+    // `extern` or not. A plain top-level `const` also defaults to
+    // internal linkage in C++ (unlike C) unless marked `extern` too, so
+    // both things (moving it out, AND keeping the explicit extern) are
+    // required together. This still resolves at ordinary LINK time within
+    // the same DLL -- no dllexport/dllimport needed for an intra-module
+    // reference, only for a FUTURE cross-namespace (cross-DLL) base, which
+    // isn't wired up yet.
+    if (hasScriptBase)
+        c << "extern const crate::script::CompiledClassInfo kClassInfo_" << baseExportSuffix << ";\n";
+    c << "extern const crate::script::CompiledClassInfo kClassInfo_" << exportSuffix << " = {\n";
+    c << "    " << cppStringLiteral(decl.name) << ", \"\", "
+      << (hasScriptBase ? ("&kClassInfo_" + baseExportSuffix) : "nullptr") << ",\n";
     c << "    " << (decl.fields.empty() ? "nullptr" : ("kFields_" + exportSuffix)) << ", "
       << decl.fields.size() << ",\n";
     c << "    " << (decl.functions.empty() ? "nullptr" : ("kMethods_" + exportSuffix)) << ", "
@@ -1465,21 +1609,39 @@ CodeGenResult generateClass(const ClassDecl& decl,
     c << "    " << (decl.signals.empty() ? "nullptr" : ("kSignals_" + exportSuffix)) << ", "
       << decl.signals.size() << ",\n";
     c << "    &selfView_" << exportSuffix << "\n";
-    c << "};\n";
-    c << "} // namespace\n\n";
+    c << "};\n\n";
 
     c << "namespace crate::script::generated {\n\n";
     if (decl.isStatic) {
         c << cls << "::" << cls << "(crate::script::ScriptContext* ctx)\n";
         c << "    : ctx_(ctx) {\n";
+        c << "    selfView_ = std::make_shared<crate::script::ScriptObject>();\n";
+        c << "    selfView_->nativePtr = this;\n";
+        c << "    selfView_->compiledInfo = &kClassInfo_" << exportSuffix << ";\n";
+        c << "    selfView_->owner = owner_;\n";
+    } else if (hasScriptBase) {
+        // Phase 9f: delegates to the base's own constructor (member-init
+        // list), which -- since `this` inside a base subobject's
+        // constructor, while constructing a DERIVED instance, already
+        // refers to the FULL derived object -- has already constructed
+        // selfView_ with the correct nativePtr/owner AND initialized every
+        // ancestor's own fields to their defaults (base-to-derived chain,
+        // exactly matching Interpreter::constructFields()'s own walk
+        // order). Only selfView_->compiledInfo needs correcting here, from
+        // whatever the base ctor set it to (the BASE's own kClassInfo) to
+        // THIS class's -- so signal/method/get_component lookups on this
+        // instance see its ACTUAL most-derived type, not an ancestor's.
+        c << cls << "::" << cls << "(crate::script::ScriptContext* ctx, crate::Actor* owner)\n";
+        c << "    : crate::script::generated::" << baseCls << "(ctx, owner), ctx_(ctx), owner_(owner) {\n";
+        c << "    selfView_->compiledInfo = &kClassInfo_" << exportSuffix << ";\n";
     } else {
         c << cls << "::" << cls << "(crate::script::ScriptContext* ctx, crate::Actor* owner)\n";
         c << "    : ctx_(ctx), owner_(owner) {\n";
+        c << "    selfView_ = std::make_shared<crate::script::ScriptObject>();\n";
+        c << "    selfView_->nativePtr = this;\n";
+        c << "    selfView_->compiledInfo = &kClassInfo_" << exportSuffix << ";\n";
+        c << "    selfView_->owner = owner_;\n";
     }
-    c << "    selfView_ = std::make_shared<crate::script::ScriptObject>();\n";
-    c << "    selfView_->nativePtr = this;\n";
-    c << "    selfView_->compiledInfo = &kClassInfo_" << exportSuffix << ";\n";
-    c << "    selfView_->owner = owner_;\n";
     {
         FnCtx fieldScope;
         fieldScope.push();

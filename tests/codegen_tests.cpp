@@ -97,12 +97,21 @@ static bool compileWithCl(const std::string& vcvars, const std::string& cppPath,
 // verify it compiles.
 // ---------------------------------------------------------------------------
 
-static bool parseOne(const std::string& src, ClassDecl& outDecl, std::string& err) {
+// Builds a full ClassInfo (not just the ClassDecl) -- Phase 9f's
+// generateClass() needs `baseClass` (set by the caller afterward, via
+// `outInfo.baseClass = ...`, for an inheritance scenario) and
+// indexFunctions() (for this.base.method()'s findFunction() check).
+static bool parseOne(const std::string& src, ClassInfo& outInfo, std::string& err) {
     try {
         Lexer lex(src);
         Parser parser(lex.tokenize());
         auto decl = parser.parseClass();
-        outDecl = std::move(*decl);
+        outInfo.name = decl->name;
+        outInfo.base = decl->base;
+        outInfo.isStatic = decl->isStatic;
+        outInfo.isAbstract = decl->isAbstract;
+        outInfo.decl = std::move(decl);
+        outInfo.indexFunctions();
         return true;
     } catch (const ParseError& e) {
         err = "line " + std::to_string(e.line) + ": " + e.what();
@@ -110,14 +119,35 @@ static bool parseOne(const std::string& src, ClassDecl& outDecl, std::string& er
     }
 }
 
+// Generates and writes (but doesn't compile) a class's .gen.h/.gen.cpp to
+// scratchDir -- used to pre-seed a BASE class's files before testing a
+// DERIVED one's compile (Phase 9f), mirroring how buildNamespace() writes
+// every class in a namespace before compiling any of them, so a derived
+// class's `#include "Base_Native.gen.h"` resolves.
+static bool writeGeneratedFiles(const ClassInfo& info, const std::string& scratchDir,
+                                std::string& err) {
+    CodeGenResult r = generateClass(info);
+    if (!r.ok) {
+        err = r.error;
+        return false;
+    }
+    std::ofstream hf(scratchDir + "/" + r.className + ".gen.h", std::ios::binary);
+    hf << r.header;
+    std::ofstream cf(scratchDir + "/" + r.className + ".gen.cpp", std::ios::binary);
+    cf << r.source;
+    return true;
+}
+
 static int expectCompiles(const std::string& label, const std::string& src, const std::string& vcvars,
                           const std::string& scratchDir,
-                          const std::unordered_set<std::string>& knownClassNames = {}) {
-    ClassDecl decl;
+                          const std::unordered_set<std::string>& knownClassNames = {},
+                          const ClassInfo* baseClassInfo = nullptr) {
+    ClassInfo info;
     std::string perr;
-    CHECK(parseOne(src, decl, perr));
+    CHECK(parseOne(src, info, perr));
+    info.baseClass = baseClassInfo;
 
-    CodeGenResult r = generateClass(decl, knownClassNames);
+    CodeGenResult r = generateClass(info, knownClassNames);
     if (!r.ok)
         std::printf("  (%s) generateClass error: %s\n", label.c_str(), r.error.c_str());
     CHECK(r.ok);
@@ -152,12 +182,13 @@ static int expectCompiles(const std::string& label, const std::string& src, cons
 }
 
 static int expectRefused(const std::string& label, const std::string& src,
-                         const std::string& mustContain) {
-    ClassDecl decl;
+                         const std::string& mustContain, const ClassInfo* baseClassInfo = nullptr) {
+    ClassInfo info;
     std::string perr;
-    CHECK(parseOne(src, decl, perr));
+    CHECK(parseOne(src, info, perr));
+    info.baseClass = baseClassInfo;
 
-    CodeGenResult r = generateClass(decl);
+    CodeGenResult r = generateClass(info);
     CHECK(!r.ok);
     CHECK(!r.error.empty());
     if (!mustContain.empty() && r.error.find(mustContain) == std::string::npos) {
@@ -569,13 +600,92 @@ int main() {
         }
     )", vcvars, scratchDir)) return 1;
 
-    if (expectRefused("this.base.method() is refused", R"(
+    if (expectRefused("this.base.method() is refused when there is no script base", R"(
         class GenBaseCall : Actor {
             func update(float delta) {
                 this.base.update(delta);
             }
         }
     )", "base")) return 1;
+
+    // ---- Phase 9f: same-namespace script-to-script inheritance, now real
+    // (not refused) ----------------------------------------------------
+
+    {
+        ClassInfo baseInfo;
+        std::string perr;
+        CHECK(parseOne(R"(
+            class GenBase : Actor {
+                signal died(cause);
+                var health = 100;
+                var untouched = 1;
+                func heal(int amount) {
+                    health = health + amount;
+                    return health;
+                }
+                func describe() {
+                    return "base";
+                }
+            }
+        )", baseInfo, perr));
+
+        // Pre-seed GenBase's own generated files in scratchDir (unless no
+        // toolchain is available, in which case nothing gets compiled
+        // anyway) so a derived class's `#include "GenBase_Native.gen.h"`
+        // resolves -- mirrors buildNamespace() writing every class in a
+        // namespace before compiling any of them.
+        if (!vcvars.empty()) {
+            std::string werr;
+            CHECK(writeGeneratedFiles(baseInfo, scratchDir, werr));
+        }
+
+        if (expectCompiles("derived class: inherits a base field unchanged, calls an "
+                           "inherited method directly, and reads/writes an inherited field",
+                           R"(
+            class GenDerivedNoOverride : GenBase {
+                func update(float delta) {
+                    var h = heal(5);
+                    untouched = untouched + 1;
+                    var d = describe();
+                }
+            }
+        )", vcvars, scratchDir, {}, &baseInfo)) return 1;
+
+        if (expectCompiles("derived class: overrides a base field's default AND a base method, "
+                           "plus this.base.<method>() to reach the base's own version", R"(
+            class GenDerivedOverride : GenBase {
+                var health = 50;
+                func describe() {
+                    var baseDesc = this.base.describe();
+                    return baseDesc + "+derived";
+                }
+                func update(float delta) {
+                    var h = heal(10);
+                    var d = describe();
+                }
+            }
+        )", vcvars, scratchDir, {}, &baseInfo)) return 1;
+
+        if (expectCompiles("derived class: this.<inheritedSignal>.connect/emit -- a signal "
+                           "declared only on the base, used from a derived instance", R"(
+            class GenDerivedSignal : GenBase {
+                func onDied(cause) {}
+                func update(float delta) {
+                    this.died.connect(onDied);
+                    this.emit_signal("died", "fell");
+                }
+            }
+        )", vcvars, scratchDir, {}, &baseInfo)) return 1;
+
+        if (expectRefused("this.base.<method>() is refused for a method the base doesn't have",
+                          R"(
+            class GenBaseMissingMethod : GenBase {
+                func update(float delta) {
+                    this.base.nonexistent_method();
+                }
+            }
+        )", "no method", &baseInfo)) return 1;
+    }
 
     // ---- Phase 9e: static classes compiled natively, now real (not
     // refused) --------------------------------------------------------

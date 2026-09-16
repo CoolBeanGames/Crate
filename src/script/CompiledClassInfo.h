@@ -43,6 +43,24 @@ struct CompiledClassInfo {
     const char* className;
     const char* baseClassName; // "" for a direct Actor/Actor2D/Actor3D base
 
+    // Non-null when `className` has a SCRIPT base compiled into the same
+    // module (Phase 9f, same-namespace script-to-script inheritance) --
+    // points directly at the base's own kClassInfo_<base> (a compile-time-
+    // resolvable address, since same-namespace classes live in one
+    // translation unit). getObjectMember/trySetObjectMember/
+    // callObjectMethod (ObjectDispatch.cpp) walk this chain exactly like
+    // ClassInfo::findFunction()/hasSignal() walk ClassInfo::baseClass for
+    // the interpreted side, when a name isn't in THIS class's own
+    // fields/methods/signalNames tables below -- e.g. a derived instance
+    // that doesn't override "start" still has "start" reachable by name
+    // through get_component()/callObjectMethod, resolved via the base's
+    // OWN accessor function pointers (which take a base-typed void* --
+    // safe to call with a derived instance's address under single
+    // inheritance, where a derived object's address IS its base
+    // subobject's address). Cross-namespace inheritance is not wired up
+    // yet -- see transpiration.txt Phase 9f's own notes on what's left.
+    const CompiledClassInfo* baseClassInfo;
+
     const FieldAccessor* fields;
     size_t fieldCount;
     const MethodAccessor* methods;
