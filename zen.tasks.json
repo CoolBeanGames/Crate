@@ -2,7 +2,7 @@
     "schemaVersion":  1,
     "projectId":  "8afe2a0217d7419db234ceda7ecb9dff",
     "name":  "Crate",
-    "nextCardIndex":  101,
+    "nextCardIndex":  102,
     "latestExePath":  "build-Release/Crate.exe",
     "latestReleasePath":  "build-Release/Crate.exe",
     "tagCatalog":  [
@@ -4795,6 +4795,44 @@
                                            "isCollapsed":  false,
                                            "createdAt":  "2026-09-17T00:58:47.3315984+00:00",
                                            "updatedAt":  "2026-09-17T00:58:47.3315984+00:00"
+                                       },
+                                       {
+                                           "id":  "6495fef877b04df39ef2942f8911ec04",
+                                           "index":  101,
+                                           "kind":  "note",
+                                           "dueDate":  null,
+                                           "startedDate":  null,
+                                           "priority":  null,
+                                           "title":  "Scenes Phase 1 done: Scene::save()/load() serialization",
+                                           "task":  "Scenes Phase 1 complete and committed (2026-09-16, commit efc14b4 on project-management).\n\nImplemented full Scene::save()/Scene::load() serialization -- the foundational piece the rest of the Scenes task spec depends on. Summary:\n- New hand-rolled text format (documented in full at the top of src/scene/SceneIO.cpp): actor hierarchy, transforms, visible/enabled flags, and every component\u0027s fields.\n- Component and Actor both gained writeFields()/readField() virtuals, implemented for all 7 builtin components (MeshRenderer, Light, Fog, Volumetric Fog, Camera, Light Probe, Spinner) and SpriteActor/UIControlActor\u0027s extra fields.\n- Script components (interpreted AND native-compiled) serialize generically through their existing fields map -- no per-script-class code needed at all.\n- Actor-reference fields and native-component-reference fields (the exact kind Inspector drag-and-drop produces, e.g. a field holding another actor\u0027s Light component) both round-trip correctly, resolved in a deferred second pass so forward references anywhere in the file work.\n- Components are reconstructed on load via ComponentRegistry::create() -- builtin and script types share the identical load path, no special-casing.\n- Wired File \u003e Save Scene / Save Scene As / Open Scene in the editor with real native save/open dialogs.\n- New tests/scene_io_tests.cpp: 50 checks, covers every component type + a 3-level hierarchy across all 5 Actor kinds + script fields including both reference kinds. Full existing 20+ test suite still passes with zero regressions.\n- All built and tested in the isolated build-scenes/ tree; build/ and build-Release/Crate.exe (what\u0027s being tested on main) were never touched.\n\nNOT done yet (remaining Scenes task scope, in roughly the order I\u0027d tackle them next):\n- Asset Browser integration: recognizing .cscene files as an asset type, new-scene creation via toolbar/right-click/File menu, double-click to open (File \u003e Open Scene exists now, but there\u0027s no Asset Browser tile/double-click path yet).\n- Root scene concept + get_root() script API (a blank \"root\" scene created at game start) -- not started.\n- Tabbed multi-scene Scene View -- not started.\n- Prefab/nested-scene instancing: drag-to-asset-window extraction workflow, blue prefab coloring, Asset-type vs Actor-type distinction for script reference fields -- not started. This is probably the single largest remaining chunk.\n- Known format limitations (disclosed in SceneIO.cpp\u0027s header comment): FIELD string values can\u0027t contain an embedded newline; Value::T::Array-typed script fields aren\u0027t persisted yet (silently written/read as null) -- fine for now, but worth fixing before Array-typed fields become common.\n- The File \u003e Save Scene menu wiring was visually smoke-tested (dialogs open with correct titles/filters) but a full click-through save+reopen in the live app wasn\u0027t confirmed due to UI-automation focus flakiness against the native common dialog -- the save/load LOGIC itself is thoroughly covered by the automated test, so this is a low-risk gap, just flagging it honestly rather than claiming a live end-to-end UI test that didn\u0027t actually complete.\n\nNext session: continue with Asset Browser integration (probably the most user-visible next increment) or the root-scene/get_root() API, whichever the user prioritizes -- haven\u0027t picked one without their input.",
+                                           "tags":  [
+
+                                                    ],
+                                           "files":  [
+
+                                                     ],
+                                           "customTypeId":  null,
+                                           "customValues":  {
+
+                                                            },
+                                           "requirements":  [
+
+                                                            ],
+                                           "notes":  [
+
+                                                     ],
+                                           "flags":  {
+                                                         "commit":  false,
+                                                         "build":  false,
+                                                         "release":  false,
+                                                         "merge":  false
+                                                     },
+                                           "isDone":  false,
+                                           "isLocked":  false,
+                                           "isAwaitingFeedback":  false,
+                                           "isCollapsed":  false,
+                                           "createdAt":  "2026-09-17T03:24:52.4169184+00:00",
+                                           "updatedAt":  "2026-09-17T03:24:52.4169184+00:00"
                                        },
                                        {
                                            "id":  "c95aa21c18c84dd1811ebfec78f7831a",
