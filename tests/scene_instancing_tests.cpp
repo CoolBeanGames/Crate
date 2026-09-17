@@ -112,6 +112,49 @@ int main() {
                     "chain (World2 -> MidInWorld -> LeafInMid -> Lamp)\n");
     }
 
+    // --- Step 3: per-instance transform overrides persist across reload,
+    // independent of later changes to the source scene ---------------------
+    {
+        std::string err;
+        Scene world("World3");
+        Actor* inst = world.instantiate(leafPath, nullptr, "LeafInstance2", &err);
+        CHECK(inst != nullptr && err.empty());
+        CHECK(inst->children().size() == 1);
+        Actor* lamp = inst->children()[0].get();
+        CHECK(lamp->name() == "Lamp");
+        lamp->transform().position = {99.0f, 0.0f, 0.0f}; // override, straight in memory
+
+        const std::string worldPath = "_world3_scene_test.cscene";
+        CHECK(world.save(worldPath, &err));
+
+        Scene reloaded = Scene::load(worldPath, &err);
+        CHECK(err.empty());
+        Actor* rLamp = reloaded.atPath("LeafInstance2/Lamp");
+        CHECK(rLamp != nullptr);
+        CHECK(rLamp->transform().position.x == 99.0f); // override survived the round trip
+
+        // Now change the SOURCE scene's Lamp position and re-save it --
+        // reloading world must still show the OVERRIDE, not the new source
+        // value, since this descendant was explicitly edited after
+        // instancing.
+        {
+            Scene leaf2 = Scene::load(leafPath, &err);
+            CHECK(err.empty());
+            Actor* srcLamp = leaf2.atPath("Lamp");
+            CHECK(srcLamp != nullptr);
+            srcLamp->transform().position = {-5.0f, -5.0f, -5.0f};
+            CHECK(leaf2.save(leafPath, &err));
+        }
+        Scene reloaded2 = Scene::load(worldPath, &err);
+        std::remove(worldPath.c_str());
+        CHECK(err.empty());
+        Actor* rLamp2 = reloaded2.atPath("LeafInstance2/Lamp");
+        CHECK(rLamp2 != nullptr);
+        CHECK(rLamp2->transform().position.x == 99.0f); // still the override, not the new source value
+        std::printf("ok  per-instance transform override persists across reload and stays "
+                    "independent of later source-scene edits\n");
+    }
+
     // --- cycle guard: a scene that instances itself must not hang --------
     {
         Scene self("Self");

@@ -39,18 +39,30 @@
 //       of its source. sourcePath/name are tab-separated on one line
 //       (rather than two FIELD lines) since both need "rest of line"
 //       freedom and neither may contain a tab.
+//   OVERRIDE <localIndex> xform <px> <py> <pz> <rx> <ry> <rz> <sx> <sy> <sz>
+//       A per-instance transform override (Scenes task, Step 3): belongs to
+//       the most recently opened INSTANCE. `localIndex` addresses a
+//       descendant by its pre-order position WITHIN the instance's own
+//       subtree (root = 0, its first child = 1, ...; index 0 itself never
+//       appears here since the root's transform is always the plain XFORM
+//       line right after INSTANCE, not an override). Written only when that
+//       descendant's live transform differs from a fresh reload of the
+//       instance's source -- i.e. only for fields the user actually edited
+//       after instancing, everything else still tracks the source scene.
 //
 // Known limitations (disclosed for the next session, not silently swallowed):
 //   - FIELD string values may not contain an embedded newline.
 //   - Value::T::Array fields are not yet persisted (written/read as null).
-//   - An instance's children are ALWAYS exactly what its source scene
-//     currently contains -- no per-instance overrides yet (editing an
-//     instanced actor's fields in the Inspector won't persist across a
-//     reload) and no adding extra "local" children under an instance root.
-//     Both are planned follow-ups (see the Scenes task's Zen notes).
-//   - The Asset Browser drag-to-instantiate workflow and the prefab-
-//     extraction workflow (drag a node OUT to create a new saved scene)
-//     are separate, later increments.
+//   - Per-instance overrides (Step 3) cover DESCENDANT TRANSFORMS only so
+//     far -- editing a component field (e.g. a Light's color) on an actor
+//     inside an instance does not yet persist across a reload, and there's
+//     no way to add an extra "local" child under an instance root that
+//     isn't part of the source scene. Both are planned follow-ups.
+//   - The Asset Browser drag-to-instantiate workflow (place a NEW instance
+//     by dragging a .cscene from the browser into the viewport/hierarchy,
+//     as opposed to Scene::instantiate() called from code) is a separate,
+//     later increment; extraction (turning an actor INTO a saved scene) is
+//     already wired up in EditorApp's Asset Browser drop target.
 
 #include "scene/Actor2D.h"
 #include "scene/Actor3D.h"
@@ -61,6 +73,7 @@
 #include "core/Log.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -114,15 +127,54 @@ void writeXform(std::ostream& out, const Transform& t) {
         << t.scale.x << ' ' << t.scale.y << ' ' << t.scale.z << '\n';
 }
 
+bool xformsDiffer(const Transform& a, const Transform& b) {
+    auto near = [](float x, float y) { return std::fabs(x - y) < 1e-4f; };
+    return !(near(a.position.x, b.position.x) && near(a.position.y, b.position.y) &&
+             near(a.position.z, b.position.z) && near(a.rotationEuler.x, b.rotationEuler.x) &&
+             near(a.rotationEuler.y, b.rotationEuler.y) && near(a.rotationEuler.z, b.rotationEuler.z) &&
+             near(a.scale.x, b.scale.x) && near(a.scale.y, b.scale.y) && near(a.scale.z, b.scale.z));
+}
+
+// Walks `live` (this instance's actual subtree) and `baseline` (a fresh
+// reload of the SAME instance's own source, same structural shape) in
+// lockstep pre-order, emitting an OVERRIDE line for every descendant whose
+// transform differs -- i.e. only fields the user actually edited after
+// instancing. `idx` starts at 0 for the instance root itself, which never
+// gets an OVERRIDE (its XFORM line, written by the caller, already covers
+// it unconditionally). A structural mismatch (the source gained/lost a
+// child since this instance was made) is handled by simply not descending
+// past whichever side runs out first -- a disclosed limitation, not a
+// crash.
+void writeOverridesRecursive(std::ostream& out, const Actor& live, const Actor& baseline, int& idx) {
+    if (idx > 0 && xformsDiffer(live.transform(), baseline.transform())) {
+        const Transform& t = live.transform();
+        out << "OVERRIDE " << idx << " xform " << t.position.x << ' ' << t.position.y << ' '
+            << t.position.z << ' ' << t.rotationEuler.x << ' ' << t.rotationEuler.y << ' '
+            << t.rotationEuler.z << ' ' << t.scale.x << ' ' << t.scale.y << ' ' << t.scale.z << '\n';
+    }
+    size_t n = (std::min)(live.children().size(), baseline.children().size());
+    for (size_t i = 0; i < n; ++i) {
+        ++idx;
+        writeOverridesRecursive(out, *live.children()[i], *baseline.children()[i], idx);
+    }
+}
+
 void writeActorRecursive(std::ostream& out, const Actor& a, int id, int parentId,
                          std::unordered_map<const Actor*, int>& ids) {
     if (a.isInstanceRoot()) {
         // Short-circuit: no COMP/FIELD/children lines -- the source scene
         // supplies all of that fresh on every load. Only this node's own
-        // placement (transform) belongs to the INSTANCING scene.
+        // placement (transform) belongs to the INSTANCING scene, plus any
+        // per-descendant OVERRIDE lines (Step 3).
         out << "INSTANCE " << id << ' ' << parentId << ' ' << a.instanceSource() << '\t' << a.name()
             << '\n';
         writeXform(out, a.transform());
+        std::string baseErr;
+        Scene baseline = Scene::load(a.instanceSource(), &baseErr);
+        if (baseErr.empty()) {
+            int idx = 0;
+            writeOverridesRecursive(out, a, baseline.root(), idx);
+        }
         return;
     }
     out << "ACTOR " << id << ' ' << parentId << ' ' << a.typeName() << ' ' << (a.visible() ? 1 : 0)
@@ -220,6 +272,17 @@ Scene Scene::loadWithStack(const std::string& path, std::string* error,
     int currentActorId = -1;
     Component* currentComp = nullptr;
     std::vector<PendingField> pending;
+    // Valid only right after an INSTANCE line: pre-order localIndex -> Actor*
+    // within THAT instance's subtree, for OVERRIDE lines to address (root=0,
+    // matching writeOverridesRecursive's numbering exactly).
+    std::unordered_map<int, Actor*> instanceIndex;
+    std::function<void(Actor&, int&)> numberInstance = [&](Actor& a, int& idx) {
+        instanceIndex[idx] = &a;
+        for (const auto& c : a.children()) {
+            ++idx;
+            numberInstance(*c, idx);
+        }
+    };
 
     std::string line;
     bool first = true;
@@ -254,6 +317,7 @@ Scene Scene::loadWithStack(const std::string& path, std::string* error,
             currentActorId = id;
             byId[id] = currentActor;
             currentComp = nullptr;
+            instanceIndex.clear();
         } else if (line.rfind("INSTANCE ", 0) == 0) {
             auto tok = splitLine(line.substr(9), 3);
             int id = (int)std::strtol(tok[0].c_str(), nullptr, 10);
@@ -265,6 +329,7 @@ Scene Scene::loadWithStack(const std::string& path, std::string* error,
             std::string canon = canonicalOrRaw(sourcePath);
             currentActor = nullptr;
             currentComp = nullptr;
+            instanceIndex.clear();
             if (std::find(stack.begin(), stack.end(), canon) != stack.end()) {
                 CR_WARN("scene", "Scene load: '" + sourcePath +
                                      "' would instance itself (directly or transitively) -- skipped");
@@ -286,6 +351,10 @@ Scene Scene::loadWithStack(const std::string& path, std::string* error,
             currentActor = scene.add(std::move(instanceRoot), parent);
             currentActorId = id;
             byId[id] = currentActor;
+            {
+                int idx = 0;
+                numberInstance(*currentActor, idx);
+            }
         } else if (line.rfind("XFORM ", 0) == 0) {
             if (!currentActor) continue;
             std::istringstream ss(line.substr(6));
@@ -316,6 +385,20 @@ Scene Scene::loadWithStack(const std::string& path, std::string* error,
             else if (currentActor) pf.actorTarget = currentActor;
             else continue;
             pending.push_back(std::move(pf));
+        } else if (line.rfind("OVERRIDE ", 0) == 0) {
+            auto tok = splitLine(line.substr(9), 3);
+            int idx = (int)std::strtol(tok[0].c_str(), nullptr, 10);
+            const std::string& kind = tok[1];
+            auto it = instanceIndex.find(idx);
+            if (it == instanceIndex.end())
+                continue; // stale/out-of-range index (structural drift) -- skip, don't crash
+            if (kind == "xform") {
+                std::istringstream ss(tok[2]);
+                Transform t;
+                ss >> t.position.x >> t.position.y >> t.position.z >> t.rotationEuler.x >>
+                    t.rotationEuler.y >> t.rotationEuler.z >> t.scale.x >> t.scale.y >> t.scale.z;
+                it->second->transform() = t;
+            }
         }
         // Unrecognized lines are ignored (forward-compat with newer writers).
     }
