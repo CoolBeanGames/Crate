@@ -489,123 +489,6 @@
           "updatedAt": "2026-09-17T09:38:39.7338057+00:00"
         },
         {
-          "id": "5338ccc6168f49a496725f90f59b4f23",
-          "index": 108,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Inspector can\u0027t be double-clicked at all (regression?)",
-          "task": "Double-clicking in the Inspector does nothing at all right now -- neither for scripts nor other fields. User reverted to the last release build to keep testing other changes while this gets investigated. Needs repro steps / clarification on exactly what double-click interaction is expected here (which field/row?).",
-          "tags": [
-            "bug"
-          ],
-          "files": [],
-          "customTypeId": "e361978d91d9447f97033586db3c87b0",
-          "customValues": {
-            "c474f092663247ebb286cc5b978853d3": "Inspector can\u0027t be double-clicked at all (regression?)",
-            "77f8b466f2874429a253d2256f62c42a": "Double-clicking in the Inspector does nothing at all right now -- neither for scripts nor other fields. User reverted to the last release build to keep testing other changes while this gets investigated. Needs repro steps / clarification on exactly what double-click interaction is expected here (which field/row?).",
-            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
-            "203da294781c41a1b1e7f760ea47047e": "Crate",
-            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
-            "ce370daef7e94671b0b947c000ce780e": "0",
-            "37571d4735f1403b85a48880a05ec554": "bug"
-          },
-          "requirements": [],
-          "notes": [],
-          "flags": {
-            "commit": false,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
-          "updatedAt": "2026-09-17T09:38:39.7338057+00:00"
-        },
-        {
-          "id": "2f041e0faa5446b59ebad8b1834180a0",
-          "index": 110,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Double-clicking a script asset should open it in the Script Editor",
-          "task": "Double-clicking a .cscript tile in the Asset Browser should switch to the Script Editor tab and open that script for editing. May already partially work -- verify against current build and fix any gap.",
-          "tags": [
-            "bug",
-            "script editor"
-          ],
-          "files": [],
-          "customTypeId": "e361978d91d9447f97033586db3c87b0",
-          "customValues": {
-            "c474f092663247ebb286cc5b978853d3": "Double-clicking a script asset should open it in the Script Editor",
-            "77f8b466f2874429a253d2256f62c42a": "Double-clicking a .cscript tile in the Asset Browser should switch to the Script Editor tab and open that script for editing. May already partially work -- verify against current build and fix any gap.",
-            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
-            "203da294781c41a1b1e7f760ea47047e": "Crate",
-            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
-            "ce370daef7e94671b0b947c000ce780e": "0",
-            "37571d4735f1403b85a48880a05ec554": "bug,script editor"
-          },
-          "requirements": [],
-          "notes": [],
-          "flags": {
-            "commit": false,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
-          "updatedAt": "2026-09-17T09:38:39.7338057+00:00"
-        },
-        {
-          "id": "4344a2ffb74f4b06b2e961a61889b6ad",
-          "index": 118,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "update()\u0027s delta parameter always returns 0",
-          "task": "The delta (dt) parameter passed into a script\u0027s update(float delta) function doesn\u0027t work currently -- it always reads as 0 instead of the actual frame time.",
-          "tags": [
-            "bug",
-            "cScript",
-            "Scripting"
-          ],
-          "files": [],
-          "customTypeId": "e361978d91d9447f97033586db3c87b0",
-          "customValues": {
-            "c474f092663247ebb286cc5b978853d3": "update()\u0027s delta parameter always returns 0",
-            "77f8b466f2874429a253d2256f62c42a": "The delta (dt) parameter passed into a script\u0027s update(float delta) function doesn\u0027t work currently -- it always reads as 0 instead of the actual frame time.",
-            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
-            "203da294781c41a1b1e7f760ea47047e": "Crate",
-            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
-            "ce370daef7e94671b0b947c000ce780e": "0",
-            "37571d4735f1403b85a48880a05ec554": "bug,cScript,Scripting"
-          },
-          "requirements": [],
-          "notes": [],
-          "flags": {
-            "commit": false,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
-          "updatedAt": "2026-09-17T09:38:39.7338057+00:00"
-        },
-        {
           "id": "613adb44f6ec4217836690ab93326525",
           "index": 88,
           "kind": "task",
@@ -1818,6 +1701,123 @@
           "isCollapsed": true,
           "createdAt": "2026-09-17T09:38:39.7338057+00:00",
           "updatedAt": "2026-09-17T11:00:36+00:00"
+        },
+        {
+          "id": "5338ccc6168f49a496725f90f59b4f23",
+          "index": 108,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Inspector can\u0027t be double-clicked at all (regression?)",
+          "task": "Double-clicking in the Inspector does nothing at all right now -- neither for scripts nor other fields. User reverted to the last release build to keep testing other changes while this gets investigated. Needs repro steps / clarification on exactly what double-click interaction is expected here (which field/row?).\n\nRESOLUTION (verified live, 2026-09-17): Could not reproduce. Tested double-click on a Mesh Renderer numeric field (enters text-edit mode correctly, standard ImGui DragFloat behavior) and single/double-click on the actor name field (InputText -- edits immediately on a single click, renaming propagates live to the Hierarchy). Both work correctly in the current build. This item was filed while the user had reverted to an older release build to keep testing other things (see the item\u0027s own note) -- most likely already fixed there, or was a symptom of the same invisible-button click-blocking bug fixed for the Asset Browser (see note index 120), just not in the Inspector\u0027s own code path. Re-open with an exact repro (which field, which panel) if it recurs on the latest build.",
+          "tags": [
+            "bug"
+          ],
+          "files": [],
+          "customTypeId": "e361978d91d9447f97033586db3c87b0",
+          "customValues": {
+            "c474f092663247ebb286cc5b978853d3": "Inspector can\u0027t be double-clicked at all (regression?)",
+            "77f8b466f2874429a253d2256f62c42a": "Double-clicking in the Inspector does nothing at all right now -- neither for scripts nor other fields. User reverted to the last release build to keep testing other changes while this gets investigated. Needs repro steps / clarification on exactly what double-click interaction is expected here (which field/row?).",
+            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
+            "203da294781c41a1b1e7f760ea47047e": "Crate",
+            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
+            "ce370daef7e94671b0b947c000ce780e": "0",
+            "37571d4735f1403b85a48880a05ec554": "bug"
+          },
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
+          "updatedAt": "2026-09-17T12:00:00+00:00"
+        },
+        {
+          "id": "2f041e0faa5446b59ebad8b1834180a0",
+          "index": 110,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Double-clicking a script asset should open it in the Script Editor",
+          "task": "Double-clicking a .cscript tile in the Asset Browser should switch to the Script Editor tab and open that script for editing. May already partially work -- verify against current build and fix any gap.",
+          "tags": [
+            "bug",
+            "script editor"
+          ],
+          "files": [],
+          "customTypeId": "e361978d91d9447f97033586db3c87b0",
+          "customValues": {
+            "c474f092663247ebb286cc5b978853d3": "Double-clicking a script asset should open it in the Script Editor",
+            "77f8b466f2874429a253d2256f62c42a": "Double-clicking a .cscript tile in the Asset Browser should switch to the Script Editor tab and open that script for editing. May already partially work -- verify against current build and fix any gap.",
+            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
+            "203da294781c41a1b1e7f760ea47047e": "Crate",
+            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
+            "ce370daef7e94671b0b947c000ce780e": "0",
+            "37571d4735f1403b85a48880a05ec554": "bug,script editor"
+          },
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
+          "updatedAt": "2026-09-17T12:00:00+00:00"
+        },
+        {
+          "id": "4344a2ffb74f4b06b2e961a61889b6ad",
+          "index": 118,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "update()\u0027s delta parameter always returns 0",
+          "task": "The delta (dt) parameter passed into a script\u0027s update(float delta) function doesn\u0027t work currently -- it always reads as 0 instead of the actual frame time.\n\nRESOLUTION (verified live, 2026-09-17): Could not reproduce. Attached Mover (a real script with update(float delta)) to an actor, played, and printed delta every frame in the Game Console -- consistently correct real per-frame values (~0.0165s at 60fps), and Mover\u0027s own \u0060elapsed\u0060 field and rotation both accumulated correctly. Also verified float*Vector3 multiplication (both operand orders, chained forward*speed*delta, and position \u002B= accumulation) all produce correct results in both the interpreter and native-compiled paths (they share one Runtime::arith() implementation). User\u0027s likely original symptom: vector*delta silently producing a near-zero vector reads identically to \u0027multiply failed\u0027 when delta itself was 0 on whatever build was tested -- one root cause, two-sounding symptoms. Re-open with the user\u0027s exact script line if it recurs on the latest build.",
+          "tags": [
+            "bug",
+            "cScript",
+            "Scripting"
+          ],
+          "files": [],
+          "customTypeId": "e361978d91d9447f97033586db3c87b0",
+          "customValues": {
+            "c474f092663247ebb286cc5b978853d3": "update()\u0027s delta parameter always returns 0",
+            "77f8b466f2874429a253d2256f62c42a": "The delta (dt) parameter passed into a script\u0027s update(float delta) function doesn\u0027t work currently -- it always reads as 0 instead of the actual frame time.",
+            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
+            "203da294781c41a1b1e7f760ea47047e": "Crate",
+            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
+            "ce370daef7e94671b0b947c000ce780e": "0",
+            "37571d4735f1403b85a48880a05ec554": "bug,cScript,Scripting"
+          },
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
+          "updatedAt": "2026-09-17T12:00:00+00:00"
         },
         {
           "id": "c9d4482b33c94eeda497726091ff6dbf",
