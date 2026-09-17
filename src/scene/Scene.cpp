@@ -216,6 +216,30 @@ Scene Scene::makeSample() {
     }
     s.add(std::move(sun), set);
 
+    auto fog = std::make_unique<Actor3D>("Volumetric Fog");
+    fog->addComponent(std::make_unique<VolumetricFogComponent>());
+    s.add(std::move(fog), set);
+
+    auto* player = s.add(std::make_unique<Actor3D>("Player"));
+    player->transform().position = {2.0f, 0.0f, 2.0f}; // offset from the center
+
+    auto camera = std::make_unique<Actor3D>("Camera");
+    camera->transform().position = {0.0f, 2.5f, 0.0f}; // higher than Player
+    // Looks toward the Crate/Ceiling Lamp cluster near the world origin.
+    camera->transform().rotationEuler = {12.46f, -135.0f, 0.0f};
+    camera->addComponent(std::make_unique<CameraComponent>());
+    auto* camPtr = s.add(std::move(camera), player);
+
+    auto spotLight = std::make_unique<Actor3D>("Spot Light");
+    {
+        auto lc = std::make_unique<LightComponent>();
+        lc->type = LightComponent::Type::Spot;
+        lc->range = 10.0f;
+        lc->intensity = 1.2f;
+        spotLight->addComponent(std::move(lc)); // zero local rotation -> same aim as Camera
+    }
+    s.add(std::move(spotLight), camPtr);
+
     auto* cast = s.add(std::make_unique<Actor>("-- CAST --"));
     s.add(std::make_unique<SpriteActor>("Player Ghost"), cast);
 
