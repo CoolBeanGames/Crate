@@ -29,6 +29,7 @@ Vec3 Input::stickValue(int stick) const {
 
 void Input::poll() {
     events_.clear();
+    pollMouse();
     if (!map_)
         return;
 
@@ -43,6 +44,30 @@ void Input::poll() {
         else if (s.down)
             events_.push_back({b.name, 0});
     }
+}
+
+// Mouse buttons feed the SAME buttons_/events_ machinery as InputMap actions,
+// under reserved names -- so Input.is_pressed("mouse_left"),
+// Input.get_button("mouse_left").just_pressed.connect(...), etc. all work
+// through the existing generic dispatch with no new script-side plumbing.
+void Input::pollMouse() {
+    static const struct { int imguiButton; const char* name; } kButtons[] = {
+        {0, "mouse_left"}, {1, "mouse_right"}, {2, "mouse_middle"},
+    };
+    ImGuiIO& io = ImGui::GetIO();
+    for (const auto& b : kButtons) {
+        BtnState& s = buttons_[b.name];
+        s.prev = s.down;
+        s.down = ImGui::IsMouseDown(b.imguiButton);
+        if (s.down && !s.prev)
+            events_.push_back({b.name, 1});
+        else if (!s.down && s.prev)
+            events_.push_back({b.name, 2});
+        else if (s.down)
+            events_.push_back({b.name, 0});
+    }
+    mouseDelta_ = {io.MouseDelta.x, io.MouseDelta.y, 0};
+    scrollDelta_ = {io.MouseWheelH, io.MouseWheel, 0};
 }
 
 bool Input::pressed(const std::string& name) const {

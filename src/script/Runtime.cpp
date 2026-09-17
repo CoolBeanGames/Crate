@@ -293,9 +293,203 @@ const NativeFieldEntry kCameraFields[] = {
      }},
 };
 
+const NativeFieldEntry kTransformFields[] = {
+    {"position",
+     [](void* p) -> Value {
+         auto* t = static_cast<Transform*>(p);
+         return makeVector("Vector3", t->position.x, t->position.y, t->position.z);
+     },
+     [](void* p, const Value& v, crate::Actor*) -> bool {
+         auto* t = static_cast<Transform*>(p);
+         if (v.t == Value::T::Object && v.obj) {
+             t->position.x = (float)v.obj->fields["x"].num();
+             t->position.y = (float)v.obj->fields["y"].num();
+             t->position.z = (float)v.obj->fields["z"].num();
+         }
+         return true;
+     }},
+    {"rotation",
+     [](void* p) -> Value {
+         auto* t = static_cast<Transform*>(p);
+         return makeVector("Vector3", t->rotationEuler.x, t->rotationEuler.y, t->rotationEuler.z);
+     },
+     [](void* p, const Value& v, crate::Actor*) -> bool {
+         auto* t = static_cast<Transform*>(p);
+         if (v.t == Value::T::Object && v.obj) {
+             t->rotationEuler.x = (float)v.obj->fields["x"].num();
+             t->rotationEuler.y = (float)v.obj->fields["y"].num();
+             t->rotationEuler.z = (float)v.obj->fields["z"].num();
+         }
+         return true;
+     }},
+    {"scale",
+     [](void* p) -> Value {
+         auto* t = static_cast<Transform*>(p);
+         return makeVector("Vector3", t->scale.x, t->scale.y, t->scale.z);
+     },
+     [](void* p, const Value& v, crate::Actor*) -> bool {
+         auto* t = static_cast<Transform*>(p);
+         if (v.t == Value::T::Object && v.obj) {
+             t->scale.x = (float)v.obj->fields["x"].num();
+             t->scale.y = (float)v.obj->fields["y"].num();
+             t->scale.z = (float)v.obj->fields["z"].num();
+         }
+         return true;
+     }},
+};
+
+const NativeFieldEntry kLightFields[] = {
+    {"type",
+     [](void* p) -> Value { return Value::Int((long long)static_cast<LightComponent*>(p)->type); },
+     [](void* p, const Value& v, crate::Actor*) -> bool {
+         static_cast<LightComponent*>(p)->type = (LightComponent::Type)v.num();
+         return true;
+     }},
+    {"color",
+     [](void* p) -> Value {
+         auto* lc = static_cast<LightComponent*>(p);
+         return makeVector("Vector3", lc->color[0], lc->color[1], lc->color[2]);
+     },
+     [](void* p, const Value& v, crate::Actor*) -> bool {
+         auto* lc = static_cast<LightComponent*>(p);
+         if (v.t == Value::T::Object && v.obj) {
+             lc->color[0] = (float)v.obj->fields["x"].num();
+             lc->color[1] = (float)v.obj->fields["y"].num();
+             lc->color[2] = (float)v.obj->fields["z"].num();
+         }
+         return true;
+     }},
+    {"intensity",
+     [](void* p) -> Value { return Value::Float(static_cast<LightComponent*>(p)->intensity); },
+     [](void* p, const Value& v, crate::Actor*) -> bool {
+         static_cast<LightComponent*>(p)->intensity = (float)v.num();
+         return true;
+     }},
+    {"range",
+     [](void* p) -> Value { return Value::Float(static_cast<LightComponent*>(p)->range); },
+     [](void* p, const Value& v, crate::Actor*) -> bool {
+         static_cast<LightComponent*>(p)->range = (float)v.num();
+         return true;
+     }},
+    {"spot_inner_deg",
+     [](void* p) -> Value { return Value::Float(static_cast<LightComponent*>(p)->spotInnerDeg); },
+     [](void* p, const Value& v, crate::Actor*) -> bool {
+         static_cast<LightComponent*>(p)->spotInnerDeg = (float)v.num();
+         return true;
+     }},
+    {"spot_outer_deg",
+     [](void* p) -> Value { return Value::Float(static_cast<LightComponent*>(p)->spotOuterDeg); },
+     [](void* p, const Value& v, crate::Actor*) -> bool {
+         static_cast<LightComponent*>(p)->spotOuterDeg = (float)v.num();
+         return true;
+     }},
+    {"is_static",
+     [](void* p) -> Value { return Value::Bool(static_cast<LightComponent*>(p)->isStatic); },
+     [](void* p, const Value& v, crate::Actor*) -> bool {
+         static_cast<LightComponent*>(p)->isStatic = v.truthy();
+         return true;
+     }},
+};
+
+const NativeFieldEntry kVolumetricFogFields[] = {
+    {"color",
+     [](void* p) -> Value {
+         auto* vf = static_cast<VolumetricFogComponent*>(p);
+         return makeVector("Vector3", vf->color[0], vf->color[1], vf->color[2]);
+     },
+     [](void* p, const Value& v, crate::Actor*) -> bool {
+         auto* vf = static_cast<VolumetricFogComponent*>(p);
+         if (v.t == Value::T::Object && v.obj) {
+             vf->color[0] = (float)v.obj->fields["x"].num();
+             vf->color[1] = (float)v.obj->fields["y"].num();
+             vf->color[2] = (float)v.obj->fields["z"].num();
+         }
+         return true;
+     }},
+    {"density",
+     [](void* p) -> Value { return Value::Float(static_cast<VolumetricFogComponent*>(p)->density); },
+     [](void* p, const Value& v, crate::Actor*) -> bool {
+         static_cast<VolumetricFogComponent*>(p)->density = (float)v.num();
+         return true;
+     }},
+};
+
+const NativeFieldEntry kMeshRendererFields[] = {
+    {"tint",
+     [](void* p) -> Value {
+         auto* mr = static_cast<MeshRenderer*>(p);
+         return makeVector("Vector3", mr->tint[0], mr->tint[1], mr->tint[2]);
+     },
+     [](void* p, const Value& v, crate::Actor*) -> bool {
+         auto* mr = static_cast<MeshRenderer*>(p);
+         if (v.t == Value::T::Object && v.obj) {
+             mr->tint[0] = (float)v.obj->fields["x"].num();
+             mr->tint[1] = (float)v.obj->fields["y"].num();
+             mr->tint[2] = (float)v.obj->fields["z"].num();
+         }
+         return true;
+     }},
+    {"cast_shadows",
+     [](void* p) -> Value { return Value::Bool(static_cast<MeshRenderer*>(p)->castShadows); },
+     [](void* p, const Value& v, crate::Actor*) -> bool {
+         static_cast<MeshRenderer*>(p)->castShadows = v.truthy();
+         return true;
+     }},
+    {"receive_shadows",
+     [](void* p) -> Value { return Value::Bool(static_cast<MeshRenderer*>(p)->receiveShadows); },
+     [](void* p, const Value& v, crate::Actor*) -> bool {
+         static_cast<MeshRenderer*>(p)->receiveShadows = v.truthy();
+         return true;
+     }},
+};
+
+const NativeFieldEntry kLightProbeFields[] = {
+    {"baked_light",
+     [](void* p) -> Value {
+         auto* lp = static_cast<LightProbeComponent*>(p);
+         return makeVector("Vector3", lp->bakedLight[0], lp->bakedLight[1], lp->bakedLight[2]);
+     },
+     [](void* p, const Value& v, crate::Actor*) -> bool {
+         auto* lp = static_cast<LightProbeComponent*>(p);
+         if (v.t == Value::T::Object && v.obj) {
+             lp->bakedLight[0] = (float)v.obj->fields["x"].num();
+             lp->bakedLight[1] = (float)v.obj->fields["y"].num();
+             lp->bakedLight[2] = (float)v.obj->fields["z"].num();
+         }
+         return true;
+     }},
+    {"baked_valid",
+     [](void* p) -> Value { return Value::Bool(static_cast<LightProbeComponent*>(p)->bakedValid); },
+     [](void* p, const Value& v, crate::Actor*) -> bool {
+         static_cast<LightProbeComponent*>(p)->bakedValid = v.truthy();
+         return true;
+     }},
+};
+
+const NativeFieldEntry kSpinnerFields[] = {
+    {"degrees_per_second",
+     [](void* p) -> Value { return Value::Float(static_cast<SpinnerComponent*>(p)->degreesPerSecond); },
+     [](void* p, const Value& v, crate::Actor*) -> bool {
+         static_cast<SpinnerComponent*>(p)->degreesPerSecond = (float)v.num();
+         return true;
+     }},
+    {"axis",
+     [](void* p) -> Value { return Value::Int(static_cast<SpinnerComponent*>(p)->axis); },
+     [](void* p, const Value& v, crate::Actor*) -> bool {
+         static_cast<SpinnerComponent*>(p)->axis = (int)v.num();
+         return true;
+     }},
+};
+
 const NativeTypeEntry kNativeTypes[] = {
     {"Fog", kFogFields, sizeof(kFogFields) / sizeof(kFogFields[0])},
     {"Camera", kCameraFields, sizeof(kCameraFields) / sizeof(kCameraFields[0])},
+    {"Transform", kTransformFields, sizeof(kTransformFields) / sizeof(kTransformFields[0])},
+    {"Light", kLightFields, sizeof(kLightFields) / sizeof(kLightFields[0])},
+    {"VolumetricFog", kVolumetricFogFields, sizeof(kVolumetricFogFields) / sizeof(kVolumetricFogFields[0])},
+    {"MeshRenderer", kMeshRendererFields, sizeof(kMeshRendererFields) / sizeof(kMeshRendererFields[0])},
+    {"LightProbe", kLightProbeFields, sizeof(kLightProbeFields) / sizeof(kLightProbeFields[0])},
+    {"Spinner", kSpinnerFields, sizeof(kSpinnerFields) / sizeof(kSpinnerFields[0])},
 };
 
 const NativeTypeEntry* findNativeType(const std::string& builtin) {

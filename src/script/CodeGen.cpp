@@ -433,7 +433,9 @@ std::string Gen::expr(const Expr& e, FnCtx& fc) {
             // time -- e.g. `type_of(SomeOtherScript)` for a
             // get_component(type_of(...)) call.
             static const std::unordered_set<std::string> kBuiltinTypeNames = {
-                "Actor", "Actor2D", "Actor3D", "Vector2", "Vector3", "Fog", "Camera"};
+                "Actor",    "Actor2D",     "Actor3D",   "Vector2", "Vector3",
+                "Fog",      "Camera",      "Transform", "Light",   "VolumetricFog",
+                "MeshRenderer", "LightProbe", "Spinner"};
             if (n == decl_.name || kBuiltinTypeNames.count(n) || knownClassNames_.count(n))
                 return "crate::script::Value::Type(" + cppStringLiteral(n) + ")";
             // A bare reference to one of this class's own declared methods,
@@ -676,6 +678,16 @@ std::string Gen::expr(const Expr& e, FnCtx& fc) {
                                "ctx_->inputQuery(" +
                                n + ", 3) : 0.0, ctx_ && ctx_->inputQuery ? ctx_->inputQuery(" + n +
                                ", 4) : 0.0, 0.0)";
+                    if (method == "get_mouse_delta")
+                        return "crate::script::makeVector(\"Vector2\", ctx_ && ctx_->inputQuery ? "
+                               "ctx_->inputQuery(" +
+                               n + ", 5) : 0.0, ctx_ && ctx_->inputQuery ? ctx_->inputQuery(" + n +
+                               ", 6) : 0.0, 0.0)";
+                    if (method == "get_scroll_delta")
+                        return "crate::script::makeVector(\"Vector2\", ctx_ && ctx_->inputQuery ? "
+                               "ctx_->inputQuery(" +
+                               n + ", 7) : 0.0, ctx_ && ctx_->inputQuery ? ctx_->inputQuery(" + n +
+                               ", 8) : 0.0, 0.0)";
                     if (method == "is_pressed")
                         return "crate::script::Value::Bool(ctx_ && ctx_->inputQuery && "
                                "ctx_->inputQuery(" +

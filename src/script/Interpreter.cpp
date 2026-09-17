@@ -265,7 +265,9 @@ Value Interpreter::eval(const Expr& e) {
             // a bare type name evaluates to a TypeRef
             if (ctx_->findType(e.strVal) || e.strVal == "Actor" || e.strVal == "Actor2D" ||
                 e.strVal == "Actor3D" || e.strVal == "Vector2" || e.strVal == "Vector3" ||
-                e.strVal == "Fog" || e.strVal == "Camera")
+                e.strVal == "Fog" || e.strVal == "Camera" || e.strVal == "Transform" ||
+                e.strVal == "Light" || e.strVal == "VolumetricFog" || e.strVal == "MeshRenderer" ||
+                e.strVal == "LightProbe" || e.strVal == "Spinner")
                 return Value::Type(e.strVal);
             // a bare signal name on `this`.
             if (self_ && self_->cls && self_->cls->hasSignal(e.strVal))
@@ -449,6 +451,20 @@ Value Interpreter::evalCall(const Expr& e) {
             if (method == "get_axis") {
                 double x = ctx_->inputQuery ? ctx_->inputQuery(n, 3) : 0.0;
                 double y = ctx_->inputQuery ? ctx_->inputQuery(n, 4) : 0.0;
+                return makeVector("Vector2", x, y, 0);
+            }
+            // Mouse buttons ride the same is_pressed/is_just_pressed/
+            // is_just_released/get_button API above under reserved names:
+            // "mouse_left" / "mouse_right" / "mouse_middle" (see Input::
+            // pollMouse). Delta/scroll have no button identity of their own.
+            if (method == "get_mouse_delta") {
+                double x = ctx_->inputQuery ? ctx_->inputQuery(n, 5) : 0.0;
+                double y = ctx_->inputQuery ? ctx_->inputQuery(n, 6) : 0.0;
+                return makeVector("Vector2", x, y, 0);
+            }
+            if (method == "get_scroll_delta") {
+                double x = ctx_->inputQuery ? ctx_->inputQuery(n, 7) : 0.0;
+                double y = ctx_->inputQuery ? ctx_->inputQuery(n, 8) : 0.0;
                 return makeVector("Vector2", x, y, 0);
             }
             if (method == "is_pressed")

@@ -178,7 +178,8 @@ void NativeScriptComponent::physicsUpdate(float dt) {
 
 void NativeScriptComponent::drawRefField(const std::string& label, const std::string& declType,
                                          Value& val) {
-    const bool isActorType = declType == "Actor" || declType == "Actor2D" || declType == "Actor3D";
+    const bool isActorType = declType == "Actor" || declType == "Actor2D" || declType == "Actor3D" ||
+                             declType == "Transform";
     crate::Actor* root = sceneRootOf(actor());
 
     std::string current = "(none)";

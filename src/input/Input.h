@@ -25,6 +25,14 @@ public:
     // 2-button axis -> {x, 0}; 4-button / analog axis -> {x, y}.
     Vec3 axis(const std::string& name) const;
 
+    // Raw mouse state, reachable from script through the same reserved
+    // button names ("mouse_left"/"mouse_right"/"mouse_middle") pressed/
+    // justPressed/justReleased/the button-signal system above already
+    // understand -- see poll()'s mouse section. Delta/scroll have no
+    // per-button identity, so they get their own accessors instead.
+    Vec3 mouseDelta() const { return mouseDelta_; }  // pixels moved this frame
+    Vec3 scrollDelta() const { return scrollDelta_; } // wheel {h, v} this frame
+
     // Transitions this frame, for the scripting signal layer to dispatch.
     // kind: 0 = pressed (held), 1 = just_pressed, 2 = just_released.
     struct Event {
@@ -41,9 +49,12 @@ private:
     const InputMap* map_ = nullptr;
     std::unordered_map<std::string, BtnState> buttons_;
     std::vector<Event> events_;
+    Vec3 mouseDelta_{0, 0, 0};
+    Vec3 scrollDelta_{0, 0, 0};
 
     static bool keyDown(int imguiKey);
     Vec3 stickValue(int stick) const;
+    void pollMouse();
 };
 
 } // namespace crate

@@ -114,7 +114,8 @@ void ScriptComponent::physicsUpdate(float dt) { runHook("physics_update", true, 
 // any component type without needing to special-case each one here.
 void ScriptComponent::drawRefField(const std::string& label, const std::string& declType,
                                    Value& val) {
-    const bool isActorType = declType == "Actor" || declType == "Actor2D" || declType == "Actor3D";
+    const bool isActorType = declType == "Actor" || declType == "Actor2D" || declType == "Actor3D" ||
+                             declType == "Transform";
     crate::Actor* root = sceneRootOf(actor());
 
     std::string current = "(none)";

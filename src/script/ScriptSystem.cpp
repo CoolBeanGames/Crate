@@ -93,6 +93,61 @@ ScriptSystem::ScriptSystem() {
                 return o;
             }
         }
+        // The actor's own Transform isn't a Component at all, but is
+        // reachable the same way for consistency (get_component(type_of(
+        // Transform)), and the Inspector's generic component picker).
+        if (typeName == "Transform") {
+            auto o = std::make_shared<ScriptObject>();
+            o->builtin = "Transform";
+            o->nativePtr = &a->transform();
+            o->owner = a;
+            return o;
+        }
+        if (typeName == "Light") {
+            if (auto* lc = a->getComponent<LightComponent>()) {
+                auto o = std::make_shared<ScriptObject>();
+                o->builtin = "Light";
+                o->nativePtr = lc;
+                o->owner = a;
+                return o;
+            }
+        }
+        if (typeName == "VolumetricFog") {
+            if (auto* vf = a->getComponent<VolumetricFogComponent>()) {
+                auto o = std::make_shared<ScriptObject>();
+                o->builtin = "VolumetricFog";
+                o->nativePtr = vf;
+                o->owner = a;
+                return o;
+            }
+        }
+        if (typeName == "MeshRenderer") {
+            if (auto* mr = a->getComponent<MeshRenderer>()) {
+                auto o = std::make_shared<ScriptObject>();
+                o->builtin = "MeshRenderer";
+                o->nativePtr = mr;
+                o->owner = a;
+                return o;
+            }
+        }
+        if (typeName == "LightProbe") {
+            if (auto* lp = a->getComponent<LightProbeComponent>()) {
+                auto o = std::make_shared<ScriptObject>();
+                o->builtin = "LightProbe";
+                o->nativePtr = lp;
+                o->owner = a;
+                return o;
+            }
+        }
+        if (typeName == "Spinner") {
+            if (auto* sp = a->getComponent<SpinnerComponent>()) {
+                auto o = std::make_shared<ScriptObject>();
+                o->builtin = "Spinner";
+                o->nativePtr = sp;
+                o->owner = a;
+                return o;
+            }
+        }
         return nullptr;
     };
     ctx_.getStatic = [this](const std::string& name) -> std::shared_ptr<ScriptObject> {
@@ -108,6 +163,10 @@ ScriptSystem::ScriptSystem() {
             case 2: return in.justReleased(name) ? 1.0 : 0.0;
             case 3: return in.axis(name).x;
             case 4: return in.axis(name).y;
+            case 5: return in.mouseDelta().x;
+            case 6: return in.mouseDelta().y;
+            case 7: return in.scrollDelta().x;
+            case 8: return in.scrollDelta().y;
         }
         return 0.0;
     };
@@ -605,12 +664,26 @@ void ScriptSystem::rebuildTypeDocs() {
     // "Camera" is also reachable as a bare global for Camera.main (task 77):
     // the scene's one active camera, readable and assignable to switch it.
     add("Camera", "", false, {"main", "fov", "near", "far", "active"});
+    // Reachable via get_component(type_of(Light)) / drag-drop onto a field
+    // declared with this type -- see ScriptSystem's ctx_.getComponent.
+    add("Light", "", false,
+        {"type", "color", "intensity", "range", "spot_inner_deg", "spot_outer_deg", "is_static"});
+    add("VolumetricFog", "", false, {"color", "density"});
+    add("MeshRenderer", "", false, {"tint", "cast_shadows", "receive_shadows"});
+    add("LightProbe", "", false, {"baked_light", "baked_valid"});
+    add("Spinner", "", false, {"degrees_per_second", "axis"});
     // Global namespace reached as Input.<method>(...), handled directly in
     // Interpreter::evalCall rather than through get_component -- listed here
     // purely so its methods show up in autocomplete (task: "Input global
     // missing from script autocomplete").
+    // Mouse buttons use the same get_button/is_pressed/is_just_pressed/
+    // is_just_released API under reserved names "mouse_left"/"mouse_right"/
+    // "mouse_middle" (e.g. Input.is_pressed("mouse_left"),
+    // Input.get_button("mouse_left").just_pressed.connect(...)); delta/
+    // scroll get their own methods since they aren't per-button.
     add("Input", "", false,
-       {"get_button", "get_axis", "is_pressed", "is_just_pressed", "is_just_released"});
+       {"get_button", "get_axis", "is_pressed", "is_just_pressed", "is_just_released",
+        "get_mouse_delta", "get_scroll_delta"});
 
     for (const auto& [name, ci] : types_) {
         std::vector<std::string> members;
