@@ -69,6 +69,18 @@ public:
     // Build a small default scene so the editor is not empty on first launch.
     static Scene makeSample();
 
+    // --- Serialization (Scenes task, Phase 1: see scene/SceneIO.cpp for the
+    // file format and its documented limitations) ---------------------------
+    // Writes the full actor hierarchy, transforms, and every component's
+    // fields to a text file. Returns false (and sets *error, if given) on
+    // failure, e.g. an unwritable path.
+    bool save(const std::string& path, std::string* error = nullptr) const;
+
+    // Reads a file previously written by save(). Returns a scene named
+    // "Untitled" with nothing in it (and sets *error) on failure -- never
+    // partially-loaded silent corruption.
+    static Scene load(const std::string& path, std::string* error = nullptr);
+
 private:
     std::string name_;
     std::unique_ptr<Actor> root_;

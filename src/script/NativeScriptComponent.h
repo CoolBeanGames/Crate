@@ -72,6 +72,10 @@ public:
         return std::make_unique<NativeScriptComponent>(ctx_, cls_, exp_);
     }
 
+    void writeFields(std::ostream& out, const std::function<int(const Actor*)>& idOf) const override;
+    void readField(const std::string& key, const std::string& kind, const std::string& value,
+                   const std::function<Actor*(int)>& actorById) override;
+
 private:
     void ensureNative(); // lazily CreateInstance_<Class>(ctx_, actor())
     void ensureObject();  // lazily Interpreter::instantiate (mirrors ScriptComponent)

@@ -16,6 +16,9 @@ public:
     std::unique_ptr<Component> clone() const override {
         return std::make_unique<MeshRenderer>(*this);
     }
+    void writeFields(std::ostream& out, const std::function<int(const Actor*)>& idOf) const override;
+    void readField(const std::string& key, const std::string& kind, const std::string& value,
+                   const std::function<Actor*(int)>& actorById) override;
 
     bool usePrimitive = true;
     std::string primitive = "Cube"; // Cube/Sphere/Cylinder/Capsule/Plane/Quad
@@ -58,6 +61,9 @@ public:
     std::unique_ptr<Component> clone() const override {
         return std::make_unique<LightComponent>(*this);
     }
+    void writeFields(std::ostream& out, const std::function<int(const Actor*)>& idOf) const override;
+    void readField(const std::string& key, const std::string& kind, const std::string& value,
+                   const std::function<Actor*(int)>& actorById) override;
 
     Type type = Type::Point;
     float color[3] = {1.0f, 0.94f, 0.85f};
@@ -84,6 +90,9 @@ public:
     std::unique_ptr<Component> clone() const override {
         return std::make_unique<FogComponent>(*this);
     }
+    void writeFields(std::ostream& out, const std::function<int(const Actor*)>& idOf) const override;
+    void readField(const std::string& key, const std::string& kind, const std::string& value,
+                   const std::function<Actor*(int)>& actorById) override;
 
     float color[3] = {0.043f, 0.051f, 0.070f};
     float start = 6.0f;
@@ -104,6 +113,9 @@ public:
     std::unique_ptr<Component> clone() const override {
         return std::make_unique<VolumetricFogComponent>(*this);
     }
+    void writeFields(std::ostream& out, const std::function<int(const Actor*)>& idOf) const override;
+    void readField(const std::string& key, const std::string& kind, const std::string& value,
+                   const std::function<Actor*(int)>& actorById) override;
 
     float color[3] = {0.6f, 0.6f, 0.65f};
     float density = 0.35f; // 0 = invisible, 1 = fully opaque
@@ -122,6 +134,9 @@ public:
     std::unique_ptr<Component> clone() const override {
         return std::make_unique<CameraComponent>(*this);
     }
+    void writeFields(std::ostream& out, const std::function<int(const Actor*)>& idOf) const override;
+    void readField(const std::string& key, const std::string& kind, const std::string& value,
+                   const std::function<Actor*(int)>& actorById) override;
 
     float fovY = 55.0f;
     float nearZ = 0.01f;
@@ -138,6 +153,9 @@ public:
     std::unique_ptr<Component> clone() const override {
         return std::make_unique<LightProbeComponent>(*this);
     }
+    void writeFields(std::ostream& out, const std::function<int(const Actor*)>& idOf) const override;
+    void readField(const std::string& key, const std::string& kind, const std::string& value,
+                   const std::function<Actor*(int)>& actorById) override;
 
     float bakedLight[3] = {0.0f, 0.0f, 0.0f};
     bool bakedValid = false;
@@ -156,6 +174,9 @@ public:
     std::unique_ptr<Component> clone() const override {
         return std::make_unique<SpinnerComponent>(*this);
     }
+    void writeFields(std::ostream& out, const std::function<int(const Actor*)>& idOf) const override;
+    void readField(const std::string& key, const std::string& kind, const std::string& value,
+                   const std::function<Actor*(int)>& actorById) override;
 
     float degreesPerSecond = 90.0f;
     int axis = 1; // 0=X 1=Y 2=Z

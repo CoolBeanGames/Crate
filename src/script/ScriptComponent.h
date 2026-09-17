@@ -30,6 +30,10 @@ public:
         return std::make_unique<ScriptComponent>(ctx_, cls_);
     }
 
+    void writeFields(std::ostream& out, const std::function<int(const Actor*)>& idOf) const override;
+    void readField(const std::string& key, const std::string& kind, const std::string& value,
+                   const std::function<Actor*(int)>& actorById) override;
+
 private:
     void ensureObject();
     void runHook(const char* hook, bool passDt, float dt);

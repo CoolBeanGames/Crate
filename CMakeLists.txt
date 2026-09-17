@@ -75,6 +75,7 @@ endif()
 add_library(crate_core STATIC
     src/core/Log.cpp
     src/scene/Scene.cpp
+    src/scene/SceneIO.cpp
     src/scene/ComponentRegistry.cpp
     src/scene/BuiltinComponents.cpp
     src/script/Lexer.cpp
@@ -85,6 +86,7 @@ add_library(crate_core STATIC
     src/script/NativeScriptComponent.cpp
     src/script/Format.cpp
     src/script/ScriptComponent.cpp
+    src/script/ScriptFieldIO.cpp
     src/script/ScriptSystem.cpp
     src/render/Mesh.cpp
     src/render/Renderer.cpp
@@ -259,3 +261,9 @@ target_link_libraries(cross_namespace_inheritance_tests PRIVATE crate_core)
 target_compile_definitions(cross_namespace_inheritance_tests PRIVATE
     CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
 add_test(NAME cross_namespace_inheritance_tests COMMAND cross_namespace_inheritance_tests)
+
+add_executable(scene_io_tests tests/scene_io_tests.cpp)
+target_link_libraries(scene_io_tests PRIVATE crate_core)
+target_compile_definitions(scene_io_tests PRIVATE
+    CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
+add_test(NAME scene_io_tests COMMAND scene_io_tests)

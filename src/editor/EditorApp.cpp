@@ -299,9 +299,13 @@ void EditorApp::drawMenuBar() {
             renderer_.loadLightmap(scene_, assetDir_);
             CR_LOG("scene", "Reloaded sample scene");
         }
+        if (ImGui::MenuItem("Open Scene..."))
+            openScene();
         ImGui::Separator();
-        if (ImGui::MenuItem("Save", "Ctrl+S"))
-            CR_WARN("scene", "Scene serialization arrives with the Data branch");
+        if (ImGui::MenuItem("Save Scene", "Ctrl+S"))
+            saveScene();
+        if (ImGui::MenuItem("Save Scene As..."))
+            saveSceneAs();
         ImGui::EndMenu();
     }
     if (ImGui::BeginMenu("Edit")) {
@@ -1987,6 +1991,49 @@ void EditorApp::deleteSelection() {
         }
         selectedAsset_.clear();
     }
+}
+
+void EditorApp::saveSceneAs() {
+    std::string path = platform::saveFileDialog("Save Scene", "Crate Scene\0*.cscene\0All\0*.*\0",
+                                                "cscene");
+    if (path.empty())
+        return;
+    std::string error;
+    if (scene_.save(path, &error)) {
+        currentScenePath_ = path;
+        CR_LOG("scene", "Saved scene to " + path);
+    } else {
+        CR_ERROR("scene", "Save failed: " + error);
+    }
+}
+
+void EditorApp::saveScene() {
+    if (currentScenePath_.empty()) {
+        saveSceneAs();
+        return;
+    }
+    std::string error;
+    if (scene_.save(currentScenePath_, &error))
+        CR_LOG("scene", "Saved scene to " + currentScenePath_);
+    else
+        CR_ERROR("scene", "Save failed: " + error);
+}
+
+void EditorApp::openScene() {
+    std::string path =
+        platform::openFileDialog("Open Scene", "Crate Scene\0*.cscene\0All\0*.*\0");
+    if (path.empty())
+        return;
+    std::string error;
+    Scene loaded = Scene::load(path, &error);
+    if (!error.empty()) {
+        CR_ERROR("scene", "Open failed: " + error);
+        return;
+    }
+    scene_ = std::move(loaded);
+    currentScenePath_ = path;
+    renderer_.loadLightmap(scene_, assetDir_);
+    CR_LOG("scene", "Opened scene " + path);
 }
 
 void EditorApp::setPlaying(bool playing) {

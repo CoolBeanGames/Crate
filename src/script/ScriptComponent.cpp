@@ -2,6 +2,7 @@
 
 #include "core/Log.h"
 #include "scene/Actor.h"
+#include "script/ScriptFieldIO.h"
 
 #include "imgui.h"
 
@@ -105,6 +106,22 @@ void ScriptComponent::update(float dt) {
 }
 
 void ScriptComponent::physicsUpdate(float dt) { runHook("physics_update", true, dt); }
+
+void ScriptComponent::writeFields(std::ostream& out, const std::function<int(const Actor*)>& idOf) const {
+    const_cast<ScriptComponent*>(this)->ensureObject();
+    if (!obj_)
+        return;
+    for (const auto& [name, val] : obj_->fields)
+        writeValueField(out, name, val, idOf);
+}
+
+void ScriptComponent::readField(const std::string& key, const std::string& kind, const std::string& value,
+                                const std::function<Actor*(int)>& actorById) {
+    ensureObject();
+    if (!obj_)
+        return;
+    obj_->fields[key] = readValueField(kind, value, actorById, ctx_);
+}
 
 // Picker + drag-drop target for a field declared as an actor/component type.
 // `declType` is "Actor"/"Actor2D"/"Actor3D" for a plain actor reference, or

@@ -96,6 +96,13 @@ private:
     Actor* pasteInto(Actor* parent);
     void reparentToNewNode(Actor* a);
 
+    // Scene file I/O (Scenes task, Phase 1: see scene/SceneIO.cpp). saveScene()
+    // reuses currentScenePath_ if the scene was already Saved/Opened this
+    // session, else behaves like saveSceneAs() (prompts for a path).
+    void saveSceneAs();
+    void saveScene();
+    void openScene();
+
     void setPlaying(bool playing);
 
     // Camera activation (task 77): enforces "only one CameraComponent in the
@@ -113,6 +120,7 @@ private:
 
     Scene scene_;
     Scene playBackup_;      // scene state captured when Play was pressed
+    std::string currentScenePath_; // empty until Saved/Opened at least once
     float physicsAccum_ = 0.0f;
     MeshLibrary meshLib_;
     MaterialLibrary materialLib_;

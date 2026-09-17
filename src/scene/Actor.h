@@ -2,6 +2,7 @@
 #include "core/Transform.h"
 #include "scene/Component.h"
 #include <cstdint>
+#include <iosfwd>
 #include <memory>
 #include <string>
 #include <vector>
@@ -61,6 +62,19 @@ public:
     int indexInParent() const;
 
     bool isDescendantOf(const Actor* other) const;
+
+    // Scene (de)serialization (see SceneIO.cpp): concrete leaf types with
+    // their own extra fields (SpriteActor's texturePath, UIControlActor's
+    // label...) override these the same way Component::writeFields/
+    // readField work. Plain Actor/Actor2D/Actor3D have nothing extra to
+    // save -- name/transform/visible/enabled are handled generically by
+    // SceneIO itself.
+    virtual void writeFields(std::ostream& out) const { (void)out; }
+    virtual void readField(const std::string& key, const std::string& kind, const std::string& value) {
+        (void)key;
+        (void)kind;
+        (void)value;
+    }
 
     // Deep copy of this actor and its whole subtree. A fresh numeric id is
     // always assigned. `preserveAuid` keeps the stable AUUID (used for the

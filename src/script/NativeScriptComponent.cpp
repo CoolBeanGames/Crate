@@ -2,6 +2,7 @@
 
 #include "core/Log.h"
 #include "scene/Actor.h"
+#include "script/ScriptFieldIO.h"
 
 #include "imgui.h"
 
@@ -169,6 +170,23 @@ void NativeScriptComponent::physicsUpdate(float dt) {
     pushFieldsToNative();
     native_->physicsUpdate(dt);
     pullFieldsFromNative();
+}
+
+void NativeScriptComponent::writeFields(std::ostream& out, const std::function<int(const Actor*)>& idOf) const {
+    const_cast<NativeScriptComponent*>(this)->ensureObject();
+    if (!obj_)
+        return;
+    for (const auto& [name, val] : obj_->fields)
+        writeValueField(out, name, val, idOf);
+}
+
+void NativeScriptComponent::readField(const std::string& key, const std::string& kind,
+                                      const std::string& value,
+                                      const std::function<Actor*(int)>& actorById) {
+    ensureObject();
+    if (!obj_)
+        return;
+    obj_->fields[key] = readValueField(kind, value, actorById, ctx_);
 }
 
 // ---------------------------------------------------------------------------

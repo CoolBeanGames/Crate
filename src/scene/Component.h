@@ -1,5 +1,8 @@
 #pragma once
+#include <functional>
+#include <iosfwd>
 #include <memory>
+#include <string>
 
 namespace crate {
 
@@ -33,6 +36,31 @@ public:
 
     // Deep copy for actor duplication / paste.
     virtual std::unique_ptr<Component> clone() const = 0;
+
+    // Scene (de)serialization (see SceneIO.cpp): write "key type value..."
+    // lines, one per field, via `emit`. Default writes nothing -- an
+    // all-default component round-trips fine with zero lines. `idOf` maps a
+    // live Actor* to its save-time local id, for a field that references
+    // another actor (Value::T::Actor or a native-component live view); most
+    // builtin components ignore it, since none of their own fields hold an
+    // actor/component reference.
+    virtual void writeFields(std::ostream& out, const std::function<int(const Actor*)>& idOf) const {
+        (void)out;
+        (void)idOf;
+    }
+    // Restore one field previously written by writeFields(). `key`/`kind`/
+    // `value` are exactly one parsed FIELD line (see SceneIO.cpp's format);
+    // an unrecognized key is ignored so older/newer scene files stay
+    // tolerant of field additions/removals. `actorById` resolves a
+    // reference field's saved local id back to a live Actor* (nullptr if
+    // out of range / not yet known).
+    virtual void readField(const std::string& key, const std::string& kind, const std::string& value,
+                           const std::function<Actor*(int)>& actorById) {
+        (void)key;
+        (void)kind;
+        (void)value;
+        (void)actorById;
+    }
 
     bool enabled = true;
     bool inspectorOpen = true;

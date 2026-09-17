@@ -1,5 +1,6 @@
 #pragma once
 #include "scene/Actor.h"
+#include "scene/FieldCodec.h"
 
 namespace crate {
 
@@ -22,6 +23,17 @@ public:
     std::string texturePath;
     float tint[4] = {1.0f, 1.0f, 1.0f, 1.0f};
 
+    void writeFields(std::ostream& out) const override {
+        writeFieldString(out, "texturePath", texturePath);
+        writeFieldVec3(out, "tint", tint[0], tint[1], tint[2]);
+        writeFieldFloat(out, "tintA", tint[3]);
+    }
+    void readField(const std::string& key, const std::string&, const std::string& value) override {
+        if (key == "texturePath") texturePath = value;
+        else if (key == "tint") { float v[3]; parseFieldVec3(value, v); tint[0]=v[0]; tint[1]=v[1]; tint[2]=v[2]; }
+        else if (key == "tintA") tint[3] = (float)fieldF(value);
+    }
+
 protected:
     Actor* cloneSelf() const override {
         auto* s = new SpriteActor(name_);
@@ -40,6 +52,15 @@ public:
 
     std::string label = "Button";
     float size[2] = {160.0f, 40.0f};
+
+    void writeFields(std::ostream& out) const override {
+        writeFieldString(out, "label", label);
+        writeFieldVec2(out, "size", size[0], size[1]);
+    }
+    void readField(const std::string& key, const std::string&, const std::string& value) override {
+        if (key == "label") label = value;
+        else if (key == "size") { float v[2]; parseFieldVec2(value, v); size[0]=v[0]; size[1]=v[1]; }
+    }
 
 protected:
     Actor* cloneSelf() const override {
