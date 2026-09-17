@@ -11,6 +11,7 @@
 
 namespace crate {
 class Actor;
+class Component;
 }
 
 namespace crate::script {
@@ -48,6 +49,32 @@ struct ScriptContext {
     // this ScriptContext is also reachable from a generated per-namespace
     // DLL (crate_script_runtime only).
     std::function<crate::Actor*(const std::string& path, crate::Actor* parent)> instantiateScene;
+
+    // Deferred destruction (Actor.destroy() / Component.remove()): queues
+    // rather than frees immediately, since the call is very commonly made
+    // from within the very script/component being destroyed -- freeing it
+    // synchronously would leave the CURRENTLY EXECUTING interpreter frame
+    // (self_, ctx_, everything) pointing at freed memory the instant
+    // control returns from the call. Actually removed (and freed) once
+    // it's safe to do so, after every script has finished this frame's
+    // hooks -- see ScriptSystem::flushPending(), called once per tick.
+    std::function<void(crate::Actor*)> destroyActor;
+    // Component.remove(): `obj` identifies WHICH component by ScriptObject
+    // identity -- for a native builtin view (Fog/Camera/.../ never
+    // "Transform", which isn't a removable Component) obj->nativePtr IS
+    // directly the Component*; for a script instance, ScriptSystem
+    // resolves it by searching the actor's components for the one whose
+    // own object() matches. Kept as one callback (rather than exposing a
+    // raw Component*) so this resolution logic lives in exactly one place
+    // (ScriptSystem.cpp, which already has visibility into
+    // ScriptComponent/NativeScriptComponent) instead of duplicated
+    // dynamic_casts in the interpreter/codegen dispatch layer.
+    std::function<void(crate::Actor*, const std::shared_ptr<ScriptObject>&)> removeComponent;
+
+    // Actor.add_component(type_of(X)): mirrors getComponent's resolution
+    // (ComponentRegistry::create + Actor::addComponent), returning a live
+    // view of the newly added component the same shape getComponent would.
+    std::function<std::shared_ptr<ScriptObject>(crate::Actor*, const std::string&)> addComponent;
 
     const ClassInfo* findType(const std::string& n) const {
         if (!types)

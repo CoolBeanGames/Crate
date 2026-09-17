@@ -6,7 +6,12 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
+
+namespace crate {
+class Scene;
+}
 
 namespace crate::script {
 
@@ -95,6 +100,16 @@ public:
     void physicsStatics(float dt);
     void resetStatics(); // re-instantiate (called on Stop)
 
+    // Actually performs every Actor.destroy() / Component.remove() call
+    // queued (via ctx_.destroyActor/removeComponent) since the last flush
+    // -- call once per tick, AFTER every script's update/physics_update has
+    // run, so nothing is ever freed while still on the call stack that
+    // triggered its own removal. See Interpreter.h's ScriptContext doc.
+    // Takes the live Scene so actor destruction goes through Scene::remove()
+    // (clears a dangling Inspector selection, logs it) rather than a bare
+    // tree-level removeChild().
+    void flushPending(crate::Scene& scene);
+
 private:
     ScriptSystem();
     void resolveBases();
@@ -135,6 +150,8 @@ private:
     std::unordered_map<std::string, std::shared_ptr<ScriptObject>> inputButtons_;
     std::vector<ScriptFile> files_;
     std::vector<TypeDoc> typeDocs_;
+    std::vector<crate::Actor*> pendingDestroy_;
+    std::vector<std::pair<crate::Actor*, crate::Component*>> pendingComponentRemove_;
 };
 
 } // namespace crate::script

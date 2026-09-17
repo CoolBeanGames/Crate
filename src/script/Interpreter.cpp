@@ -521,8 +521,36 @@ Value Interpreter::evalCall(const Expr& e) {
                         return Value::Obj(so);
                 return Value::Null_();
             }
+            if (method == "add_component") {
+                std::string typeName;
+                if (!args.empty())
+                    typeName = args[0].t == Value::T::TypeRef ? args[0].s : args[0].str();
+                if (ctx_->addComponent)
+                    if (auto so = ctx_->addComponent(obj.actor, typeName))
+                        return Value::Obj(so);
+                return Value::Null_();
+            }
+            if (method == "destroy") {
+                if (ctx_->destroyActor)
+                    ctx_->destroyActor(obj.actor);
+                return Value::Null_();
+            }
             throw RuntimeError("Actor has no method '" + method + "'", e.line);
         }
+        // Kind 2 (native BuiltinComponent live view: Fog/Camera/Light/.../
+        // Transform): the only method it supports is .remove() (Transform
+        // isn't itself a removable Component, so it's a no-op there).
+        if (obj.t == Value::T::Object && obj.obj && obj.obj->nativePtr && !obj.obj->cls &&
+            !obj.obj->compiledInfo) {
+            if (method == "remove") {
+                if (ctx_->removeComponent)
+                    ctx_->removeComponent(obj.obj->owner, obj.obj);
+                return Value::Null_();
+            }
+        }
+        // Vector method: normalize() (mutates in place, returns itself).
+        if (crate::script::isVec(obj) && method == "normalize")
+            return crate::script::vectorNormalize(obj);
         if (obj.t == Value::T::Array) {
             if (method == "add" && !args.empty() && crate::script::arrayAdd(obj, args[0]))
                 return Value::Null_();
@@ -697,6 +725,14 @@ void Interpreter::assign(const Expr& target, Value v) {
             if (target.strVal == "position") { setVec(a->transform().position); return; }
             if (target.strVal == "rotation") { setVec(a->transform().rotationEuler); return; }
             if (target.strVal == "scale") { setVec(a->transform().scale); return; }
+            if (target.strVal == "forward" || target.strVal == "right" || target.strVal == "up") {
+                if (v.t == Value::T::Object && v.obj) {
+                    Vec3 dir{(float)v.obj->fields["x"].num(), (float)v.obj->fields["y"].num(),
+                            (float)v.obj->fields["z"].num()};
+                    crate::script::setActorDirection(a, target.strVal, dir);
+                }
+                return;
+            }
             throw RuntimeError("cannot assign Actor." + target.strVal, target.line);
         }
         if (obj.t == Value::T::TypeRef && obj.s == "Camera" && target.strVal == "main") {

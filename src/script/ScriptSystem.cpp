@@ -19,6 +19,7 @@
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <unordered_set>
 
 namespace crate::script {
 namespace fs = std::filesystem;
@@ -175,6 +176,45 @@ ScriptSystem::ScriptSystem() {
         std::string err;
         return Scene::instantiateUnder(parent, path, std::string(), &err);
     };
+    ctx_.destroyActor = [this](crate::Actor* a) {
+        if (a) pendingDestroy_.push_back(a);
+    };
+    ctx_.removeComponent = [this](crate::Actor* a, const std::shared_ptr<ScriptObject>& obj) {
+        if (!a || !obj)
+            return;
+        // Native builtin component view: nativePtr IS directly the
+        // Component* (every builtin type except "Transform", which isn't a
+        // real removable Component -- nativePtr there is a raw Transform*).
+        if (obj->nativePtr && !obj->cls && !obj->compiledInfo && obj->builtin != "Transform") {
+            pendingComponentRemove_.emplace_back(a, static_cast<Component*>(obj->nativePtr));
+            return;
+        }
+        // Script instance: find the wrapper Component on `a` whose OWN
+        // ScriptObject identity matches (works for both interpreted and
+        // natively-compiled script components).
+        for (const auto& c : a->components()) {
+            if (auto* sc = dynamic_cast<ScriptComponent*>(c.get())) {
+                if (sc->object() == obj) {
+                    pendingComponentRemove_.emplace_back(a, sc);
+                    return;
+                }
+            } else if (auto* nc = dynamic_cast<NativeScriptComponent*>(c.get())) {
+                if (nc->object() == obj) {
+                    pendingComponentRemove_.emplace_back(a, nc);
+                    return;
+                }
+            }
+        }
+    };
+    ctx_.addComponent = [this](crate::Actor* a, const std::string& typeName) -> std::shared_ptr<ScriptObject> {
+        if (!a || typeName.empty())
+            return nullptr;
+        auto comp = ComponentRegistry::get().create(typeName);
+        if (!comp)
+            return nullptr;
+        a->addComponent(std::move(comp));
+        return ctx_.getComponent ? ctx_.getComponent(a, typeName) : nullptr;
+    };
     rebuildTypeDocs();
 }
 
@@ -314,6 +354,42 @@ void ScriptSystem::resetStatics() {
     for (const auto& [name, ci] : types_)
         if (ci->isStatic)
             rebuildStatic(name);
+}
+
+void ScriptSystem::flushPending(crate::Scene& scene) {
+    // Component removals first. Skip any whose OWNING ACTOR is also queued
+    // for destruction this flush -- destroying the actor already takes its
+    // components with it, so removing one individually first would just be
+    // touching memory that's about to go away anyway (still safe, since
+    // component removal alone doesn't invalidate the actor, but redundant).
+    std::unordered_set<crate::Actor*> toDestroy(pendingDestroy_.begin(), pendingDestroy_.end());
+    for (auto& [actor, comp] : pendingComponentRemove_)
+        if (!toDestroy.count(actor))
+            actor->removeComponent(comp);
+    pendingComponentRemove_.clear();
+
+    // Actor destruction: drop any entry that is a descendant of ANOTHER
+    // still-pending entry (destroying the ancestor already takes it with
+    // it) -- computed BEFORE any destruction happens, while every parent-
+    // chain pointer in the batch is still valid to walk.
+    std::vector<crate::Actor*> roots;
+    for (crate::Actor* a : pendingDestroy_) {
+        bool nested = false;
+        for (crate::Actor* other : pendingDestroy_)
+            if (other != a && a->isDescendantOf(other)) {
+                nested = true;
+                break;
+            }
+        if (!nested)
+            roots.push_back(a);
+    }
+    pendingDestroy_.clear();
+    std::unordered_set<crate::Actor*> destroyed; // destroy() called twice on the same actor
+    for (crate::Actor* a : roots) {
+        if (!destroyed.insert(a).second)
+            continue;
+        scene.remove(a); // clears a dangling Inspector selection, logs it, then frees the subtree
+    }
 }
 
 std::shared_ptr<ScriptObject> ScriptSystem::inputButton(const std::string& name) {
@@ -653,35 +729,52 @@ void ScriptSystem::rebuildTypeDocs() {
     add("char", "", false, {});
     add("string", "", false, {"length"});
     add("array", "", false, {"length", "add", "str"});
-    add("Vector2", "", false, {"x", "y", "str"});
-    add("Vector3", "", false, {"x", "y", "z", "str"});
+    add("Vector2", "", false, {"x", "y", "str", "normalize"});
+    add("Vector3", "", false, {"x", "y", "z", "str", "normalize"});
     add("Transform", "", false, {"position", "rotation", "scale", "forward", "right", "up"});
     add("Actor", "", false,
-        {"name", "position", "rotation", "scale", "forward", "right", "up", "get_component"});
+        {"name", "position", "rotation", "scale", "forward", "right", "up", "get_component",
+         "add_component", "destroy"});
     add("Actor2D", "Actor", false,
-        {"name", "position", "rotation", "scale", "forward", "right", "up", "get_component"});
+        {"name", "position", "rotation", "scale", "forward", "right", "up", "get_component",
+         "add_component", "destroy"});
     add("Actor3D", "Actor", false,
-        {"name", "position", "rotation", "scale", "forward", "right", "up", "get_component"});
+        {"name", "position", "rotation", "scale", "forward", "right", "up", "get_component",
+         "add_component", "destroy"});
     // Not spawnable/constructible from script -- only reachable via
     // get_component(type_of(Fog)). Listed so its members show up in
-    // completions once you're chained off that call.
-    add("Fog", "", false, {"color", "start", "end", "height_range"});
+    // completions once you're chained off that call. Every native
+    // component view also reaches its OWNING ACTOR's Transform via
+    // `.transform` (getNativeField handles this generically for all of
+    // them), so "transform" is listed on every one below too.
+    add("Fog", "", false, {"color", "start", "end", "height_range", "transform", "remove"});
     // "Camera" is also reachable as a bare global for Camera.main (task 77):
     // the scene's one active camera, readable and assignable to switch it.
-    add("Camera", "", false, {"main", "fov", "near", "far", "active"});
+    add("Camera", "", false, {"main", "fov", "near", "far", "active", "transform", "remove"});
     // Reachable via get_component(type_of(Light)) / drag-drop onto a field
     // declared with this type -- see ScriptSystem's ctx_.getComponent.
     add("Light", "", false,
-        {"type", "color", "intensity", "range", "spot_inner_deg", "spot_outer_deg", "is_static"});
-    add("VolumetricFog", "", false, {"color", "density"});
-    add("MeshRenderer", "", false, {"tint", "cast_shadows", "receive_shadows"});
-    add("LightProbe", "", false, {"baked_light", "baked_valid"});
-    add("Spinner", "", false, {"degrees_per_second", "axis"});
+        {"type", "color", "intensity", "range", "spot_inner_deg", "spot_outer_deg", "is_static",
+         "transform", "remove"});
+    add("VolumetricFog", "", false, {"color", "density", "transform", "remove"});
+    add("MeshRenderer", "", false, {"tint", "cast_shadows", "receive_shadows", "transform", "remove"});
+    add("LightProbe", "", false, {"baked_light", "baked_valid", "transform", "remove"});
+    add("Spinner", "", false, {"degrees_per_second", "axis", "transform", "remove"});
     // Not a component -- an ASSET reference (a saved .cscene path), for a
     // field declared `Scene`. Drag a scene tile from the Asset Browser onto
     // it in the Inspector; .instantiate() spawns a live instance at runtime
     // (Scenes task; see Runtime.h's valueInstantiate).
     add("Scene", "", false, {"instantiate"});
+    // Global helper namespace, reached as Math.<fn>(...) (Interpreter::
+    // evalCall's mathCall branch) -- registered here purely for
+    // autocomplete visibility, which it never had before (Math wasn't in
+    // any typeDoc/globals list at all, so Math.-prefixed calls -- including
+    // ones that already existed, like clamp/lerp/sin/rand_i_range -- were
+    // simply undiscoverable via Ctrl+Space).
+    add("Math", "", false,
+       {"clamp", "lerp", "slerp", "sin", "cos", "tan", "sqrt", "exp", "pow", "abs", "floor", "ceil",
+        "round", "min", "max", "deg2rad", "rad2deg", "rand_f", "rand_i", "rand_f_range",
+        "rand_i_range"});
     // Global namespace reached as Input.<method>(...), handled directly in
     // Interpreter::evalCall rather than through get_component -- listed here
     // purely so its methods show up in autocomplete (task: "Input global
@@ -714,8 +807,8 @@ std::vector<std::string> ScriptSystem::completions(const std::string& prefix) co
                                      "switch", "case",   "default", "do",     "do_async", "true",
                                      "false",  "null",   "static", "abstract", "this",  "base",
                                      "break",  "continue"};
-    static const char* globals[] = {"print",     "type_of", "Vector2", "Vector3", "transform",
-                                    "actor",     "Camera",  "Input",   "get_root"};
+    static const char* globals[] = {"print", "type_of", "Vector2", "Vector3", "transform",
+                                    "actor", "Camera",  "Input",   "get_root", "Math"};
 
     std::vector<std::string> out;
     auto consider = [&](const std::string& s) {

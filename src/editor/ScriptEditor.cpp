@@ -399,6 +399,13 @@ void ScriptEditor::applyElectricIndent() {
 // because it doesn't exist, or because it belongs to a script class -- those
 // are resolved separately via ClassInfo).
 static std::string builtinMemberType(const std::string& type, const std::string& member) {
+    // Every native component view (Fog/Camera/Light/VolumetricFog/
+    // MeshRenderer/LightProbe/Spinner) reaches its owning actor's Transform
+    // via `.transform`, matching getNativeField's generic runtime handling
+    // -- so this_camera.transform.position autocompletes fully regardless
+    // of `type`, not just for Actor/Transform receivers.
+    if (member == "transform")
+        return "Transform";
     if (type == "Actor" || type == "Actor2D" || type == "Actor3D" || type == "Transform") {
         if (member == "position" || member == "rotation" || member == "scale" ||
             member == "forward" || member == "right" || member == "up")
@@ -444,7 +451,7 @@ std::string ScriptEditor::resolveChainType(const std::string& chain) const {
     std::string type;
     if (segs[0] == "transform" || segs[0] == "actor") {
         type = "Actor";
-    } else if (segs[0] == "Input" || segs[0] == "Camera") {
+    } else if (segs[0] == "Input" || segs[0] == "Camera" || segs[0] == "Math") {
         type = segs[0];
     } else {
         auto it = sys.types().find(current_);

@@ -283,3 +283,9 @@ target_link_libraries(scene_instantiate_script_tests PRIVATE crate_core)
 target_compile_definitions(scene_instantiate_script_tests PRIVATE
     CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
 add_test(NAME scene_instantiate_script_tests COMMAND scene_instantiate_script_tests)
+
+add_executable(actor_api_tests tests/actor_api_tests.cpp)
+target_link_libraries(actor_api_tests PRIVATE crate_core)
+target_compile_definitions(actor_api_tests PRIVATE
+    CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
+add_test(NAME actor_api_tests COMMAND actor_api_tests)

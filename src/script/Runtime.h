@@ -1,4 +1,5 @@
 #pragma once
+#include "core/Math.h"
 #include "script/Token.h"
 #include "script/Value.h"
 
@@ -108,6 +109,25 @@ bool setNativeField(ScriptObject& o, const std::string& name, const Value& v);
 // the statically-known bare `transform`/`actor` identifiers CodeGen already
 // special-cases. Throws RuntimeError for a null actor or an unknown member.
 Value actorMember(crate::Actor* a, const std::string& name, int line);
+
+// A live view onto `owner`'s own Transform (builtin "Transform", same
+// reflection table Scene serialization's actor-reference fields already
+// use) -- the shared implementation behind both actor.transform and any
+// native-component-view's .transform (see getNativeField).
+Value makeTransformView(crate::Actor* owner);
+
+// Sets `a`'s rotation so its forward/right/up axis points along `dir`
+// (`which` is "forward"/"right"/"up"). See Runtime.cpp for the derivation
+// and its documented "roll always resets to 0" / ".right can't determine
+// pitch" limitations.
+void setActorDirection(crate::Actor* a, const std::string& which, const crate::Vec3& dir);
+
+// In-place vector normalization (Value.normalize()): rescales a Vector2/
+// Vector3 Value to unit length and returns the SAME Value (mutated, for
+// chaining) -- matches this engine's existing reference-semantic Vector
+// aliasing (see makeVector's own doc). No-ops (leaves the vector at zero)
+// for a non-vector or a zero-length input.
+Value vectorNormalize(const Value& v);
 
 // Walks up an actor's parent chain to the top -- the scene's implicit root
 // Actor (see Scene::root()). Shared by Camera.main's resolution and, since

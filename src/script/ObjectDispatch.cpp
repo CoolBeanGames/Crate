@@ -221,6 +221,30 @@ Value callObjectMethod(ScriptContext* ctx, const std::shared_ptr<ScriptObject>& 
             }
             if (method == "get_component")
                 return getComponentOn(ctx, Value::Obj(obj), typeArgOrEmpty(args));
+            // Actor.add_component()/.destroy() called as `this.X(...)`: obj
+            // is a Kind-1/3 SCRIPT INSTANCE here (not a Value::T::Actor --
+            // that's the separate case in callValueMethod for a field/
+            // get_component() result holding an actor reference), so the
+            // target actor is obj->owner.
+            if (method == "add_component") {
+                if (ctx && ctx->addComponent)
+                    if (auto so = ctx->addComponent(obj->owner, typeArgOrEmpty(args)))
+                        return Value::Obj(so);
+                return Value::Null_();
+            }
+            if (method == "destroy") {
+                if (ctx && ctx->destroyActor)
+                    ctx->destroyActor(obj->owner);
+                return Value::Null_();
+            }
+            // Component.remove() (works on `this`, or any get_component()-
+            // retrieved script-component reference): ScriptSystem resolves
+            // which live Component this ScriptObject's identity belongs to.
+            if (method == "remove") {
+                if (ctx && ctx->removeComponent)
+                    ctx->removeComponent(obj->owner, obj);
+                return Value::Null_();
+            }
         }
     }
 
@@ -357,6 +381,13 @@ bool trySetValueMember(ScriptContext* ctx, const Value& v, const std::string& na
             return setVec(a->transform().rotationEuler);
         if (name == "scale")
             return setVec(a->transform().scale);
+        if (name == "forward" || name == "right" || name == "up") {
+            if (val.t != Value::T::Object || !val.obj)
+                return false;
+            Vec3 dir{(float)vfield(val, "x"), (float)vfield(val, "y"), (float)vfield(val, "z")};
+            setActorDirection(a, name, dir);
+            return true;
+        }
         return false;
     }
     // Camera.main = someCamera; (Phase 9c), mirroring Interpreter::assign's
@@ -402,8 +433,30 @@ Value callValueMethod(ScriptContext* ctx, const Value& v, const std::string& met
     if (v.t == Value::T::Actor) {
         if (method == "get_component")
             return getComponentOn(ctx, v, typeArgOrEmpty(args));
+        if (method == "add_component") {
+            std::string typeName = typeArgOrEmpty(args);
+            if (ctx && ctx->addComponent)
+                if (auto so = ctx->addComponent(v.actor, typeName))
+                    return Value::Obj(so);
+            return Value::Null_();
+        }
+        if (method == "destroy") {
+            if (ctx && ctx->destroyActor)
+                ctx->destroyActor(v.actor);
+            return Value::Null_();
+        }
         throw RuntimeError("Actor has no method '" + method + "'", line);
     }
+    // Kind 2 (native BuiltinComponent live view) -- mirrors Interpreter::
+    // evalCall's identical check exactly.
+    if (v.t == Value::T::Object && v.obj && v.obj->nativePtr && !v.obj->cls && !v.obj->compiledInfo &&
+        method == "remove") {
+        if (ctx && ctx->removeComponent)
+            ctx->removeComponent(v.obj->owner, v.obj);
+        return Value::Null_();
+    }
+    if (isVec(v) && method == "normalize")
+        return vectorNormalize(v);
     if (v.t == Value::T::Array) {
         if (method == "add" && !args.empty() && arrayAdd(v, args[0]))
             return Value::Null_();

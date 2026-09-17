@@ -209,6 +209,9 @@ void EditorApp::onFrame() {
             script::ScriptSystem::get().physicsStatics(step);
             physicsAccum_ -= step;
         }
+        // Actor.destroy() / Component.remove(): actually applied here, once
+        // every script this frame has finished running, never mid-hook.
+        script::ScriptSystem::get().flushPending(scene_);
     }
 
     // Global editor shortcuts (skipped while typing in a field).
