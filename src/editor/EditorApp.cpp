@@ -567,6 +567,15 @@ void EditorApp::drawHierarchyNode(Actor& actor) {
                        ImGui::AcceptDragDropPayload(pickPayloadId(PickKind::Material))) {
             if (auto* mr = actor.getComponent<MeshRenderer>())
                 mr->materialRef = payloadStr(pm);
+        } else if (const ImGuiPayload* ps = ImGui::AcceptDragDropPayload("CRATE_SCENE_PATH")) {
+            std::string scenePath = payloadStr(ps);
+            std::string error;
+            if (Actor* inst = scene_.instantiate(scenePath, &actor, "", &error)) {
+                scene_.select(inst);
+                CR_LOG("scene", "Instantiated '" + scenePath + "' under '" + actor.name() + "'");
+            } else {
+                CR_ERROR("scene", "Instantiate failed: " + error);
+            }
         }
         ImGui::EndDragDropTarget();
     }
@@ -646,6 +655,17 @@ void EditorApp::drawHierarchy() {
                 ImGui::InvisibleButton("##empty_drop", ImVec2(-1, avail.y));
                 if (ImGui::BeginDragDropTarget()) {
                     acceptActorDrop(nullptr, -1);
+                    if (const ImGuiPayload* ps = ImGui::AcceptDragDropPayload("CRATE_SCENE_PATH")) {
+                        std::string scenePath(static_cast<const char*>(ps->Data));
+                        std::string error;
+                        if (Actor* inst = scene_.instantiate(scenePath, nullptr, "", &error)) {
+                            scene_.select(inst);
+                            CR_LOG("scene", "Instantiated '" + scenePath + "' as '" +
+                                                inst->name() + "'");
+                        } else {
+                            CR_ERROR("scene", "Instantiate failed: " + error);
+                        }
+                    }
                     ImGui::EndDragDropTarget();
                 }
                 if (ImGui::IsItemClicked())
@@ -1709,6 +1729,7 @@ void EditorApp::drawAssetFolders() {
         const auto& d = dirs[i];
         std::string name = d.path().filename().string();
         std::string rel = assetCwd_.empty() ? name : assetCwd_ + "/" + name;
+        std::string osPath = d.path().generic_string();
         unsigned int col = folderColor(rel);
         bool dbl = false;
         assetIconTile(rel.c_str(), AssetIconKind::Folder, col ? col : IM_COL32(120, 110, 200, 255),
@@ -1716,6 +1737,19 @@ void EditorApp::drawAssetFolders() {
         if (dbl)
             assetCwd_ = rel;
         folderContextMenu(rel);
+        // Folders are draggable too (item 15b): drag one onto another to
+        // nest it there.
+        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoHoldToOpenOthers)) {
+            ImGui::SetDragDropPayload("CRATE_ASSET_MOVE", osPath.c_str(), osPath.size() + 1);
+            ImGui::Text("Folder  %s", name.c_str());
+            ImGui::EndDragDropSource();
+        }
+        // Any asset (file or folder) can be dropped here to move it in.
+        if (ImGui::BeginDragDropTarget()) {
+            if (const ImGuiPayload* p = ImGui::AcceptDragDropPayload("CRATE_ASSET_MOVE"))
+                moveAssetToFolder(std::string(static_cast<const char*>(p->Data)), rel);
+            ImGui::EndDragDropTarget();
+        }
         assetGridWrap(i + 1 < dirs.size() || !files.empty());
     }
 
@@ -1805,6 +1839,20 @@ void EditorApp::drawAssetFolders() {
             } else {
                 ingestDroppedFile(f.path().string());
             }
+        }
+        // Every asset type is draggable, to move it into a folder (item 15):
+        // a plain drag (no modifier needed) carries CRATE_ASSET_MOVE, caught
+        // by a folder tile's drop target above. This is a SEPARATE
+        // BeginDragDropSource call from the type-specific ones below (e.g.
+        // Texture/CRATE_FBX_PATH/CRATE_SCENE_PATH) -- only one drag source
+        // actually activates per frame (whichever's payload a drop target
+        // asks for), so having both registered on the same item is safe:
+        // the folder-move target only ever looks for CRATE_ASSET_MOVE, and
+        // the field/viewport targets only ever look for their own type.
+        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoHoldToOpenOthers)) {
+            ImGui::SetDragDropPayload("CRATE_ASSET_MOVE", path.c_str(), path.size() + 1);
+            ImGui::Text("%s", name.c_str());
+            ImGui::EndDragDropSource();
         }
         // Drag a texture straight onto a component's Texture field.
         if (isImg && ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoHoldToOpenOthers)) {
@@ -1977,6 +2025,8 @@ void EditorApp::drawBottomPanel() {
         // (which depends on child-window last-item tracking); the cursor is
         // reset afterward so the button sits underneath the real content.
         ImVec2 dropAreaMin = ImGui::GetCursorScreenPos();
+        ImGui::SetNextItemAllowOverlap(); // let the real tiles drawn after it (below) still
+                                          // receive hover/click instead of this button eating them
         ImGui::InvisibleButton("##prefab_extract_drop", ImGui::GetContentRegionAvail());
         if (ImGui::BeginDragDropTarget()) {
             if (const ImGuiPayload* p = ImGui::AcceptDragDropPayload(kActorPayload)) {
@@ -2173,6 +2223,47 @@ void EditorApp::extractPrefabToScene(Actor* target, const std::string& name) {
     scene_.select(inst);
     CR_LOG("assets", "Created " + p.filename().string() + " from '" + name +
                          "' and replaced it with an instance");
+}
+
+void EditorApp::moveAssetToFolder(const std::string& srcOsPath, const std::string& destFolderRel) {
+    std::error_code ec;
+    fs::path src(srcOsPath);
+    if (!fs::exists(src, ec))
+        return;
+    fs::path destDir = fs::path(assetDir_) / destFolderRel;
+    fs::path dest = destDir / src.filename();
+    if (src == dest)
+        return; // dropped onto its own current folder -- no-op
+    if (fs::is_directory(src, ec)) {
+        // Refuse moving a folder into itself or one of its own descendants.
+        fs::path destAbs = fs::absolute(destDir, ec);
+        fs::path srcAbs = fs::absolute(src, ec);
+        auto rel = destAbs.lexically_relative(srcAbs).generic_string();
+        if (rel.rfind("..", 0) != 0 && !ec) {
+            CR_WARN("assets", "Can't move a folder into itself or its own subfolder");
+            return;
+        }
+    }
+    fs::create_directories(destDir, ec);
+    if (fs::exists(dest, ec)) {
+        CR_WARN("assets", "Move failed: '" + dest.filename().string() + "' already exists there");
+        return;
+    }
+    const bool wasScript = src.extension() == ".cscript";
+    const bool wasDir = fs::is_directory(src, ec);
+    fs::rename(src, dest, ec);
+    if (ec) {
+        CR_ERROR("assets", "Move failed: " + ec.message());
+        return;
+    }
+    if (wasDir)
+        AssetDatabase::get().movedPrefix(src.generic_string() + "/", dest.generic_string() + "/");
+    else
+        AssetDatabase::get().moved(src.generic_string(), dest.generic_string());
+    if (wasScript)
+        script::ScriptSystem::get().reload(); // re-discover the file at its new path
+    CR_LOG("assets", "Moved '" + src.filename().string() + "' to '" +
+                         (destFolderRel.empty() ? std::string("assets") : destFolderRel) + "'");
 }
 
 void EditorApp::openScene() {

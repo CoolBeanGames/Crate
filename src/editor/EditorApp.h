@@ -109,6 +109,16 @@ private:
     // the same parent/sibling position/transform, so nothing visibly moves.
     void extractPrefabToScene(Actor* target, const std::string& name);
 
+    // Moves the file or folder at `srcOsPath` into `destFolderRel` (a
+    // folder path relative to assetDir_, "" = the assets root) -- the drop
+    // side of every asset tile's CRATE_ASSET_MOVE drag source (item 15/15b:
+    // all asset types, and folders themselves, are draggable into a
+    // folder). No-ops on a same-location drop or a folder dropped into its
+    // own descendant. Keeps AssetDatabase's id tracking correct
+    // (moved()/movedPrefix()) and, for a moved script, reloads ScriptSystem
+    // so it re-discovers the file at its new path.
+    void moveAssetToFolder(const std::string& srcOsPath, const std::string& destFolderRel);
+
     void setPlaying(bool playing);
 
     // Camera activation (task 77): enforces "only one CameraComponent in the
