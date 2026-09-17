@@ -723,285 +723,6 @@
           "updatedAt": "2026-09-17T09:38:39.7338057+00:00"
         },
         {
-          "id": "9cc62d70b4744c779812edd0d6cedca8",
-          "index": 111,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Actor.transform should be reachable through any component/actor reference, with autocomplete",
-          "task": "If a script holds a reference to a Camera (or any component), it should be able to write this_camera.transform.position (autocomplete included) and have it adjust the OWNING actor\u0027s transform -- since Camera is a component whose actor derives from Actor, and Actor always has a transform.",
-          "tags": [
-            "task",
-            "cScript",
-            "Scripting"
-          ],
-          "files": [],
-          "customTypeId": "e361978d91d9447f97033586db3c87b0",
-          "customValues": {
-            "c474f092663247ebb286cc5b978853d3": "Actor.transform should be reachable through any component/actor reference, with autocomplete",
-            "77f8b466f2874429a253d2256f62c42a": "If a script holds a reference to a Camera (or any component), it should be able to write this_camera.transform.position (autocomplete included) and have it adjust the OWNING actor\u0027s transform -- since Camera is a component whose actor derives from Actor, and Actor always has a transform.",
-            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
-            "203da294781c41a1b1e7f760ea47047e": "Crate",
-            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
-            "ce370daef7e94671b0b947c000ce780e": "0",
-            "37571d4735f1403b85a48880a05ec554": "task,cScript,Scripting"
-          },
-          "requirements": [],
-          "notes": [],
-          "flags": {
-            "commit": false,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
-          "updatedAt": "2026-09-17T09:38:39.7338057+00:00"
-        },
-        {
-          "id": "8c70f4a1ebfc41b18e82982abb135046",
-          "index": 112,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Add global math functions (lerp, slerp, trig, random, clamp)",
-          "task": "Need global script functions: lerp, slerp, sin, cos, tan, rand_i, rand_f, rand_i_range(min,max), rand_f_range(min,max), clamp.",
-          "tags": [
-            "task",
-            "cScript",
-            "Scripting"
-          ],
-          "files": [],
-          "customTypeId": "e361978d91d9447f97033586db3c87b0",
-          "customValues": {
-            "c474f092663247ebb286cc5b978853d3": "Add global math functions (lerp, slerp, trig, random, clamp)",
-            "77f8b466f2874429a253d2256f62c42a": "Need global script functions: lerp, slerp, sin, cos, tan, rand_i, rand_f, rand_i_range(min,max), rand_f_range(min,max), clamp.",
-            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
-            "203da294781c41a1b1e7f760ea47047e": "Crate",
-            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
-            "ce370daef7e94671b0b947c000ce780e": "0",
-            "37571d4735f1403b85a48880a05ec554": "task,cScript,Scripting"
-          },
-          "requirements": [],
-          "notes": [],
-          "flags": {
-            "commit": false,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
-          "updatedAt": "2026-09-17T09:38:39.7338057+00:00"
-        },
-        {
-          "id": "5fb0b44c80224911a0d0e478e337ee1a",
-          "index": 113,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Actor.destroy() method",
-          "task": "Actor needs a destroy() method: calling it removes the actor and all of its children from the Hierarchy/scene tree.",
-          "tags": [
-            "task",
-            "cScript",
-            "Actors"
-          ],
-          "files": [],
-          "customTypeId": "e361978d91d9447f97033586db3c87b0",
-          "customValues": {
-            "c474f092663247ebb286cc5b978853d3": "Actor.destroy() method",
-            "77f8b466f2874429a253d2256f62c42a": "Actor needs a destroy() method: calling it removes the actor and all of its children from the Hierarchy/scene tree.",
-            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
-            "203da294781c41a1b1e7f760ea47047e": "Crate",
-            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
-            "ce370daef7e94671b0b947c000ce780e": "0",
-            "37571d4735f1403b85a48880a05ec554": "task,cScript,Actors"
-          },
-          "requirements": [],
-          "notes": [],
-          "flags": {
-            "commit": false,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
-          "updatedAt": "2026-09-17T09:38:39.7338057+00:00"
-        },
-        {
-          "id": "2f89cd95ebab424a949afb056a91deb4",
-          "index": 114,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Component.remove() method",
-          "task": "Components need a remove() method: calling it removes that component from its owning actor.",
-          "tags": [
-            "task",
-            "cScript",
-            "components"
-          ],
-          "files": [],
-          "customTypeId": "e361978d91d9447f97033586db3c87b0",
-          "customValues": {
-            "c474f092663247ebb286cc5b978853d3": "Component.remove() method",
-            "77f8b466f2874429a253d2256f62c42a": "Components need a remove() method: calling it removes that component from its owning actor.",
-            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
-            "203da294781c41a1b1e7f760ea47047e": "Crate",
-            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
-            "ce370daef7e94671b0b947c000ce780e": "0",
-            "37571d4735f1403b85a48880a05ec554": "task,cScript,components"
-          },
-          "requirements": [],
-          "notes": [],
-          "flags": {
-            "commit": false,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
-          "updatedAt": "2026-09-17T09:38:39.7338057+00:00"
-        },
-        {
-          "id": "debdf1c41b074526a8051b1eabbedcdc",
-          "index": 115,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Actor.add_component(type_of(X)) method",
-          "task": "Actors need an add_component(type_of(ComponentType)) method: calling it adds a new component of that type to the actor it\u0027s called on.",
-          "tags": [
-            "task",
-            "cScript",
-            "components"
-          ],
-          "files": [],
-          "customTypeId": "e361978d91d9447f97033586db3c87b0",
-          "customValues": {
-            "c474f092663247ebb286cc5b978853d3": "Actor.add_component(type_of(X)) method",
-            "77f8b466f2874429a253d2256f62c42a": "Actors need an add_component(type_of(ComponentType)) method: calling it adds a new component of that type to the actor it\u0027s called on.",
-            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
-            "203da294781c41a1b1e7f760ea47047e": "Crate",
-            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
-            "ce370daef7e94671b0b947c000ce780e": "0",
-            "37571d4735f1403b85a48880a05ec554": "task,cScript,components"
-          },
-          "requirements": [],
-          "notes": [],
-          "flags": {
-            "commit": false,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
-          "updatedAt": "2026-09-17T09:38:39.7338057+00:00"
-        },
-        {
-          "id": "1f2dfdb283dd44a282248d0b87eda5fa",
-          "index": 116,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Allow setting an actor\u0027s rotation via forward/right/up vectors",
-          "task": "Currently forward/right/up are read-only derived directions. Need to allow assigning to them too, so setting e.g. actor.forward = someVector rotates the actor to face that direction.",
-          "tags": [
-            "task",
-            "cScript",
-            "Actors"
-          ],
-          "files": [],
-          "customTypeId": "e361978d91d9447f97033586db3c87b0",
-          "customValues": {
-            "c474f092663247ebb286cc5b978853d3": "Allow setting an actor\u0027s rotation via forward/right/up vectors",
-            "77f8b466f2874429a253d2256f62c42a": "Currently forward/right/up are read-only derived directions. Need to allow assigning to them too, so setting e.g. actor.forward = someVector rotates the actor to face that direction.",
-            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
-            "203da294781c41a1b1e7f760ea47047e": "Crate",
-            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
-            "ce370daef7e94671b0b947c000ce780e": "0",
-            "37571d4735f1403b85a48880a05ec554": "task,cScript,Actors"
-          },
-          "requirements": [],
-          "notes": [],
-          "flags": {
-            "commit": false,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
-          "updatedAt": "2026-09-17T09:38:39.7338057+00:00"
-        },
-        {
-          "id": "68b165fa36b34c48b099913af2c14a4c",
-          "index": 117,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Vector2/Vector3 need a normalize() method",
-          "task": "Vectors currently have no normalize() method -- needed for direction math (e.g. combined with the forward/right/up setters).",
-          "tags": [
-            "task",
-            "cScript"
-          ],
-          "files": [],
-          "customTypeId": "e361978d91d9447f97033586db3c87b0",
-          "customValues": {
-            "c474f092663247ebb286cc5b978853d3": "Vector2/Vector3 need a normalize() method",
-            "77f8b466f2874429a253d2256f62c42a": "Vectors currently have no normalize() method -- needed for direction math (e.g. combined with the forward/right/up setters).",
-            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
-            "203da294781c41a1b1e7f760ea47047e": "Crate",
-            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
-            "ce370daef7e94671b0b947c000ce780e": "0",
-            "37571d4735f1403b85a48880a05ec554": "task,cScript"
-          },
-          "requirements": [],
-          "notes": [],
-          "flags": {
-            "commit": false,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
-          "updatedAt": "2026-09-17T09:38:39.7338057+00:00"
-        },
-        {
           "id": "310d7103bf8b48119cdbb85d245807c8",
           "index": 99,
           "kind": "note",
@@ -4962,6 +4683,285 @@
           "isCollapsed": false,
           "createdAt": "2026-09-17T11:00:36+00:00",
           "updatedAt": "2026-09-17T11:02:52.7384235+00:00"
+        },
+        {
+          "id": "9cc62d70b4744c779812edd0d6cedca8",
+          "index": 111,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Actor.transform should be reachable through any component/actor reference, with autocomplete",
+          "task": "If a script holds a reference to a Camera (or any component), it should be able to write this_camera.transform.position (autocomplete included) and have it adjust the OWNING actor\u0027s transform -- since Camera is a component whose actor derives from Actor, and Actor always has a transform.",
+          "tags": [
+            "task",
+            "cScript",
+            "Scripting"
+          ],
+          "files": [],
+          "customTypeId": "e361978d91d9447f97033586db3c87b0",
+          "customValues": {
+            "c474f092663247ebb286cc5b978853d3": "Actor.transform should be reachable through any component/actor reference, with autocomplete",
+            "77f8b466f2874429a253d2256f62c42a": "If a script holds a reference to a Camera (or any component), it should be able to write this_camera.transform.position (autocomplete included) and have it adjust the OWNING actor\u0027s transform -- since Camera is a component whose actor derives from Actor, and Actor always has a transform.",
+            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
+            "203da294781c41a1b1e7f760ea47047e": "Crate",
+            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
+            "ce370daef7e94671b0b947c000ce780e": "0",
+            "37571d4735f1403b85a48880a05ec554": "task,cScript,Scripting"
+          },
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
+          "updatedAt": "2026-09-17T11:15:00+00:00"
+        },
+        {
+          "id": "8c70f4a1ebfc41b18e82982abb135046",
+          "index": 112,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Add global math functions (lerp, slerp, trig, random, clamp)",
+          "task": "Need global script functions: lerp, slerp, sin, cos, tan, rand_i, rand_f, rand_i_range(min,max), rand_f_range(min,max), clamp.",
+          "tags": [
+            "task",
+            "cScript",
+            "Scripting"
+          ],
+          "files": [],
+          "customTypeId": "e361978d91d9447f97033586db3c87b0",
+          "customValues": {
+            "c474f092663247ebb286cc5b978853d3": "Add global math functions (lerp, slerp, trig, random, clamp)",
+            "77f8b466f2874429a253d2256f62c42a": "Need global script functions: lerp, slerp, sin, cos, tan, rand_i, rand_f, rand_i_range(min,max), rand_f_range(min,max), clamp.",
+            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
+            "203da294781c41a1b1e7f760ea47047e": "Crate",
+            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
+            "ce370daef7e94671b0b947c000ce780e": "0",
+            "37571d4735f1403b85a48880a05ec554": "task,cScript,Scripting"
+          },
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
+          "updatedAt": "2026-09-17T11:15:00+00:00"
+        },
+        {
+          "id": "5fb0b44c80224911a0d0e478e337ee1a",
+          "index": 113,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Actor.destroy() method",
+          "task": "Actor needs a destroy() method: calling it removes the actor and all of its children from the Hierarchy/scene tree.",
+          "tags": [
+            "task",
+            "cScript",
+            "Actors"
+          ],
+          "files": [],
+          "customTypeId": "e361978d91d9447f97033586db3c87b0",
+          "customValues": {
+            "c474f092663247ebb286cc5b978853d3": "Actor.destroy() method",
+            "77f8b466f2874429a253d2256f62c42a": "Actor needs a destroy() method: calling it removes the actor and all of its children from the Hierarchy/scene tree.",
+            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
+            "203da294781c41a1b1e7f760ea47047e": "Crate",
+            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
+            "ce370daef7e94671b0b947c000ce780e": "0",
+            "37571d4735f1403b85a48880a05ec554": "task,cScript,Actors"
+          },
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
+          "updatedAt": "2026-09-17T11:15:00+00:00"
+        },
+        {
+          "id": "2f89cd95ebab424a949afb056a91deb4",
+          "index": 114,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Component.remove() method",
+          "task": "Components need a remove() method: calling it removes that component from its owning actor.",
+          "tags": [
+            "task",
+            "cScript",
+            "components"
+          ],
+          "files": [],
+          "customTypeId": "e361978d91d9447f97033586db3c87b0",
+          "customValues": {
+            "c474f092663247ebb286cc5b978853d3": "Component.remove() method",
+            "77f8b466f2874429a253d2256f62c42a": "Components need a remove() method: calling it removes that component from its owning actor.",
+            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
+            "203da294781c41a1b1e7f760ea47047e": "Crate",
+            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
+            "ce370daef7e94671b0b947c000ce780e": "0",
+            "37571d4735f1403b85a48880a05ec554": "task,cScript,components"
+          },
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
+          "updatedAt": "2026-09-17T11:15:00+00:00"
+        },
+        {
+          "id": "debdf1c41b074526a8051b1eabbedcdc",
+          "index": 115,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Actor.add_component(type_of(X)) method",
+          "task": "Actors need an add_component(type_of(ComponentType)) method: calling it adds a new component of that type to the actor it\u0027s called on.",
+          "tags": [
+            "task",
+            "cScript",
+            "components"
+          ],
+          "files": [],
+          "customTypeId": "e361978d91d9447f97033586db3c87b0",
+          "customValues": {
+            "c474f092663247ebb286cc5b978853d3": "Actor.add_component(type_of(X)) method",
+            "77f8b466f2874429a253d2256f62c42a": "Actors need an add_component(type_of(ComponentType)) method: calling it adds a new component of that type to the actor it\u0027s called on.",
+            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
+            "203da294781c41a1b1e7f760ea47047e": "Crate",
+            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
+            "ce370daef7e94671b0b947c000ce780e": "0",
+            "37571d4735f1403b85a48880a05ec554": "task,cScript,components"
+          },
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
+          "updatedAt": "2026-09-17T11:15:00+00:00"
+        },
+        {
+          "id": "1f2dfdb283dd44a282248d0b87eda5fa",
+          "index": 116,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Allow setting an actor\u0027s rotation via forward/right/up vectors",
+          "task": "Currently forward/right/up are read-only derived directions. Need to allow assigning to them too, so setting e.g. actor.forward = someVector rotates the actor to face that direction.",
+          "tags": [
+            "task",
+            "cScript",
+            "Actors"
+          ],
+          "files": [],
+          "customTypeId": "e361978d91d9447f97033586db3c87b0",
+          "customValues": {
+            "c474f092663247ebb286cc5b978853d3": "Allow setting an actor\u0027s rotation via forward/right/up vectors",
+            "77f8b466f2874429a253d2256f62c42a": "Currently forward/right/up are read-only derived directions. Need to allow assigning to them too, so setting e.g. actor.forward = someVector rotates the actor to face that direction.",
+            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
+            "203da294781c41a1b1e7f760ea47047e": "Crate",
+            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
+            "ce370daef7e94671b0b947c000ce780e": "0",
+            "37571d4735f1403b85a48880a05ec554": "task,cScript,Actors"
+          },
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
+          "updatedAt": "2026-09-17T11:15:00+00:00"
+        },
+        {
+          "id": "68b165fa36b34c48b099913af2c14a4c",
+          "index": 117,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Vector2/Vector3 need a normalize() method",
+          "task": "Vectors currently have no normalize() method -- needed for direction math (e.g. combined with the forward/right/up setters).",
+          "tags": [
+            "task",
+            "cScript"
+          ],
+          "files": [],
+          "customTypeId": "e361978d91d9447f97033586db3c87b0",
+          "customValues": {
+            "c474f092663247ebb286cc5b978853d3": "Vector2/Vector3 need a normalize() method",
+            "77f8b466f2874429a253d2256f62c42a": "Vectors currently have no normalize() method -- needed for direction math (e.g. combined with the forward/right/up setters).",
+            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
+            "203da294781c41a1b1e7f760ea47047e": "Crate",
+            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
+            "ce370daef7e94671b0b947c000ce780e": "0",
+            "37571d4735f1403b85a48880a05ec554": "task,cScript"
+          },
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
+          "updatedAt": "2026-09-17T11:15:00+00:00"
         }
       ]
     }
