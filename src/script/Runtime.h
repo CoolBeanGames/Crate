@@ -13,6 +13,8 @@ class CameraComponent;
 
 namespace crate::script {
 
+struct ScriptContext;
+
 // Thrown for any script-runtime failure (bad operator, out-of-range index,
 // division by zero, unknown identifier, ...). Shared by the tree-walking
 // interpreter and, eventually, natively-compiled script code (see
@@ -114,6 +116,16 @@ Value actorMember(crate::Actor* a, const std::string& name, int line);
 // get_root() itself (see Interpreter::builtinCall / CodeGen's global-call
 // emission). Returns nullptr for a null actor.
 crate::Actor* sceneRootOf(crate::Actor* a);
+
+// Input.Mouse.<member> -- a bare global chain read via member access
+// (parsed/evaluated structurally, like Camera.main and Input.<method>(...);
+// "Input"/"Mouse" are never themselves evaluated as values). Shares
+// ScriptContext::inputQuery's existing what-codes: 0/1/2 = pressed/
+// just_pressed/just_released for a reserved button name ("mouse_left"/
+// "mouse_right"/"mouse_middle"), 5/6 = mouse delta x/y, 7/8 = scroll delta
+// x/y (see ScriptSystem.cpp's inputQuery lambda and Input::pollMouse()).
+// Throws RuntimeError for an unrecognized member.
+Value inputMouseMember(ScriptContext* ctx, const std::string& name, int line);
 
 // ---- Camera.main resolution (task 77) ----
 // Camera.main isn't reached from a specific actor -- it's a bare global, so

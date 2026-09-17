@@ -349,9 +349,18 @@ Value Interpreter::actorMember(crate::Actor* a, const std::string& name, int lin
 }
 
 Value Interpreter::evalMember(const Expr& e) {
+    const std::string& name = e.strVal;
+
+    // Input.Mouse.<member> -- structural, like Input.<method>(...) in
+    // evalCall: "Input" has no meaningful standalone Value (it's pure
+    // namespace syntax), so this must be recognized on the AST directly,
+    // before eval(*e.a) below would throw "unknown identifier 'Input'".
+    if (e.a->kind == ExprKind::Member && e.a->strVal == "Mouse" &&
+        e.a->a->kind == ExprKind::Identifier && e.a->a->strVal == "Input" && !findVar("Input"))
+        return crate::script::inputMouseMember(ctx_, name, e.line);
+
     // this.base.method(...)  -> handled in evalCall; a bare this.base is just this.
     Value obj = eval(*e.a);
-    const std::string& name = e.strVal;
 
     if (obj.t == Value::T::Object && obj.obj) {
         // Generic dispatch: correctly handles an interpreted script
@@ -456,17 +465,8 @@ Value Interpreter::evalCall(const Expr& e) {
             // Mouse buttons ride the same is_pressed/is_just_pressed/
             // is_just_released/get_button API above under reserved names:
             // "mouse_left" / "mouse_right" / "mouse_middle" (see Input::
-            // pollMouse). Delta/scroll have no button identity of their own.
-            if (method == "get_mouse_delta") {
-                double x = ctx_->inputQuery ? ctx_->inputQuery(n, 5) : 0.0;
-                double y = ctx_->inputQuery ? ctx_->inputQuery(n, 6) : 0.0;
-                return makeVector("Vector2", x, y, 0);
-            }
-            if (method == "get_scroll_delta") {
-                double x = ctx_->inputQuery ? ctx_->inputQuery(n, 7) : 0.0;
-                double y = ctx_->inputQuery ? ctx_->inputQuery(n, 8) : 0.0;
-                return makeVector("Vector2", x, y, 0);
-            }
+            // pollMouse). Delta/scroll/button-state convenience live at
+            // Input.Mouse.<member> instead (see evalMember).
             if (method == "is_pressed")
                 return Value::Bool(ctx_->inputQuery && ctx_->inputQuery(n, 0) != 0.0);
             if (method == "is_just_pressed")

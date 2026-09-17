@@ -686,16 +686,6 @@ std::string Gen::expr(const Expr& e, FnCtx& fc) {
                                "ctx_->inputQuery(" +
                                n + ", 3) : 0.0, ctx_ && ctx_->inputQuery ? ctx_->inputQuery(" + n +
                                ", 4) : 0.0, 0.0)";
-                    if (method == "get_mouse_delta")
-                        return "crate::script::makeVector(\"Vector2\", ctx_ && ctx_->inputQuery ? "
-                               "ctx_->inputQuery(" +
-                               n + ", 5) : 0.0, ctx_ && ctx_->inputQuery ? ctx_->inputQuery(" + n +
-                               ", 6) : 0.0, 0.0)";
-                    if (method == "get_scroll_delta")
-                        return "crate::script::makeVector(\"Vector2\", ctx_ && ctx_->inputQuery ? "
-                               "ctx_->inputQuery(" +
-                               n + ", 7) : 0.0, ctx_ && ctx_->inputQuery ? ctx_->inputQuery(" + n +
-                               ", 8) : 0.0, 0.0)";
                     if (method == "is_pressed")
                         return "crate::script::Value::Bool(ctx_ && ctx_->inputQuery && "
                                "ctx_->inputQuery(" +
@@ -799,6 +789,15 @@ std::string Gen::expr(const Expr& e, FnCtx& fc) {
         case ExprKind::Member: {
             const Expr& objExpr = *e.a;
             const std::string& name = e.strVal;
+
+            // Input.Mouse.<member> -- structural, mirroring
+            // Interpreter::evalMember's identical check exactly ("Input" is
+            // pure namespace syntax, never a real Value, in either backend).
+            if (objExpr.kind == ExprKind::Member && objExpr.strVal == "Mouse" &&
+                objExpr.a->kind == ExprKind::Identifier && objExpr.a->strVal == "Input" &&
+                !fc.has("Input"))
+                return "crate::script::inputMouseMember(ctx_, " + cppStringLiteral(name) + ", " +
+                       std::to_string(e.line) + ")";
 
             if (objExpr.kind == ExprKind::This) {
                 if (isField(name))

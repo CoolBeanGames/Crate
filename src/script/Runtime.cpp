@@ -3,6 +3,7 @@
 #include "core/Math.h"
 #include "scene/Actor.h"
 #include "scene/BuiltinComponents.h"
+#include "script/Interpreter.h" // ScriptContext's full definition (inputQuery)
 
 #include <cmath>
 #include <cstdlib>
@@ -527,6 +528,32 @@ crate::Actor* sceneRootOf(crate::Actor* a) {
     while (a && a->parent())
         a = a->parent();
     return a;
+}
+
+Value inputMouseMember(ScriptContext* ctx, const std::string& name, int line) {
+    auto iq = [&](const std::string& btn, int what) -> double {
+        return ctx && ctx->inputQuery ? ctx->inputQuery(btn, what) : 0.0;
+    };
+    if (name == "delta")
+        return makeVector("Vector2", iq("", 5), iq("", 6), 0);
+    if (name == "scroll")
+        return makeVector("Vector2", iq("", 7), iq("", 8), 0);
+    struct BtnMap {
+        const char* member;
+        const char* button;
+        int what;
+    };
+    static const BtnMap kMap[] = {
+        {"left_down", "mouse_left", 0},        {"left_just_down", "mouse_left", 1},
+        {"left_just_up", "mouse_left", 2},     {"right_down", "mouse_right", 0},
+        {"right_just_down", "mouse_right", 1}, {"right_just_up", "mouse_right", 2},
+        {"middle_down", "mouse_middle", 0},    {"middle_just_down", "mouse_middle", 1},
+        {"middle_just_up", "mouse_middle", 2},
+    };
+    for (const auto& m : kMap)
+        if (name == m.member)
+            return Value::Bool(iq(m.button, m.what) != 0.0);
+    throw RuntimeError("Input.Mouse has no member '" + name + "'", line);
 }
 
 Value actorMember(crate::Actor* a, const std::string& name, int line) {

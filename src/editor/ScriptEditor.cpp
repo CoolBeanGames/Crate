@@ -412,6 +412,14 @@ static std::string builtinMemberType(const std::string& type, const std::string&
         if (member == "str")
             return "string";
     }
+    if (type == "Input" && member == "Mouse")
+        return "InputMouse";
+    if (type == "InputMouse") {
+        if (member == "delta" || member == "scroll")
+            return "Vector2";
+        if (member.find("down") != std::string::npos || member.find("up") != std::string::npos)
+            return "bool";
+    }
     if ((type == "array" || type == "string") && member == "length")
         return "int";
     return "";
@@ -436,6 +444,8 @@ std::string ScriptEditor::resolveChainType(const std::string& chain) const {
     std::string type;
     if (segs[0] == "transform" || segs[0] == "actor") {
         type = "Actor";
+    } else if (segs[0] == "Input" || segs[0] == "Camera") {
+        type = segs[0];
     } else {
         auto it = sys.types().find(current_);
         if (it != sys.types().end() && it->second->decl) {

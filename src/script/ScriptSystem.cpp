@@ -679,11 +679,15 @@ void ScriptSystem::rebuildTypeDocs() {
     // Mouse buttons use the same get_button/is_pressed/is_just_pressed/
     // is_just_released API under reserved names "mouse_left"/"mouse_right"/
     // "mouse_middle" (e.g. Input.is_pressed("mouse_left"),
-    // Input.get_button("mouse_left").just_pressed.connect(...)); delta/
-    // scroll get their own methods since they aren't per-button.
+    // Input.get_button("mouse_left").just_pressed.connect(...)). Delta/
+    // scroll/per-button convenience booleans live at Input.Mouse.<member>
+    // (a member-access chain, not a method call -- see Interpreter::
+    // evalMember / CodeGen's identical structural check).
     add("Input", "", false,
-       {"get_button", "get_axis", "is_pressed", "is_just_pressed", "is_just_released",
-        "get_mouse_delta", "get_scroll_delta"});
+       {"get_button", "get_axis", "is_pressed", "is_just_pressed", "is_just_released", "Mouse"});
+    add("InputMouse", "", false,
+       {"delta", "scroll", "left_down", "left_just_down", "left_just_up", "right_down",
+        "right_just_down", "right_just_up", "middle_down", "middle_just_down", "middle_just_up"});
 
     for (const auto& [name, ci] : types_) {
         std::vector<std::string> members;

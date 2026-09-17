@@ -497,6 +497,36 @@ static int run() {
         CHECK(obj->fields["phase"].str() == "done"); // loop finished -> post-code ran
     }
 
+    // --- Input.Mouse.<member>: a member-access chain, not a method call --
+    {
+        Harness h;
+        auto obj = h.load(R"(class MouseProbe : Actor {
+            var dx = 0.0;
+            var dy = 0.0;
+            var leftDown = false;
+            var rightJustUp = false;
+            func start() {
+                var d = Input.Mouse.delta;
+                dx = d.x;
+                dy = d.y;
+                leftDown = Input.Mouse.left_down;
+                rightJustUp = Input.Mouse.right_just_up;
+            }
+        })");
+        h.ctx.inputQuery = [](const std::string& btn, int what) -> double {
+            if (what == 5) return 3.5;                          // mouse delta x
+            if (what == 6) return -2.0;                         // mouse delta y
+            if (what == 0 && btn == "mouse_left") return 1.0;   // left down
+            if (what == 2 && btn == "mouse_right") return 1.0;  // right just_up
+            return 0.0;
+        };
+        Interpreter(&h.ctx, obj).call("start", {});
+        CHECK(obj->fields["dx"].f == 3.5);
+        CHECK(obj->fields["dy"].f == -2.0);
+        CHECK(obj->fields["leftDown"].b == true);
+        CHECK(obj->fields["rightJustUp"].b == true);
+    }
+
     // --- reindent --------------------------------------------------
     {
         std::string messy = "class x : Actor\n{\nfunc start()\n{\nreturn;\n}\n}\n";
