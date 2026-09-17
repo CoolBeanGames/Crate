@@ -2,7 +2,7 @@
     "schemaVersion":  1,
     "projectId":  "8afe2a0217d7419db234ceda7ecb9dff",
     "name":  "Crate",
-    "nextCardIndex":  102,
+    "nextCardIndex":  103,
     "latestExePath":  "build-Release/Crate.exe",
     "latestReleasePath":  "build-Release/Crate.exe",
     "tagCatalog":  [
@@ -4833,6 +4833,44 @@
                                            "isCollapsed":  false,
                                            "createdAt":  "2026-09-17T03:24:52.4169184+00:00",
                                            "updatedAt":  "2026-09-17T03:24:52.4169184+00:00"
+                                       },
+                                       {
+                                           "id":  "c1215f6939e64ea49c0fafd4ea3745b0",
+                                           "index":  102,
+                                           "kind":  "note",
+                                           "dueDate":  null,
+                                           "startedDate":  null,
+                                           "priority":  null,
+                                           "title":  "Asset Browser scene icon + create/open done",
+                                           "task":  "Asset Browser scene integration done (2026-09-16, commit 6ffa4d5 on project-management).\n\nSmall follow-up increment, prompted directly by the user mid-session (\"Make sure scene files get a icon also\"):\n- New AssetIconKind::Scene (hierarchy glyph: root + two children) on a distinct blue tile.\n- .cscene files recognized in the Asset Browser grid with that icon.\n- Double-click a scene tile to load it (same as File \u003e Open Scene).\n- \"Create Scene\" added to the asset area\u0027s right-click menu (auto-numbered on a name clash, like Create Material/Create Input Map already do).\n- Smoke-tested live in build-scenes/Crate.exe end to end: created a scene from the menu, saw the correct blue icon, double-clicked it, confirmed the editor actually switched to it (SCENE: New Scene, ACTORS: 0).\n\nCumulative Scenes progress so far: full save/load serialization (previous note) + File menu wiring + Asset Browser recognition/icon/create/open. Remaining scope is unchanged from the previous note: root scene / get_root() API, tabbed multi-scene view, and prefab/nested-scene instancing (the big one) haven\u0027t been started.",
+                                           "tags":  [
+
+                                                    ],
+                                           "files":  [
+
+                                                     ],
+                                           "customTypeId":  null,
+                                           "customValues":  {
+
+                                                            },
+                                           "requirements":  [
+
+                                                            ],
+                                           "notes":  [
+
+                                                     ],
+                                           "flags":  {
+                                                         "commit":  false,
+                                                         "build":  false,
+                                                         "release":  false,
+                                                         "merge":  false
+                                                     },
+                                           "isDone":  false,
+                                           "isLocked":  false,
+                                           "isAwaitingFeedback":  false,
+                                           "isCollapsed":  false,
+                                           "createdAt":  "2026-09-17T03:33:25.1059407+00:00",
+                                           "updatedAt":  "2026-09-17T03:33:25.1059407+00:00"
                                        },
                                        {
                                            "id":  "c95aa21c18c84dd1811ebfec78f7831a",
