@@ -2,7 +2,7 @@
     "schemaVersion":  1,
     "projectId":  "8afe2a0217d7419db234ceda7ecb9dff",
     "name":  "Crate",
-    "nextCardIndex":  103,
+    "nextCardIndex":  104,
     "latestExePath":  "build-Release/Crate.exe",
     "latestReleasePath":  "build-Release/Crate.exe",
     "tagCatalog":  [
@@ -4871,6 +4871,44 @@
                                            "isCollapsed":  false,
                                            "createdAt":  "2026-09-17T03:33:25.1059407+00:00",
                                            "updatedAt":  "2026-09-17T03:33:25.1059407+00:00"
+                                       },
+                                       {
+                                           "id":  "0b3ca94161614015bda7605955635662",
+                                           "index":  103,
+                                           "kind":  "note",
+                                           "dueDate":  null,
+                                           "startedDate":  null,
+                                           "priority":  null,
+                                           "title":  "get_root() done; cumulative Scenes status",
+                                           "task":  "get_root() script global done (2026-09-16, commit 176d1a5 on project-management).\n\nImplemented get_root() exactly per the Scenes task spec (\"returns a Scene of type Actor\"): a bare global, same category as Camera.main, resolved by walking up from the CALLING script\u0027s own actor to the top of its parent chain. Works in both the interpreter and native-compiled paths. New test in script_integration_tests.cpp confirms a script two levels deep in a real hierarchy correctly resolves get_root() to the scene\u0027s actual root actor. Also de-duplicated two identical private sceneRootOf() helpers that had accreted in ScriptComponent.cpp/NativeScriptComponent.cpp by promoting the one in Runtime.cpp (already used by Camera.main) to a public function.\n\nKnown gap: no dedicated interpreted-vs-native PARITY test for get_root() (only exercised via the interpreter test + codegen_tests.cpp\u0027s general \"does this compile\" battery) -- add one alongside the other *_parity_tests if get_root() ends up load-bearing for real gameplay code.\n\nCumulative Scenes progress: save/load serialization, File menu + Asset Browser integration (icon/create/open), and now get_root(). Remaining, unchanged from before: tabbed multi-scene Scene View and prefab/nested-scene instancing (still the largest remaining chunk, and the part of the spec I understand least confidently -- the \"dragging a scene node to the Asset window replaces it with an instance of a new prefab\" workflow deserves a design pass before diving into code, not just incremental hacking).\n\nAll work so far is on the project-management branch, built/tested exclusively in the isolated build-scenes/ tree; build/ and build-Release/Crate.exe (main, what\u0027s being tested) have not been touched by anything in this note or the ones before it.",
+                                           "tags":  [
+
+                                                    ],
+                                           "files":  [
+
+                                                     ],
+                                           "customTypeId":  null,
+                                           "customValues":  {
+
+                                                            },
+                                           "requirements":  [
+
+                                                            ],
+                                           "notes":  [
+
+                                                     ],
+                                           "flags":  {
+                                                         "commit":  false,
+                                                         "build":  false,
+                                                         "release":  false,
+                                                         "merge":  false
+                                                     },
+                                           "isDone":  false,
+                                           "isLocked":  false,
+                                           "isAwaitingFeedback":  false,
+                                           "isCollapsed":  false,
+                                           "createdAt":  "2026-09-17T03:43:19.2725286+00:00",
+                                           "updatedAt":  "2026-09-17T03:43:19.2725286+00:00"
                                        },
                                        {
                                            "id":  "c95aa21c18c84dd1811ebfec78f7831a",
