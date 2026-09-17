@@ -510,12 +510,18 @@ void EditorApp::drawHierarchyNode(Actor& actor) {
 
     const bool isDragSource = dragActorId_ == actor.id();
     const bool dimmed = isDragSource || !actor.visible() || !actor.enabled();
+    // Scene instances are blue (Scenes task spec: "Scene prefabs are blue in
+    // color"), so an instanced subtree reads as distinct from plain actors
+    // at a glance.
+    const bool isInstance = actor.isInstanceRoot();
     if (dimmed)
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+    else if (isInstance)
+        ImGui::PushStyleColor(ImGuiCol_Text, ImColor(0x5A, 0x9C, 0xF5).Value);
 
     bool open = ImGui::TreeNodeEx(actor.name().c_str(), flags);
 
-    if (dimmed)
+    if (dimmed || isInstance)
         ImGui::PopStyleColor();
 
     // IsItemClicked() fires on mouse-DOWN, before any drag has a chance to
@@ -1941,6 +1947,40 @@ void EditorApp::drawBottomPanel() {
         ImGui::Separator();
 
         ImGui::BeginChild("files");
+        // Drag an actor from the Hierarchy onto the Asset Browser to turn it
+        // (and its children) into a reusable saved scene, replacing it with
+        // an instance of that scene (Scenes task, Step 2). An invisible
+        // button spanning the whole child is a more reliable drop target
+        // than BeginDragDropTarget() called bare right after BeginChild()
+        // (which depends on child-window last-item tracking); the cursor is
+        // reset afterward so the button sits underneath the real content.
+        ImVec2 dropAreaMin = ImGui::GetCursorScreenPos();
+        ImGui::InvisibleButton("##prefab_extract_drop", ImGui::GetContentRegionAvail());
+        if (ImGui::BeginDragDropTarget()) {
+            if (const ImGuiPayload* p = ImGui::AcceptDragDropPayload(kActorPayload)) {
+                uint64_t id = *static_cast<const uint64_t*>(p->Data);
+                if (Actor* dragged = findById(scene_.root(), id)) {
+                    extractPrefabTarget_ = dragged;
+                    extractPrefabName_ = dragged->name();
+                    extractPrefabPopup_.title("Create Scene From Actor")
+                        .size(360, 0)
+                        .onBody([this](ui::Popup& pop) {
+                            pop.help(
+                                "Saves this actor and its children as a new scene, then "
+                                "replaces it here with an instance of that scene.");
+                            pop.inputText("Name", &extractPrefabName_, /*focusOnAppear=*/true);
+                        })
+                        .open();
+                }
+            }
+            ImGui::EndDragDropTarget();
+        }
+        if (extractPrefabPopup_.draw() == ui::Popup::Result::Ok && !extractPrefabName_.empty() &&
+            extractPrefabTarget_) {
+            extractPrefabToScene(extractPrefabTarget_, extractPrefabName_);
+            extractPrefabTarget_ = nullptr;
+        }
+        ImGui::SetCursorScreenPos(dropAreaMin); // draw the real content over the invisible button
         assetBrowserMenu(); // right-click empty space
         drawAssetFolders();
 
@@ -2070,6 +2110,47 @@ void EditorApp::saveScene() {
         CR_LOG("scene", "Saved scene to " + currentScenePath_);
     else
         CR_ERROR("scene", "Save failed: " + error);
+}
+
+void EditorApp::extractPrefabToScene(Actor* target, const std::string& name) {
+    if (!target || !scene_.contains(target))
+        return;
+    std::error_code ec;
+    fs::path dir = fs::path(assetDir_) / assetCwd_;
+    fs::create_directories(dir, ec);
+    fs::path p = dir / (name + ".cscene");
+    for (int n = 2; fs::exists(p, ec); ++n)
+        p = dir / (name + " " + std::to_string(n) + ".cscene");
+
+    std::string error;
+    if (!scene_.saveSubtree(target, p.generic_string(), &error)) {
+        CR_ERROR("assets", "Create Scene From Actor failed: " + error);
+        return;
+    }
+    AssetDatabase::get().idFor(p.generic_string());
+
+    Actor* parent = target->parent();
+    if (parent == &scene_.root())
+        parent = nullptr;
+    int index = target->indexInParent();
+    Transform savedTransform = target->transform();
+    bool wasVisible = target->visible();
+    bool wasEnabled = target->enabled();
+    scene_.remove(target); // target is destroyed by this call
+    target = nullptr;
+
+    Actor* inst = scene_.instantiate(p.generic_string(), parent, name, &error);
+    if (!inst) {
+        CR_ERROR("assets", "Create Scene From Actor: instantiate failed: " + error);
+        return;
+    }
+    inst->transform() = savedTransform;
+    inst->setVisible(wasVisible);
+    inst->setEnabled(wasEnabled);
+    scene_.reparent(inst, parent, index, /*keepWorld=*/false); // restore original sibling order
+    scene_.select(inst);
+    CR_LOG("assets", "Created " + p.filename().string() + " from '" + name +
+                         "' and replaced it with an instance");
 }
 
 void EditorApp::openScene() {

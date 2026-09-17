@@ -178,6 +178,34 @@ bool Scene::save(const std::string& path, std::string* error) const {
     return true;
 }
 
+bool Scene::saveSubtree(const Actor* subtreeRoot, const std::string& path, std::string* error) const {
+    if (!subtreeRoot || !contains(subtreeRoot)) {
+        if (error) *error = "actor does not belong to this scene";
+        return false;
+    }
+    // Numbers only the subtree's own actors -- a field referencing an actor
+    // OUTSIDE it (a sibling elsewhere in the full scene) resolves to null on
+    // load, a disclosed limitation rather than a silent dangling pointer.
+    std::unordered_map<const Actor*, int> ids;
+    int next = 0;
+    std::function<void(const Actor&)> number = [&](const Actor& a) {
+        ids[&a] = next++;
+        for (const auto& c : a.children())
+            number(*c);
+    };
+    number(*subtreeRoot);
+
+    std::ofstream out(path, std::ios::binary | std::ios::trunc);
+    if (!out) {
+        if (error) *error = "could not open '" + path + "' for writing";
+        return false;
+    }
+    out << "CRATE_SCENE " << kSceneFormatVersion << '\n';
+    out << "SCENE " << subtreeRoot->name() << '\n';
+    writeActorRecursive(out, *subtreeRoot, 0, -1, ids);
+    return true;
+}
+
 Scene Scene::loadWithStack(const std::string& path, std::string* error,
                            std::vector<std::string>& stack) {
     std::ifstream in(path, std::ios::binary);

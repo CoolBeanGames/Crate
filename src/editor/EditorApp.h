@@ -103,6 +103,12 @@ private:
     void saveScene();
     void openScene();
 
+    // Prefab extraction (Scenes task, Step 2): drag an actor onto the Asset
+    // Browser -> prompt for a name -> saveSubtree() it as a new .cscene ->
+    // remove the original and instantiate() the new scene in its place, at
+    // the same parent/sibling position/transform, so nothing visibly moves.
+    void extractPrefabToScene(Actor* target, const std::string& name);
+
     void setPlaying(bool playing);
 
     // Camera activation (task 77): enforces "only one CameraComponent in the
@@ -159,6 +165,9 @@ private:
     std::string assetDlgBuf_;      // name entry
     float assetDlgColor_[4] = {0.55f, 0.49f, 1.0f, 1.0f};
     ui::Popup assetPopup_;
+    ui::Popup extractPrefabPopup_;
+    std::string extractPrefabName_;
+    Actor* extractPrefabTarget_ = nullptr; // valid only while the popup above is open
     std::unique_ptr<Actor> clipboard_; // deep clone from copy/cut
     bool playing_ = false;
     bool showDemo_ = false;

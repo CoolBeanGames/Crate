@@ -76,6 +76,14 @@ public:
     // failure, e.g. an unwritable path.
     bool save(const std::string& path, std::string* error = nullptr) const;
 
+    // Saves `subtreeRoot` (which must belong to this scene) and everything
+    // under it as a STANDALONE scene file, named after the actor itself --
+    // the core of the prefab-extraction workflow (drag an actor onto the
+    // Asset Browser to turn it into a reusable saved scene; see EditorApp's
+    // extractPrefabToScene()). Returns false (*error set) on failure.
+    bool saveSubtree(const Actor* subtreeRoot, const std::string& path,
+                     std::string* error = nullptr) const;
+
     // Reads a file previously written by save(). Returns a scene named
     // "Untitled" with nothing in it (and sets *error) on failure -- never
     // partially-loaded silent corruption.
