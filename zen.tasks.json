@@ -567,45 +567,6 @@
           "updatedAt": "2026-09-17T09:38:39.7338057+00:00"
         },
         {
-          "id": "2d813d2226f04ad8bf1b4b2aff7c9230",
-          "index": 109,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Add an app icon (wooden crate)",
-          "task": "Crate has no application icon. Need a wooden-crate icon applied to the .exe (taskbar) and the window title bar.",
-          "tags": [
-            "task",
-            "UI"
-          ],
-          "files": [],
-          "customTypeId": "e361978d91d9447f97033586db3c87b0",
-          "customValues": {
-            "c474f092663247ebb286cc5b978853d3": "Add an app icon (wooden crate)",
-            "77f8b466f2874429a253d2256f62c42a": "Crate has no application icon. Need a wooden-crate icon applied to the .exe (taskbar) and the window title bar.",
-            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
-            "203da294781c41a1b1e7f760ea47047e": "Crate",
-            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
-            "ce370daef7e94671b0b947c000ce780e": "0",
-            "37571d4735f1403b85a48880a05ec554": "task,UI"
-          },
-          "requirements": [],
-          "notes": [],
-          "flags": {
-            "commit": false,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
-          "updatedAt": "2026-09-17T09:38:39.7338057+00:00"
-        },
-        {
           "id": "310d7103bf8b48119cdbb85d245807c8",
           "index": 99,
           "kind": "note",
@@ -4962,6 +4923,45 @@
           "isCollapsed": true,
           "createdAt": "2026-09-17T09:38:39.7338057+00:00",
           "updatedAt": "2026-09-17T11:15:00+00:00"
+        },
+        {
+          "id": "2d813d2226f04ad8bf1b4b2aff7c9230",
+          "index": 109,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Add an app icon (wooden crate)",
+          "task": "Crate has no application icon. Need a wooden-crate icon applied to the .exe (taskbar) and the window title bar.\n\nDONE: procedurally generated a wooden-crate ICO (16/32/48/256) and wired it into src/app.rc (exe/Explorer/taskbar icon) plus main.cpp\u0027s WNDCLASSEXW hIcon/hIconSm \u002B an explicit WM_SETICON send (title bar \u002B running taskbar button). Verified live via screenshot -- title bar shows the crate icon. Commit c3a8b6a.",
+          "tags": [
+            "task",
+            "UI"
+          ],
+          "files": [],
+          "customTypeId": "e361978d91d9447f97033586db3c87b0",
+          "customValues": {
+            "c474f092663247ebb286cc5b978853d3": "Add an app icon (wooden crate)",
+            "77f8b466f2874429a253d2256f62c42a": "Crate has no application icon. Need a wooden-crate icon applied to the .exe (taskbar) and the window title bar.",
+            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
+            "203da294781c41a1b1e7f760ea47047e": "Crate",
+            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
+            "ce370daef7e94671b0b947c000ce780e": "0",
+            "37571d4735f1403b85a48880a05ec554": "task,UI"
+          },
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
+          "updatedAt": "2026-09-17T12:30:00+00:00"
         }
       ]
     }
