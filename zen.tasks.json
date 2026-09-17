@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "projectId": "8afe2a0217d7419db234ceda7ecb9dff",
   "name": "Crate",
-  "nextCardIndex": 120,
+  "nextCardIndex": 121,
   "latestExePath": "build/Crate.exe",
   "latestReleasePath": "build-Release/Crate.exe",
   "tagCatalog": [
@@ -448,45 +448,6 @@
           "isCollapsed": true,
           "createdAt": "2026-09-17T05:55:12.0372408+00:00",
           "updatedAt": "2026-09-17T10:05:11.5543274+00:00"
-        },
-        {
-          "id": "7d747fe38d7e4574a194cb983264c586",
-          "index": 105,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Can\u0027t drag .cscene files at all",
-          "task": "Dragging a .cscene tile in the Asset Browser does nothing -- clicking and dragging doesn\u0027t pick it up, so it can\u0027t be dragged into the Scene View to instantiate it.",
-          "tags": [
-            "bug",
-            "scene tree"
-          ],
-          "files": [],
-          "customTypeId": "e361978d91d9447f97033586db3c87b0",
-          "customValues": {
-            "c474f092663247ebb286cc5b978853d3": "Can\u0027t drag .cscene files at all",
-            "77f8b466f2874429a253d2256f62c42a": "Dragging a .cscene tile in the Asset Browser does nothing -- clicking and dragging doesn\u0027t pick it up, so it can\u0027t be dragged into the Scene View to instantiate it.",
-            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
-            "203da294781c41a1b1e7f760ea47047e": "Crate",
-            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
-            "ce370daef7e94671b0b947c000ce780e": "0",
-            "37571d4735f1403b85a48880a05ec554": "bug,scene tree"
-          },
-          "requirements": [],
-          "notes": [],
-          "flags": {
-            "commit": false,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
-          "updatedAt": "2026-09-17T09:38:39.7338057+00:00"
         },
         {
           "id": "c006ee71d330451b9a76fc4e97d06138",
@@ -1024,46 +985,6 @@
             "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
             "ce370daef7e94671b0b947c000ce780e": "0",
             "37571d4735f1403b85a48880a05ec554": "task,cScript"
-          },
-          "requirements": [],
-          "notes": [],
-          "flags": {
-            "commit": false,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
-          "updatedAt": "2026-09-17T09:38:39.7338057+00:00"
-        },
-        {
-          "id": "3558885045554acdb98576cd1be4a8c5",
-          "index": 119,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "All asset types (incl. scripts, scenes) should be draggable into folders; folders should be draggable too",
-          "task": "Right now scripts and .cscene files can\u0027t be dragged within the Asset Browser to reorganize them into folders. ALL asset types should support this, and folders themselves should also be draggable (e.g. into other folders).",
-          "tags": [
-            "task",
-            "assets",
-            "files"
-          ],
-          "files": [],
-          "customTypeId": "e361978d91d9447f97033586db3c87b0",
-          "customValues": {
-            "c474f092663247ebb286cc5b978853d3": "All asset types (incl. scripts, scenes) should be draggable into folders; folders should be draggable too",
-            "77f8b466f2874429a253d2256f62c42a": "Right now scripts and .cscene files can\u0027t be dragged within the Asset Browser to reorganize them into folders. ALL asset types should support this, and folders themselves should also be draggable (e.g. into other folders).",
-            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
-            "203da294781c41a1b1e7f760ea47047e": "Crate",
-            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
-            "ce370daef7e94671b0b947c000ce780e": "0",
-            "37571d4735f1403b85a48880a05ec554": "task,assets,files"
           },
           "requirements": [],
           "notes": [],
@@ -2137,6 +2058,45 @@
           "isCollapsed": false,
           "createdAt": "2026-09-16T03:53:56.2044765+00:00",
           "updatedAt": "2026-09-16T04:48:48.4871001+00:00"
+        },
+        {
+          "id": "7d747fe38d7e4574a194cb983264c586",
+          "index": 105,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Can\u0027t drag .cscene files at all",
+          "task": "Dragging a .cscene tile in the Asset Browser does nothing -- clicking and dragging doesn\u0027t pick it up, so it can\u0027t be dragged into the Scene View to instantiate it.",
+          "tags": [
+            "bug",
+            "scene tree"
+          ],
+          "files": [],
+          "customTypeId": "e361978d91d9447f97033586db3c87b0",
+          "customValues": {
+            "c474f092663247ebb286cc5b978853d3": "Can\u0027t drag .cscene files at all",
+            "77f8b466f2874429a253d2256f62c42a": "Dragging a .cscene tile in the Asset Browser does nothing -- clicking and dragging doesn\u0027t pick it up, so it can\u0027t be dragged into the Scene View to instantiate it.",
+            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
+            "203da294781c41a1b1e7f760ea47047e": "Crate",
+            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
+            "ce370daef7e94671b0b947c000ce780e": "0",
+            "37571d4735f1403b85a48880a05ec554": "bug,scene tree"
+          },
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
+          "updatedAt": "2026-09-17T11:00:36+00:00"
         },
         {
           "id": "c9d4482b33c94eeda497726091ff6dbf",
@@ -4934,6 +4894,74 @@
           "isCollapsed": false,
           "createdAt": "2026-09-16T04:51:07.9237798+00:00",
           "updatedAt": "2026-09-16T05:25:01.8668112+00:00"
+        },
+        {
+          "id": "3558885045554acdb98576cd1be4a8c5",
+          "index": 119,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "All asset types (incl. scripts, scenes) should be draggable into folders; folders should be draggable too",
+          "task": "Right now scripts and .cscene files can\u0027t be dragged within the Asset Browser to reorganize them into folders. ALL asset types should support this, and folders themselves should also be draggable (e.g. into other folders).",
+          "tags": [
+            "task",
+            "assets",
+            "files"
+          ],
+          "files": [],
+          "customTypeId": "e361978d91d9447f97033586db3c87b0",
+          "customValues": {
+            "c474f092663247ebb286cc5b978853d3": "All asset types (incl. scripts, scenes) should be draggable into folders; folders should be draggable too",
+            "77f8b466f2874429a253d2256f62c42a": "Right now scripts and .cscene files can\u0027t be dragged within the Asset Browser to reorganize them into folders. ALL asset types should support this, and folders themselves should also be draggable (e.g. into other folders).",
+            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
+            "203da294781c41a1b1e7f760ea47047e": "Crate",
+            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
+            "ce370daef7e94671b0b947c000ce780e": "0",
+            "37571d4735f1403b85a48880a05ec554": "task,assets,files"
+          },
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
+          "updatedAt": "2026-09-17T11:00:36+00:00"
+        },
+        {
+          "id": "a1b2c3d4e5f647890a1b2c3d4e5f6789",
+          "index": 120,
+          "kind": "note",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Found and fixed the root cause of the Asset Browser click-blocking bug",
+          "task": "The user reported \u0027still cant click anyhting in the asset browser\u0027 while I was mid-investigation on item 15 (asset drag-to-folder). Reproduced live: single clicks, double-clicks, and drags on every Asset Browser tile were all silently swallowed.\n\nROOT CAUSE: Step 2\u0027s prefab-extraction drop target (an ImGui::InvisibleButton spanning the whole \u0027files\u0027 child window, added so a Hierarchy actor could be dragged onto the Asset Browser to extract a prefab) was submitted before every asset tile in that same child, without ImGui::SetNextItemAllowOverlap(). Dear ImGui\u0027s ActiveId is claimed on mouse-DOWN by whichever item is hovered at that instant -- since the invisible button was submitted first, it always won that race, even though the real tiles are drawn visually on top of it afterward. Every tile drawn inside that child was effectively dead to mouse input from the moment Step 2 shipped. This is almost certainly the real cause behind several separate-looking user reports: the Asset Browser going fully unresponsive, .cscene files not being draggable (item 105), and item 15\u0027s drag-to-folder never registering.\n\nFIX: one ImGui::SetNextItemAllowOverlap() call before the InvisibleButton (EditorApp.cpp, drawBottomPanel). Rebuilt, killed the stale locked exe, relaunched, and re-verified live: folder single-click/double-click/navigation, script and image tile selection, and the CRATE_ASSET_MOVE drag (item 15/15b) all work correctly now -- confirmed by screenshot at every step, including moving Default.inputmap into assets/scripts/ and back out again.\n\nALSO SHIPPED (same commit): scenes can now be dragged directly from the Asset Browser onto a Hierarchy row (instantiates as that actor\u0027s child) or onto empty Hierarchy space (instantiates at the scene root) -- the user asked for this mid-session after confirming the existing viewport-drop instantiate flow worked. Verified live both ways.\n\nFull 28-target test suite passes (0 failures). Both Debug (build/) and Release (build-Release/) rebuilt.\n\nMarked done: item 105 (\u0027Can\u0027t drag .cscene files at all\u0027) and item 119 (asset drag-to-folder) -- both were direct symptoms of this bug and are now confirmed fixed. Commit 3a4eb5f on project-management.",
+          "tags": [],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-17T11:00:36+00:00",
+          "updatedAt": "2026-09-17T11:02:52.7384235+00:00"
         }
       ]
     }
