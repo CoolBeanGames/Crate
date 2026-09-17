@@ -22,12 +22,6 @@ crate::Actor* findActorById(crate::Actor& node, uint64_t id) {
     return nullptr;
 }
 
-crate::Actor* sceneRootOf(crate::Actor* a) {
-    while (a && a->parent())
-        a = a->parent();
-    return a;
-}
-
 void collectActors(crate::Actor& node, const std::function<bool(crate::Actor&)>& test,
                    std::vector<crate::Actor*>& out) {
     if (test(node))

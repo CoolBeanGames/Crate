@@ -700,8 +700,8 @@ std::vector<std::string> ScriptSystem::completions(const std::string& prefix) co
                                      "switch", "case",   "default", "do",     "do_async", "true",
                                      "false",  "null",   "static", "abstract", "this",  "base",
                                      "break",  "continue"};
-    static const char* globals[] = {"print", "type_of", "Vector2", "Vector3",
-                                    "transform", "actor", "Camera", "Input"};
+    static const char* globals[] = {"print",     "type_of", "Vector2", "Vector3", "transform",
+                                    "actor",     "Camera",  "Input",   "get_root"};
 
     std::vector<std::string> out;
     auto consider = [&](const std::string& s) {

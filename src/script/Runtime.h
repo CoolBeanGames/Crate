@@ -107,6 +107,14 @@ bool setNativeField(ScriptObject& o, const std::string& name, const Value& v);
 // special-cases. Throws RuntimeError for a null actor or an unknown member.
 Value actorMember(crate::Actor* a, const std::string& name, int line);
 
+// Walks up an actor's parent chain to the top -- the scene's implicit root
+// Actor (see Scene::root()). Shared by Camera.main's resolution and, since
+// get_root() is a bare global (like Camera.main) reached by walking up from
+// the CALLING script's own actor rather than from an explicit receiver, by
+// get_root() itself (see Interpreter::builtinCall / CodeGen's global-call
+// emission). Returns nullptr for a null actor.
+crate::Actor* sceneRootOf(crate::Actor* a);
+
 // ---- Camera.main resolution (task 77) ----
 // Camera.main isn't reached from a specific actor -- it's a bare global, so
 // the scene it searches is found by walking up from the calling script's own

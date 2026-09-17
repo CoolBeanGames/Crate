@@ -586,6 +586,13 @@ Value Interpreter::builtinCall(const std::string& name, std::vector<Value>& args
             return args[0];
         return Value::Type(args[0].typeName());
     }
+    // A bare global (like Camera.main): the scene it reaches into is found
+    // by walking up from the CALLING script's own actor, not an explicit
+    // receiver (Scenes task -- see zen.tasks.json's "Scenes" card).
+    if (name == "get_root") {
+        crate::Actor* root = crate::script::sceneRootOf(self_ ? self_->owner : nullptr);
+        return root ? Value::ActorRef(root) : Value::Null_();
+    }
     // Godot-3 style: emit_signal("name", args...) on `this`.
     if (name == "emit_signal") {
         if (args.empty())

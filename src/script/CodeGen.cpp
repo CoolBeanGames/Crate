@@ -325,6 +325,14 @@ std::string Gen::identifierCallDispatch(const std::string& name, const std::vect
         }
         return "crate::script::Value::Str((" + args[0] + ").str())";
     }
+    if (name == "get_root") {
+        // Bare global (like Camera.main): walks up from THIS instance's own
+        // actor, mirroring Interpreter::builtinCall's identical case.
+        return "[&]() -> crate::script::Value {\n" + ind(1) +
+               "crate::Actor* __r = crate::script::sceneRootOf(owner_);\n" + ind(1) +
+               "return __r ? crate::script::Value::ActorRef(__r) : crate::script::Value::Null_();\n" +
+               ind(0) + "}()";
+    }
     if (name == "Vector3" || name == "Vector2") {
         std::string x = args.size() > 0 ? "(" + args[0] + ").num()" : "0.0";
         std::string y = args.size() > 1 ? "(" + args[1] + ").num()" : "0.0";

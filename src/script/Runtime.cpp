@@ -523,6 +523,12 @@ bool setNativeField(ScriptObject& o, const std::string& name, const Value& v) {
     return false;
 }
 
+crate::Actor* sceneRootOf(crate::Actor* a) {
+    while (a && a->parent())
+        a = a->parent();
+    return a;
+}
+
 Value actorMember(crate::Actor* a, const std::string& name, int line) {
     if (!a)
         throw RuntimeError("null actor", line);
@@ -569,12 +575,6 @@ void disableOtherCameraComps(crate::Actor& node, CameraComponent* keep) {
             cc->enabled = false;
     for (const auto& c : node.children())
         disableOtherCameraComps(*c, keep);
-}
-
-crate::Actor* sceneRootOf(crate::Actor* a) {
-    while (a && a->parent())
-        a = a->parent();
-    return a;
 }
 
 } // namespace
