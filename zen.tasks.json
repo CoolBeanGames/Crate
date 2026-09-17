@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "projectId": "8afe2a0217d7419db234ceda7ecb9dff",
   "name": "Crate",
-  "nextCardIndex": 121,
+  "nextCardIndex": 122,
   "latestExePath": "build/Crate.exe",
   "latestReleasePath": "build-Release/Crate.exe",
   "tagCatalog": [
@@ -745,6 +745,34 @@
           "isCollapsed": false,
           "createdAt": "2026-09-16T05:15:13.4134766+00:00",
           "updatedAt": "2026-09-16T05:15:13.4134771+00:00"
+        },
+        {
+          "id": "b7e3f1c9a2d4468e9b1c7f3a5d6e8f02",
+          "index": 121,
+          "kind": "note",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Session handoff -- 14/15 feedback items done, only item 106 left",
+          "task": "Session handoff (2026-09-17) -- where things stand right now.\n\nBOTH STANDING TASKS ARE DONE:\n- Transplation (task #88, native cScript compilation): implemented and tested, but stays OPEN per its own instructions -- awaiting the user\u0027s manual approval. Do not close it.\n- Scenes/Projects (#91/#92): all 4 steps (instancing, prefab-extraction, per-instance overrides, nesting) plus script-facing Value.instantiate() are done, tested, committed.\n\nINPUT.MOUSE: done -- Input.Mouse.delta/scroll/left_down/etc. is a real structural member-access chain, interpreted \u002B native parity tested.\n\nFOG/SPOTLIGHT BUG: filed as its own Zen bug task on main, deliberately NOT fixed yet per the user\u0027s own instruction (\u0027make a task but save it for later\u0027). Still outstanding, still deferred -- do not start on it unless asked.\n\nTHE 15-ITEM USER FEEDBACK LIST (indices 105-119): 14 of 15 are DONE.\n  105 can\u0027t drag .cscene -- DONE (see root-cause below)\n  106 can\u0027t open .cscene for editing -- STILL OPEN, NOT STARTED (see below)\n  107 hide prefab children in Hierarchy until opened -- DONE (commit b0725eb)\n  108 Inspector can\u0027t be double-clicked -- marked done: tested extensively live, could not reproduce on current build\n  109 app icon (wooden crate) -- DONE (commit c3a8b6a)\n  110 double-click script opens Script Editor -- DONE, verified already working\n  111-117 (Actor.transform/Math fns/destroy/remove/add_component/direction setters/Vector.normalize) -- DONE, were actually already shipped in df505ed before this session\u0027s compaction, board just hadn\u0027t caught up\n  118 delta always reads 0 -- marked done: tested extensively live (real script, real Play session, printed every frame), could not reproduce\n  119 drag all asset types \u002B folders into folders -- DONE, same root cause as 105\n\nROOT CAUSE found for 105/119 and probably explains why several other reports (108, 118, and the user\u0027s live \u0027still cant click anyhting\u0027 report) never reproduced: the Step 2 prefab-extraction drop target was an ImGui::InvisibleButton spanning the whole Asset Browser tile grid, submitted before every tile without SetNextItemAllowOverlap() -- it silently won every mouse-down in that whole child window, so NOTHING under it could be clicked or dragged. One-line fix (commit 3a4eb5f). If the user reports something asset-browser-shaped as still broken, this is already fixed on the current build -- ask them to confirm they\u0027re on a fresh exe, not a stale one.\n\nALSO FOUND AND FIXED (not in the original list): extracting any actor WITH CHILDREN into a prefab reliably crashed the editor (abort()). Root cause was mine, from implementing 107: TreeNodeEx()\u0027s matching TreePop() was accidentally made conditional on \u0027don\u0027t recurse into an instance,\u0027 corrupting ImGui\u0027s ID stack a frame later. Fixed same session, see commit b0725eb for the full diagnostic writeup (useful reading if a similar \u0027works, then aborts one frame later\u0027 bug shows up again -- the technique was stdout-redirected launches with checkpoint logging around each draw*() call).\n\nWHAT\u0027S LEFT: only item 106, \u0027Can\u0027t open .cscene files for editing\u0027 (id c006ee71d330451b9a76fc4e97d06138). Current behavior: double-clicking a .cscene tile loads it wholesale as the active scene (replacing whatever\u0027s currently open, no unsaved-changes warning), and Ctrl\u002BS saves back to that same path -- so editing technically already works end to end, just with two rough edges nobody\u0027s addressed: (1) no warning before it clobbers unsaved work in the CURRENT scene, and (2) there\u0027s no lighter-weight way to poke at a small nested prefab\u0027s source without replacing your whole working scene with it. Not started. My scoped recommendation from earlier in this session: add an unsaved-changes confirmation before the double-click-load (cheap, real data-loss prevention), and treat the rest of the ask as likely covered by item 107\u0027s new sub-view once the user has tried it live -- but confirm with the user before assuming that\u0027s enough, since 107 edits the LIVE scene\u0027s instances, not a .cscene FILE opened standalone from the Asset Browser.\n\nBUILD STATE: both build/Crate.exe (Debug) and build-Release/Crate.exe (Release) are current as of the last commit (bacff82) and passed the full 28-target test suite. zen.tasks.json\u0027s latestExePath/latestReleasePath are already correct, no update needed there.\n\nCommits this session, newest first: bacff82, b0725eb, eae1644, c3a8b6a, f2d1d5b, 0523898, d5e2320, 3a4eb5f, df505ed, and the earlier Scenes-step commits -- all on project-management.",
+          "tags": [],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-17T13:30:00+00:00",
+          "updatedAt": "2026-09-17T13:30:00+00:00"
         }
       ]
     },
