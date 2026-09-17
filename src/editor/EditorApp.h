@@ -186,6 +186,13 @@ private:
 
     // Drag/drop bookkeeping for the hierarchy.
     uint64_t dragActorId_ = 0; // actor currently being dragged (0 = none)
+
+    // Prefab-instance sub-view (item 107): a scene instance's children are
+    // hidden inline in the normal tree (it draws as a leaf) until double-
+    // clicked, which focuses the Hierarchy panel on that instance -- showing
+    // only its own subtree, Godot-style, until "Back" returns to the full
+    // scene. nullptr = showing the whole scene as usual.
+    Actor* hierarchyFocusRoot_ = nullptr;
 };
 
 } // namespace crate

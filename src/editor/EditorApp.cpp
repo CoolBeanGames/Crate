@@ -504,19 +504,22 @@ void EditorApp::drawHierarchyNode(Actor& actor) {
     // "Where it will go" boundary target before this row.
     drawReparentDropTarget(*actor.parent(), actor.indexInParent());
 
+    // Scene instances are blue (Scenes task spec: "Scene prefabs are blue in
+    // color"), so an instanced subtree reads as distinct from plain actors
+    // at a glance.
+    const bool isInstance = actor.isInstanceRoot();
+
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanFullWidth |
                                ImGuiTreeNodeFlags_DefaultOpen;
-    if (actor.children().empty())
+    // A prefab instance's children stay hidden inline (item 107) -- double-
+    // click focuses the panel on it instead of expanding inline, Godot-style.
+    if (actor.children().empty() || isInstance)
         flags |= ImGuiTreeNodeFlags_Leaf;
     if (scene_.selected() == &actor)
         flags |= ImGuiTreeNodeFlags_Selected;
 
     const bool isDragSource = dragActorId_ == actor.id();
     const bool dimmed = isDragSource || !actor.visible() || !actor.enabled();
-    // Scene instances are blue (Scenes task spec: "Scene prefabs are blue in
-    // color"), so an instanced subtree reads as distinct from plain actors
-    // at a glance.
-    const bool isInstance = actor.isInstanceRoot();
     if (dimmed)
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
     else if (isInstance)
@@ -536,6 +539,10 @@ void EditorApp::drawHierarchyNode(Actor& actor) {
     if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left) &&
         !ImGui::IsItemToggledOpen())
         scene_.select(&actor);
+    // Double-click an instance root to drill into its own sub-view (item 107)
+    // instead of inline-expanding -- the normal tree never shows its children.
+    if (isInstance && ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+        hierarchyFocusRoot_ = &actor;
 
     // Drag source: carries the actor id, shows a ghost label ("where it was").
     if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoHoldToOpenOthers)) {
@@ -591,17 +598,24 @@ void EditorApp::drawHierarchyNode(Actor& actor) {
 
     // Trailing metadata.
     ImGui::SameLine();
-    ImGui::TextDisabled("%s%s%s", actor.typeName(), actor.visible() ? "" : "  (hidden)",
-                        actor.enabled() ? "" : "  (disabled)");
+    ImGui::TextDisabled("%s%s%s%s", actor.typeName(), actor.visible() ? "" : "  (hidden)",
+                        actor.enabled() ? "" : "  (disabled)",
+                        (isInstance && !actor.children().empty()) ? "  (dbl-click to open)" : "");
 
     if (open) {
-        std::vector<Actor*> kids;
-        for (const auto& c : actor.children())
-            kids.push_back(c.get());
-        for (Actor* c : kids)
-            drawHierarchyNode(*c);
-        // Boundary target after the last child = append under `actor`.
-        drawReparentDropTarget(actor, static_cast<int>(actor.children().size()));
+        // Leaf-flagged nodes (no children, or a collapsed instance root)
+        // still return open=true from TreeNodeEx and still need the matching
+        // TreePop() below -- only the recursive child-drawing is instance-
+        // gated, never the push/pop balance itself.
+        if (!isInstance) {
+            std::vector<Actor*> kids;
+            for (const auto& c : actor.children())
+                kids.push_back(c.get());
+            for (Actor* c : kids)
+                drawHierarchyNode(*c);
+            // Boundary target after the last child = append under `actor`.
+            drawReparentDropTarget(actor, static_cast<int>(actor.children().size()));
+        }
         ImGui::TreePop();
     }
     ImGui::PopID();
@@ -609,6 +623,21 @@ void EditorApp::drawHierarchyNode(Actor& actor) {
 
 void EditorApp::drawHierarchy() {
     if (ImGui::Begin("Hierarchy")) {
+        // Prefab-instance sub-view (item 107): re-validate every frame in
+        // case the focused instance was deleted/cut while open.
+        Actor* focusRoot = hierarchyFocusRoot_;
+        if (focusRoot && !findById(scene_.root(), focusRoot->id()))
+            focusRoot = hierarchyFocusRoot_ = nullptr;
+        if (focusRoot) {
+            if (ImGui::SmallButton("< Back"))
+                focusRoot = hierarchyFocusRoot_ = nullptr;
+            ImGui::SameLine();
+            ImGui::TextDisabled("Scene /");
+            ImGui::SameLine();
+            ImGui::TextColored(ImColor(0x5A, 0x9C, 0xF5).Value, "%s",
+                               hierarchyFocusRoot_ ? hierarchyFocusRoot_->name().c_str() : "");
+            ImGui::Separator();
+        }
         if (ImGui::Button("+ Add")) ImGui::OpenPopup("add_actor");
         {
             static ui::ContextMenu addMenu("add_actor");
@@ -640,25 +669,29 @@ void EditorApp::drawHierarchy() {
             dragActorId_ = 0;
 
         if (ImGui::BeginChild("tree")) {
+            Actor& viewRoot = focusRoot ? *focusRoot : scene_.root();
             std::vector<Actor*> roots;
-            for (const auto& c : scene_.root().children())
+            for (const auto& c : viewRoot.children())
                 roots.push_back(c.get());
             for (Actor* c : roots)
                 drawHierarchyNode(*c);
 
             // Trailing target under the root (append at end).
-            drawReparentDropTarget(scene_.root(), static_cast<int>(scene_.root().children().size()));
+            drawReparentDropTarget(viewRoot, static_cast<int>(viewRoot.children().size()));
 
-            // Empty space below the tree: drop here to unparent to the root.
+            // Empty space below the tree: drop here to unparent to the
+            // current view's root (the scene root normally, or the focused
+            // instance while inside its sub-view -- so a drag never
+            // "escapes" the sub-view unexpectedly).
             ImVec2 avail = ImGui::GetContentRegionAvail();
             if (avail.y > 4.0f) {
                 ImGui::InvisibleButton("##empty_drop", ImVec2(-1, avail.y));
                 if (ImGui::BeginDragDropTarget()) {
-                    acceptActorDrop(nullptr, -1);
+                    acceptActorDrop(focusRoot, -1);
                     if (const ImGuiPayload* ps = ImGui::AcceptDragDropPayload("CRATE_SCENE_PATH")) {
                         std::string scenePath(static_cast<const char*>(ps->Data));
                         std::string error;
-                        if (Actor* inst = scene_.instantiate(scenePath, nullptr, "", &error)) {
+                        if (Actor* inst = scene_.instantiate(scenePath, focusRoot, "", &error)) {
                             scene_.select(inst);
                             CR_LOG("scene", "Instantiated '" + scenePath + "' as '" +
                                                 inst->name() + "'");
