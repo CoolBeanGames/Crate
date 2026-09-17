@@ -20,7 +20,7 @@ namespace crate {
 class CameraComponent;
 
 // What an asset-browser tile represents, for icon drawing purposes.
-enum class AssetIconKind { Folder, Material, Script, Image, Fbx, InputMap, Generic };
+enum class AssetIconKind { Folder, Material, Script, Image, Fbx, InputMap, Scene, Generic };
 
 // The editor shell. Owns the active Scene and draws every panel each frame.
 // Windowing is handled by the platform layer (see src/main.cpp); the D3D11

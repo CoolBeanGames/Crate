@@ -1419,6 +1419,23 @@ void EditorApp::assetBrowserMenu() {
         scene_.select(nullptr);
         CR_LOG("assets", "Created material '" + m.name + "'");
     }
+    if (menu.item("Create Scene")) {
+        std::error_code ec;
+        fs::path dir = fs::path(assetDir_) / assetCwd_;
+        fs::create_directories(dir, ec);
+        fs::path p = dir / "New Scene.cscene";
+        for (int n = 2; fs::exists(p, ec); ++n)
+            p = dir / ("New Scene " + std::to_string(n) + ".cscene");
+        Scene fresh(p.stem().string());
+        std::string error;
+        if (fresh.save(p.generic_string(), &error)) {
+            AssetDatabase::get().idFor(p.generic_string());
+            selectedAsset_ = p.generic_string();
+            CR_LOG("assets", "Created scene " + p.filename().string());
+        } else {
+            CR_ERROR("assets", "Create Scene failed: " + error);
+        }
+    }
     if (menu.item("Create Input Map")) {
         std::error_code ec;
         fs::path dir = fs::path(assetDir_) / assetCwd_;
@@ -1577,6 +1594,22 @@ void EditorApp::drawAssetIconGlyph(ImDrawList* dl, ImVec2 iconMin, ImVec2 iconMa
         dl->AddCircleFilled(ImVec2(bMax.x - bw * 0.34f, c.y + bh * 0.15f), btnR, accent, 12);
         break;
     }
+    case AssetIconKind::Scene: {
+        // Small hierarchy glyph (a scene is a tree of actors): one root node
+        // with two children, matching the task's "scenes are blue" note via
+        // the tile's accent color rather than the glyph itself.
+        float r = h * 0.09f;
+        ImVec2 root(c.x, iconMin.y + h * 0.30f);
+        ImVec2 leftChild(c.x - w * 0.22f, iconMax.y - h * 0.24f);
+        ImVec2 rightChild(c.x + w * 0.22f, iconMax.y - h * 0.24f);
+        unsigned int line = IM_COL32(235, 235, 240, 200);
+        dl->AddLine(root, leftChild, line, 1.5f);
+        dl->AddLine(root, rightChild, line, 1.5f);
+        dl->AddCircleFilled(root, r * 1.15f, IM_COL32(255, 255, 255, 255), 16);
+        dl->AddCircleFilled(leftChild, r, IM_COL32(255, 255, 255, 230), 12);
+        dl->AddCircleFilled(rightChild, r, IM_COL32(255, 255, 255, 230), 12);
+        break;
+    }
     case AssetIconKind::Generic: {
         float pw = w * 0.46f, ph = h * 0.60f;
         ImVec2 pMin(c.x - pw * 0.5f, c.y - ph * 0.5f), pMax(c.x + pw * 0.5f, c.y + ph * 0.5f);
@@ -1675,15 +1708,18 @@ void EditorApp::drawAssetFolders() {
         bool isFbx = ext == "fbx";
         bool isMap = ext == "inputmap";
         bool isScript = ext == "cscript";
+        bool isScene = ext == "cscene";
         AssetIconKind kind = isImg      ? AssetIconKind::Image
                             : isFbx     ? AssetIconKind::Fbx
                             : isMap     ? AssetIconKind::InputMap
                             : isScript  ? AssetIconKind::Script
+                            : isScene   ? AssetIconKind::Scene
                                         : AssetIconKind::Generic;
         unsigned int col = isImg      ? IM_COL32(70, 150, 170, 255)
                           : isFbx     ? IM_COL32(150, 110, 190, 255)
                           : isMap     ? IM_COL32(90, 130, 200, 255)
                           : isScript  ? IM_COL32(56, 109, 154, 255)
+                          : isScene   ? IM_COL32(64, 96, 210, 255)
                                       : IM_COL32(90, 94, 104, 255);
         // Resolve which registered script class (if any) this file currently
         // holds, once per frame, for both the tile's "selected" highlight
@@ -1727,6 +1763,23 @@ void EditorApp::drawAssetFolders() {
                     if (dbl) {
                         openScriptsTab_ = true;
                         scriptEditor_.openScript(scriptClassName);
+                    }
+                }
+            } else if (isScene) {
+                selectedAsset_ = path;
+                selectedMaterial_.clear();
+                selectedScript_.clear();
+                scene_.select(nullptr);
+                if (dbl) {
+                    std::string error;
+                    Scene loaded = Scene::load(path, &error);
+                    if (!error.empty()) {
+                        CR_ERROR("scene", "Open failed: " + error);
+                    } else {
+                        scene_ = std::move(loaded);
+                        currentScenePath_ = path;
+                        renderer_.loadLightmap(scene_, assetDir_);
+                        CR_LOG("scene", "Opened scene " + path);
                     }
                 }
             } else {
