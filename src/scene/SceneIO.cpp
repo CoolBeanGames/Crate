@@ -27,12 +27,30 @@
 //       Starts a new component (constructed via ComponentRegistry::create,
 //       so this covers builtin AND script component types identically) on
 //       the current actor. typeName may contain spaces ("Mesh Renderer").
+//   INSTANCE <id> <parentId> <sourcePath>\t<name>
+//       A nested scene instance (see Scene::instantiate() / Actor::
+//       isInstanceRoot()), in place of an ACTOR line: `sourcePath` is
+//       loaded recursively (so instances can nest arbitrarily deep -- a
+//       source that would directly or transitively instance itself is
+//       detected and skipped rather than infinite-looping) and its root's
+//       CHILDREN become this node's children, rebuilt fresh every load. The
+//       node itself still gets its own XFORM line right after, exactly
+//       like an ACTOR, since an instance can be repositioned independent
+//       of its source. sourcePath/name are tab-separated on one line
+//       (rather than two FIELD lines) since both need "rest of line"
+//       freedom and neither may contain a tab.
 //
 // Known limitations (disclosed for the next session, not silently swallowed):
 //   - FIELD string values may not contain an embedded newline.
 //   - Value::T::Array fields are not yet persisted (written/read as null).
-//   - Prefabs/nested scenes, the Asset Browser integration, and the root-
-//     scene/get_root() API are separate, later increments of the Scenes task.
+//   - An instance's children are ALWAYS exactly what its source scene
+//     currently contains -- no per-instance overrides yet (editing an
+//     instanced actor's fields in the Inspector won't persist across a
+//     reload) and no adding extra "local" children under an instance root.
+//     Both are planned follow-ups (see the Scenes task's Zen notes).
+//   - The Asset Browser drag-to-instantiate workflow and the prefab-
+//     extraction workflow (drag a node OUT to create a new saved scene)
+//     are separate, later increments.
 
 #include "scene/Actor2D.h"
 #include "scene/Actor3D.h"
@@ -42,7 +60,9 @@
 
 #include "core/Log.h"
 
+#include <algorithm>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <functional>
 #include <sstream>
@@ -50,6 +70,7 @@
 #include <vector>
 
 namespace crate {
+namespace fs = std::filesystem;
 namespace {
 
 constexpr int kSceneFormatVersion = 1;
@@ -87,14 +108,26 @@ struct PendingField {
     std::string key, kind, value;
 };
 
-void writeActorRecursive(std::ostream& out, const Actor& a, int id, int parentId,
-                         std::unordered_map<const Actor*, int>& ids) {
-    out << "ACTOR " << id << ' ' << parentId << ' ' << a.typeName() << ' ' << (a.visible() ? 1 : 0)
-        << ' ' << (a.enabled() ? 1 : 0) << ' ' << a.name() << '\n';
-    const Transform& t = a.transform();
+void writeXform(std::ostream& out, const Transform& t) {
     out << "XFORM " << t.position.x << ' ' << t.position.y << ' ' << t.position.z << ' '
         << t.rotationEuler.x << ' ' << t.rotationEuler.y << ' ' << t.rotationEuler.z << ' '
         << t.scale.x << ' ' << t.scale.y << ' ' << t.scale.z << '\n';
+}
+
+void writeActorRecursive(std::ostream& out, const Actor& a, int id, int parentId,
+                         std::unordered_map<const Actor*, int>& ids) {
+    if (a.isInstanceRoot()) {
+        // Short-circuit: no COMP/FIELD/children lines -- the source scene
+        // supplies all of that fresh on every load. Only this node's own
+        // placement (transform) belongs to the INSTANCING scene.
+        out << "INSTANCE " << id << ' ' << parentId << ' ' << a.instanceSource() << '\t' << a.name()
+            << '\n';
+        writeXform(out, a.transform());
+        return;
+    }
+    out << "ACTOR " << id << ' ' << parentId << ' ' << a.typeName() << ' ' << (a.visible() ? 1 : 0)
+        << ' ' << (a.enabled() ? 1 : 0) << ' ' << a.name() << '\n';
+    writeXform(out, a.transform());
     a.writeFields(out);
     auto idOf = [&ids](const Actor* p) -> int {
         auto it = ids.find(p);
@@ -106,6 +139,15 @@ void writeActorRecursive(std::ostream& out, const Actor& a, int id, int parentId
     }
     for (const auto& child : a.children())
         writeActorRecursive(out, *child, ids.at(child.get()), id, ids);
+}
+
+// Resolves two scenes' worth of relative paths to the SAME absolute form
+// for cycle comparison -- "Scenes/x.cscene" loaded from two different
+// working directories should still be recognized as the same file.
+std::string canonicalOrRaw(const std::string& path) {
+    std::error_code ec;
+    fs::path c = fs::weakly_canonical(path, ec);
+    return ec ? path : c.generic_string();
 }
 
 } // namespace
@@ -136,7 +178,8 @@ bool Scene::save(const std::string& path, std::string* error) const {
     return true;
 }
 
-Scene Scene::load(const std::string& path, std::string* error) {
+Scene Scene::loadWithStack(const std::string& path, std::string* error,
+                           std::vector<std::string>& stack) {
     std::ifstream in(path, std::ios::binary);
     if (!in) {
         if (error) *error = "could not open '" + path + "'";
@@ -183,6 +226,38 @@ Scene Scene::load(const std::string& path, std::string* error) {
             currentActorId = id;
             byId[id] = currentActor;
             currentComp = nullptr;
+        } else if (line.rfind("INSTANCE ", 0) == 0) {
+            auto tok = splitLine(line.substr(9), 3);
+            int id = (int)std::strtol(tok[0].c_str(), nullptr, 10);
+            int parentId = (int)std::strtol(tok[1].c_str(), nullptr, 10);
+            size_t tab = tok[2].find('\t');
+            std::string sourcePath = tab == std::string::npos ? tok[2] : tok[2].substr(0, tab);
+            std::string instName =
+                tab == std::string::npos ? std::string() : tok[2].substr(tab + 1);
+            std::string canon = canonicalOrRaw(sourcePath);
+            currentActor = nullptr;
+            currentComp = nullptr;
+            if (std::find(stack.begin(), stack.end(), canon) != stack.end()) {
+                CR_WARN("scene", "Scene load: '" + sourcePath +
+                                     "' would instance itself (directly or transitively) -- skipped");
+                continue;
+            }
+            stack.push_back(canon);
+            std::string subError;
+            Scene sub = loadWithStack(sourcePath, &subError, stack);
+            stack.pop_back();
+            if (!subError.empty()) {
+                CR_WARN("scene", "Scene load: instance source '" + sourcePath +
+                                     "' failed to load: " + subError);
+                continue;
+            }
+            std::unique_ptr<Actor> instanceRoot = std::move(sub.root_);
+            instanceRoot->setName(instName.empty() ? fs::path(sourcePath).stem().string() : instName);
+            instanceRoot->setInstanceSource(sourcePath);
+            Actor* parent = parentId < 0 ? nullptr : byId.count(parentId) ? byId[parentId] : nullptr;
+            currentActor = scene.add(std::move(instanceRoot), parent);
+            currentActorId = id;
+            byId[id] = currentActor;
         } else if (line.rfind("XFORM ", 0) == 0) {
             if (!currentActor) continue;
             std::istringstream ss(line.substr(6));
@@ -229,6 +304,26 @@ Scene Scene::load(const std::string& path, std::string* error) {
     }
 
     return scene;
+}
+
+Scene Scene::load(const std::string& path, std::string* error) {
+    std::vector<std::string> stack{canonicalOrRaw(path)};
+    return loadWithStack(path, error, stack);
+}
+
+Actor* Scene::instantiate(const std::string& sourcePath, Actor* parent, const std::string& name,
+                          std::string* error) {
+    std::vector<std::string> stack{canonicalOrRaw(sourcePath)};
+    std::string subError;
+    Scene sub = loadWithStack(sourcePath, &subError, stack);
+    if (!subError.empty()) {
+        if (error) *error = subError;
+        return nullptr;
+    }
+    std::unique_ptr<Actor> instanceRoot = std::move(sub.root_);
+    instanceRoot->setName(name.empty() ? fs::path(sourcePath).stem().string() : name);
+    instanceRoot->setInstanceSource(sourcePath);
+    return add(std::move(instanceRoot), parent);
 }
 
 } // namespace crate

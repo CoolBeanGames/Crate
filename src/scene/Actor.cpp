@@ -72,6 +72,7 @@ std::unique_ptr<Actor> Actor::clone(bool preserveAuid) const {
     c->transform_ = transform_;
     c->visible_ = visible_;
     c->enabled_ = enabled_;
+    c->instanceSource_ = instanceSource_;
     if (preserveAuid)
         c->auid_ = auid_;
     for (const auto& comp : components_)

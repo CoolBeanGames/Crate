@@ -81,7 +81,27 @@ public:
     // partially-loaded silent corruption.
     static Scene load(const std::string& path, std::string* error = nullptr);
 
+    // Nested scene instancing (Godot-style): loads `sourcePath` as a fresh
+    // sub-scene and inserts its root as a new child under `parent` (or this
+    // scene's own root). The new actor is tagged Actor::isInstanceRoot() ==
+    // true, so save() writes it back as a single INSTANCE reference (see
+    // SceneIO.cpp) instead of a full recursive copy, and its children are
+    // whatever the source scene currently contains -- rebuilt fresh on
+    // every load, not frozen at instancing time. `name` overrides the
+    // node's default name (empty = the source file's stem). Returns
+    // nullptr (and sets *error) on failure, including a source that would
+    // (directly or transitively) instance itself.
+    Actor* instantiate(const std::string& sourcePath, Actor* parent = nullptr,
+                       const std::string& name = std::string(), std::string* error = nullptr);
+
 private:
+    // Shared by load() and instantiate(): `stack` carries the canonical
+    // paths of every scene file currently being loaded, up the recursion
+    // chain, so a source that would (directly or transitively) instance
+    // itself is detected and skipped rather than recursing forever.
+    static Scene loadWithStack(const std::string& path, std::string* error,
+                               std::vector<std::string>& stack);
+
     std::string name_;
     std::unique_ptr<Actor> root_;
     Actor* selected_ = nullptr;

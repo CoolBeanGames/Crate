@@ -63,6 +63,17 @@ public:
 
     bool isDescendantOf(const Actor* other) const;
 
+    // Non-empty when this actor is the ROOT of a nested scene instance
+    // (Scenes task -- see Scene::instantiate() and SceneIO.cpp's INSTANCE
+    // line): the .cscene path it was instanced from. An instance keeps its
+    // OWN transform (it can be freely repositioned independent of the
+    // source), but its children are rebuilt fresh from that file on every
+    // load rather than saved with this scene -- see writeFields()'s INSTANCE
+    // short-circuit vs. a plain actor's recursive ACTOR lines.
+    const std::string& instanceSource() const { return instanceSource_; }
+    void setInstanceSource(std::string path) { instanceSource_ = std::move(path); }
+    bool isInstanceRoot() const { return !instanceSource_.empty(); }
+
     // Scene (de)serialization (see SceneIO.cpp): concrete leaf types with
     // their own extra fields (SpriteActor's texturePath, UIControlActor's
     // label...) override these the same way Component::writeFields/
@@ -122,6 +133,7 @@ protected:
     std::vector<std::unique_ptr<Component>> components_;
     bool visible_ = true;
     bool enabled_ = true;
+    std::string instanceSource_;
 
 private:
     static uint64_t nextId_;
