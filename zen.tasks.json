@@ -528,45 +528,6 @@
           "updatedAt": "2026-09-17T10:06:17.0431536+00:00"
         },
         {
-          "id": "80e9af63213d46a882a0f3143d3371a8",
-          "index": 107,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Prefab instances should hide their children in the Hierarchy until opened",
-          "task": "Dragging actor A (with children B and C) into the Asset Browser correctly turns A blue, but the Hierarchy still shows B and C nested under it. Expected (Godot-style): only A should be visible/expanded normally; double-clicking A should open a NEW Hierarchy view with A as the root and B/C as its children, not inline-expand it in the current scene.",
-          "tags": [
-            "task",
-            "scene tree"
-          ],
-          "files": [],
-          "customTypeId": "e361978d91d9447f97033586db3c87b0",
-          "customValues": {
-            "c474f092663247ebb286cc5b978853d3": "Prefab instances should hide their children in the Hierarchy until opened",
-            "77f8b466f2874429a253d2256f62c42a": "Dragging actor A (with children B and C) into the Asset Browser correctly turns A blue, but the Hierarchy still shows B and C nested under it. Expected (Godot-style): only A should be visible/expanded normally; double-clicking A should open a NEW Hierarchy view with A as the root and B/C as its children, not inline-expand it in the current scene.",
-            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
-            "203da294781c41a1b1e7f760ea47047e": "Crate",
-            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
-            "ce370daef7e94671b0b947c000ce780e": "0",
-            "37571d4735f1403b85a48880a05ec554": "task,scene tree"
-          },
-          "requirements": [],
-          "notes": [],
-          "flags": {
-            "commit": false,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
-          "updatedAt": "2026-09-17T09:38:39.7338057+00:00"
-        },
-        {
           "id": "310d7103bf8b48119cdbb85d245807c8",
           "index": 99,
           "kind": "note",
@@ -4962,6 +4923,45 @@
           "isCollapsed": true,
           "createdAt": "2026-09-17T09:38:39.7338057+00:00",
           "updatedAt": "2026-09-17T12:30:00+00:00"
+        },
+        {
+          "id": "80e9af63213d46a882a0f3143d3371a8",
+          "index": 107,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Prefab instances should hide their children in the Hierarchy until opened",
+          "task": "Dragging actor A (with children B and C) into the Asset Browser correctly turns A blue, but the Hierarchy still shows B and C nested under it. Expected (Godot-style): only A should be visible/expanded normally; double-clicking A should open a NEW Hierarchy view with A as the root and B/C as its children, not inline-expand it in the current scene.\n\nDONE: instance roots now draw as a leaf in the Hierarchy (children hidden inline) with a \u0027(dbl-click to open)\u0027 hint; double-click focuses the whole panel on that instance\u0027s own subtree via a breadcrumb (\u0027\u003C Back  Scene / Name\u0027), matching the Godot-style spec exactly. Found and fixed a real crash along the way -- extracting any actor WITH children into a prefab reliably crashed the editor (a TreeNodeEx/TreePop mismatch corrupting ImGui\u0027s ID stack, nothing to do with the scene data itself). See commit b0725eb for the full root-cause writeup. Verified live, full test suite passes, both configs rebuilt.",
+          "tags": [
+            "task",
+            "scene tree"
+          ],
+          "files": [],
+          "customTypeId": "e361978d91d9447f97033586db3c87b0",
+          "customValues": {
+            "c474f092663247ebb286cc5b978853d3": "Prefab instances should hide their children in the Hierarchy until opened",
+            "77f8b466f2874429a253d2256f62c42a": "Dragging actor A (with children B and C) into the Asset Browser correctly turns A blue, but the Hierarchy still shows B and C nested under it. Expected (Godot-style): only A should be visible/expanded normally; double-clicking A should open a NEW Hierarchy view with A as the root and B/C as its children, not inline-expand it in the current scene.",
+            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
+            "203da294781c41a1b1e7f760ea47047e": "Crate",
+            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
+            "ce370daef7e94671b0b947c000ce780e": "0",
+            "37571d4735f1403b85a48880a05ec554": "task,scene tree"
+          },
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
+          "updatedAt": "2026-09-17T13:15:00+00:00"
         }
       ]
     }
