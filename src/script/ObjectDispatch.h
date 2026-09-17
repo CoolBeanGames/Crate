@@ -114,9 +114,11 @@ bool trySetValueMember(ScriptContext* ctx, const Value& v, const std::string& na
 // signal shortcuts, all via callObjectMethod), Actor (get_component only),
 // Array (.add/.length), Signal (connect/disconnect/is_connected/emit/
 // get_connections, via signalCall), Callable (.call()/.emit(), via
-// invokeCallable), plus the universal .str(). Throws RuntimeError for a
-// null/unsupported receiver or an unknown method.
+// invokeCallable), String (.instantiate(), anchored off `callerOwner`'s own
+// scene root -- see Runtime.h's valueInstantiate), plus the universal
+// .str(). Throws RuntimeError for a null/unsupported receiver or an
+// unknown method.
 Value callValueMethod(ScriptContext* ctx, const Value& v, const std::string& method,
-                      std::vector<Value> args, int line);
+                      std::vector<Value> args, int line, crate::Actor* callerOwner = nullptr);
 
 } // namespace crate::script

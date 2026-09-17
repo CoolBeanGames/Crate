@@ -127,6 +127,14 @@ crate::Actor* sceneRootOf(crate::Actor* a);
 // Throws RuntimeError for an unrecognized member.
 Value inputMouseMember(ScriptContext* ctx, const std::string& name, int line);
 
+// Value.instantiate() -- called on a "Scene"-typed field (a plain string
+// holding a .cscene asset path; see ScriptComponent's Inspector asset-
+// picker for such a field). Loads that scene and attaches it as a new
+// child under `callerOwner`'s scene root (i.e. sceneRootOf(callerOwner),
+// matching get_root()'s own anchor point), returning an Actor reference to
+// the new instance, or Null on failure (a bad/empty path, most commonly).
+Value valueInstantiate(ScriptContext* ctx, const Value& pathValue, crate::Actor* callerOwner, int line);
+
 // ---- Camera.main resolution (task 77) ----
 // Camera.main isn't reached from a specific actor -- it's a bare global, so
 // the scene it searches is found by walking up from the calling script's own

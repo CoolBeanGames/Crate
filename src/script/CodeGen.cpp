@@ -744,7 +744,7 @@ std::string Gen::expr(const Expr& e, FnCtx& fc) {
                             out += ", ";
                         out += "(" + args[i] + ")";
                     }
-                    out += "}, " + std::to_string(e.line) + ")";
+                    out += "}, " + std::to_string(e.line) + ", owner_)";
                     return out;
                 }
 
@@ -777,7 +777,7 @@ std::string Gen::expr(const Expr& e, FnCtx& fc) {
                 o << "};\n";
                 o << ind(1) << "return crate::script::callValueMethod(ctx_, " << tmp << ", "
                   << cppStringLiteral(method) << ", std::move(" << tmp << "_args), " << e.line
-                  << ");\n";
+                  << ", owner_);\n";
                 o << ind(0) << "}()";
                 return o.str();
             }

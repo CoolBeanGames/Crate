@@ -6,6 +6,7 @@
 #include "scene/Actor.h"
 #include "scene/BuiltinComponents.h"
 #include "scene/ComponentRegistry.h"
+#include "scene/Scene.h"
 #include "script/Format.h"
 #include "script/Lexer.h"
 #include "script/NativeClassRegistry.h"
@@ -169,6 +170,10 @@ ScriptSystem::ScriptSystem() {
             case 8: return in.scrollDelta().y;
         }
         return 0.0;
+    };
+    ctx_.instantiateScene = [](const std::string& path, crate::Actor* parent) -> crate::Actor* {
+        std::string err;
+        return Scene::instantiateUnder(parent, path, std::string(), &err);
     };
     rebuildTypeDocs();
 }
@@ -672,6 +677,11 @@ void ScriptSystem::rebuildTypeDocs() {
     add("MeshRenderer", "", false, {"tint", "cast_shadows", "receive_shadows"});
     add("LightProbe", "", false, {"baked_light", "baked_valid"});
     add("Spinner", "", false, {"degrees_per_second", "axis"});
+    // Not a component -- an ASSET reference (a saved .cscene path), for a
+    // field declared `Scene`. Drag a scene tile from the Asset Browser onto
+    // it in the Inspector; .instantiate() spawns a live instance at runtime
+    // (Scenes task; see Runtime.h's valueInstantiate).
+    add("Scene", "", false, {"instantiate"});
     // Global namespace reached as Input.<method>(...), handled directly in
     // Interpreter::evalCall rather than through get_component -- listed here
     // purely so its methods show up in autocomplete (task: "Input global

@@ -41,6 +41,11 @@ private:
     // the .cpp): drawn as a picker button + drag-drop target for a hierarchy
     // row, instead of the generic read-only str() label other fields get.
     void drawRefField(const std::string& label, const std::string& declType, Value& val);
+    // A field declared `Scene` (see isPlainValueType in the .cpp): an asset-
+    // reference, not a hierarchy one -- drag a .cscene tile from the Asset
+    // Browser onto it, storing its path as a plain string. Value.instantiate()
+    // (Runtime.h) reads that path back at runtime.
+    void drawSceneRefField(const std::string& label, Value& val);
 
     ScriptContext* ctx_ = nullptr;
     const ClassInfo* cls_ = nullptr;

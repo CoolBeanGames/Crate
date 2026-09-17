@@ -382,7 +382,7 @@ bool trySetValueMember(ScriptContext* ctx, const Value& v, const std::string& na
 }
 
 Value callValueMethod(ScriptContext* ctx, const Value& v, const std::string& method,
-                      std::vector<Value> args, int line) {
+                      std::vector<Value> args, int line, crate::Actor* callerOwner) {
     // Signal.connect/disconnect/is_connected/emit/get_connections (Phase
     // 9d), and callable.call(args)/callable.emit(args) -- both delegate to
     // the SAME free functions the interpreter itself now uses (see
@@ -418,6 +418,11 @@ Value callValueMethod(ScriptContext* ctx, const Value& v, const std::string& met
         if (auto so = ctx->getStatic(v.s))
             return callObjectMethod(ctx, so, method, std::move(args), line);
     }
+    // Value.instantiate(): mirrors Interpreter::evalCall's identical check
+    // exactly (see its comment) -- a "Scene"-typed field is a plain string
+    // holding a .cscene asset path.
+    if (v.t == Value::T::String && method == "instantiate")
+        return valueInstantiate(ctx, v, callerOwner, line);
     if (method == "str")
         return Value::Str(v.str());
     throw RuntimeError("no method '" + method + "'", line);

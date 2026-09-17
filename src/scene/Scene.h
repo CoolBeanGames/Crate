@@ -102,6 +102,17 @@ public:
     Actor* instantiate(const std::string& sourcePath, Actor* parent = nullptr,
                        const std::string& name = std::string(), std::string* error = nullptr);
 
+    // Like instantiate(), but attaches directly under a given LIVE parent
+    // actor without needing the owning Scene object at all -- `parent` must
+    // be non-null. Used by the script-facing Value.instantiate() API (see
+    // Runtime.cpp's valueInstantiate / a "Scene"-typed field holding an
+    // asset path), which only ever has an Actor* to anchor onto, never a
+    // Scene&. instantiate() itself is just this with parent defaulted to
+    // the scene's own root.
+    static Actor* instantiateUnder(Actor* parent, const std::string& sourcePath,
+                                   const std::string& name = std::string(),
+                                   std::string* error = nullptr);
+
 private:
     // Shared by load() and instantiate(): `stack` carries the canonical
     // paths of every scene file currently being loaded, up the recursion

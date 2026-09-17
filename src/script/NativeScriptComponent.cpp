@@ -254,6 +254,21 @@ void NativeScriptComponent::drawRefField(const std::string& label, const std::st
     ImGui::PopID();
 }
 
+void NativeScriptComponent::drawSceneRefField(const std::string& label, Value& val) {
+    std::string current = (val.t == Value::T::String && !val.s.empty()) ? val.s : std::string("(none)");
+    ImGui::PushID(label.c_str());
+    ImGui::SetNextItemWidth(-70);
+    ImGui::Button(current.c_str());
+    if (ImGui::BeginDragDropTarget()) {
+        if (const ImGuiPayload* p = ImGui::AcceptDragDropPayload("CRATE_SCENE_PATH"))
+            val = Value::Str(std::string(static_cast<const char*>(p->Data)));
+        ImGui::EndDragDropTarget();
+    }
+    ImGui::SameLine();
+    ImGui::TextUnformatted(label.c_str());
+    ImGui::PopID();
+}
+
 void NativeScriptComponent::drawInspector() {
     if (!cls_) {
         ImGui::TextDisabled("(script type missing)");
@@ -270,7 +285,9 @@ void NativeScriptComponent::drawInspector() {
                         declType = fd.type;
                         break;
                     }
-            if (!isPlainValueType(declType)) {
+            if (declType == "Scene") {
+                drawSceneRefField(name, val);
+            } else if (!isPlainValueType(declType)) {
                 drawRefField(name, declType, val);
             } else if (val.t == Value::T::Int) {
                 int v = (int)val.i;

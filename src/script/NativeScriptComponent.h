@@ -83,6 +83,8 @@ private:
     void pullFieldsFromNative(); // native_ -> obj_->fields (incl. overflow)
     // Byte-for-byte copy of ScriptComponent::drawRefField -- see .cpp.
     void drawRefField(const std::string& label, const std::string& declType, Value& val);
+    // Byte-for-byte copy of ScriptComponent::drawSceneRefField -- see .cpp.
+    void drawSceneRefField(const std::string& label, Value& val);
 
     ScriptContext* ctx_ = nullptr;
     const ClassInfo* cls_ = nullptr; // interpreted ClassInfo; Inspector declared-type lookups only

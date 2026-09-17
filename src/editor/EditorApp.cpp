@@ -934,6 +934,17 @@ void EditorApp::drawViewport() {
                             mr->meshPath = key;
                             a->addComponent(std::move(mr));
                             scene_.select(scene_.add(std::move(a)));
+                        } else if (const ImGuiPayload* ps =
+                                       ImGui::AcceptDragDropPayload("CRATE_SCENE_PATH")) {
+                            std::string scenePath(static_cast<const char*>(ps->Data));
+                            std::string error;
+                            if (Actor* inst = scene_.instantiate(scenePath, nullptr, "", &error)) {
+                                scene_.select(inst);
+                                CR_LOG("scene", "Instantiated '" + scenePath + "' as '" +
+                                                    inst->name() + "'");
+                            } else {
+                                CR_ERROR("scene", "Instantiate failed: " + error);
+                            }
                         }
                         ImGui::EndDragDropTarget();
                     }
@@ -1807,6 +1818,14 @@ void EditorApp::drawAssetFolders() {
             std::string osPath = f.path().string();
             ImGui::SetDragDropPayload("CRATE_FBX_PATH", osPath.c_str(), osPath.size() + 1);
             ImGui::Text("Model  %s", name.c_str());
+            ImGui::EndDragDropSource();
+        }
+        // Drag a scene into the viewport to place an INSTANCE of it (Scenes
+        // task, Step 4: nesting works through the UI too, not just code --
+        // this is the natural counterpart to the extraction workflow).
+        if (isScene && ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoHoldToOpenOthers)) {
+            ImGui::SetDragDropPayload("CRATE_SCENE_PATH", path.c_str(), path.size() + 1);
+            ImGui::Text("Scene  %s", name.c_str());
             ImGui::EndDragDropSource();
         }
         assetGridWrap(i + 1 < files.size());

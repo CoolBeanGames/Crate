@@ -277,3 +277,9 @@ add_test(NAME scene_io_tests COMMAND scene_io_tests)
 add_executable(scene_instancing_tests tests/scene_instancing_tests.cpp)
 target_link_libraries(scene_instancing_tests PRIVATE crate_core)
 add_test(NAME scene_instancing_tests COMMAND scene_instancing_tests)
+
+add_executable(scene_instantiate_script_tests tests/scene_instantiate_script_tests.cpp)
+target_link_libraries(scene_instantiate_script_tests PRIVATE crate_core)
+target_compile_definitions(scene_instantiate_script_tests PRIVATE
+    CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
+add_test(NAME scene_instantiate_script_tests COMMAND scene_instantiate_script_tests)

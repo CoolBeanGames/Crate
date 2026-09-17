@@ -556,6 +556,17 @@ Value inputMouseMember(ScriptContext* ctx, const std::string& name, int line) {
     throw RuntimeError("Input.Mouse has no member '" + name + "'", line);
 }
 
+Value valueInstantiate(ScriptContext* ctx, const Value& pathValue, crate::Actor* callerOwner, int line) {
+    (void)line;
+    if (!ctx || !ctx->instantiateScene || pathValue.s.empty())
+        return Value::Null_();
+    crate::Actor* parent = sceneRootOf(callerOwner);
+    if (!parent)
+        return Value::Null_();
+    crate::Actor* inst = ctx->instantiateScene(pathValue.s, parent);
+    return inst ? Value::ActorRef(inst) : Value::Null_();
+}
+
 Value actorMember(crate::Actor* a, const std::string& name, int line) {
     if (!a)
         throw RuntimeError("null actor", line);

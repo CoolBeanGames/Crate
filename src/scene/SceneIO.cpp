@@ -424,6 +424,15 @@ Scene Scene::load(const std::string& path, std::string* error) {
 
 Actor* Scene::instantiate(const std::string& sourcePath, Actor* parent, const std::string& name,
                           std::string* error) {
+    return instantiateUnder(parent ? parent : root_.get(), sourcePath, name, error);
+}
+
+Actor* Scene::instantiateUnder(Actor* parent, const std::string& sourcePath, const std::string& name,
+                               std::string* error) {
+    if (!parent) {
+        if (error) *error = "instantiate: null parent";
+        return nullptr;
+    }
     std::vector<std::string> stack{canonicalOrRaw(sourcePath)};
     std::string subError;
     Scene sub = loadWithStack(sourcePath, &subError, stack);
@@ -434,7 +443,7 @@ Actor* Scene::instantiate(const std::string& sourcePath, Actor* parent, const st
     std::unique_ptr<Actor> instanceRoot = std::move(sub.root_);
     instanceRoot->setName(name.empty() ? fs::path(sourcePath).stem().string() : name);
     instanceRoot->setInstanceSource(sourcePath);
-    return add(std::move(instanceRoot), parent);
+    return parent->addChild(std::move(instanceRoot));
 }
 
 } // namespace crate

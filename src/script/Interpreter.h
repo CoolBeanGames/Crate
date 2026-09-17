@@ -39,6 +39,16 @@ struct ScriptContext {
     // 3..5 = axis x/y/(unused). name in arg.
     std::function<double(const std::string&, int)> inputQuery;
 
+    // Scene instancing (Scenes task): loads a saved .cscene at the given
+    // path and attaches it as a new child under `parent`, returning the new
+    // instance root (or null on failure). Backs Value.instantiate() -- a
+    // "Scene"-typed field holds the path as a plain string, and calling
+    // .instantiate() on it goes through here rather than a direct
+    // Scene::instantiateUnder() call, since that lives in crate_core and
+    // this ScriptContext is also reachable from a generated per-namespace
+    // DLL (crate_script_runtime only).
+    std::function<crate::Actor*(const std::string& path, crate::Actor* parent)> instantiateScene;
+
     const ClassInfo* findType(const std::string& n) const {
         if (!types)
             return nullptr;

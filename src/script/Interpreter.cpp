@@ -529,6 +529,14 @@ Value Interpreter::evalCall(const Expr& e) {
             if (method == "length" && obj.arr)
                 return crate::script::arrayLength(obj);
         }
+        // Value.instantiate(): a "Scene"-typed field is a plain string
+        // holding a .cscene asset path (see ScriptComponent's Inspector
+        // asset-picker for that declared type) -- calling .instantiate() on
+        // it loads and attaches that scene under the CALLING script's own
+        // scene root, returning an Actor reference to the new instance.
+        if (obj.t == Value::T::String && method == "instantiate")
+            return crate::script::valueInstantiate(ctx_, obj, self_ ? self_->owner : nullptr, e.line);
+
         // universal .str()
         if (method == "str")
             return Value::Str(obj.str());
