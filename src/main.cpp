@@ -9,6 +9,7 @@
 #include "editor/EditorApp.h"
 #include "editor/Theme.h"
 #include "core/Log.h"
+#include "resource.h"
 
 #include "imgui.h"
 #include "backends/imgui_impl_win32.h"
@@ -46,9 +47,15 @@ int main(int argc, char** argv) {
         else
             g_droppedFiles.push_back(argv[i]); // treat other CLI args like dropped files
     }
+    HICON hIconBig = static_cast<HICON>(::LoadImageW(
+        GetModuleHandle(nullptr), MAKEINTRESOURCEW(IDI_APPICON), IMAGE_ICON,
+        ::GetSystemMetrics(SM_CXICON), ::GetSystemMetrics(SM_CYICON), LR_DEFAULTCOLOR));
+    HICON hIconSmall = static_cast<HICON>(::LoadImageW(
+        GetModuleHandle(nullptr), MAKEINTRESOURCEW(IDI_APPICON), IMAGE_ICON,
+        ::GetSystemMetrics(SM_CXSMICON), ::GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR));
     WNDCLASSEXW wc = {sizeof(wc), CS_CLASSDC, WndProc, 0L, 0L,
-                      GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr,
-                      L"CrateEngine", nullptr};
+                      GetModuleHandle(nullptr), hIconBig, nullptr, nullptr, nullptr,
+                      L"CrateEngine", hIconSmall};
     ::RegisterClassExW(&wc);
     HWND hwnd = ::CreateWindowW(wc.lpszClassName, L"Crate - PSX Horror Engine",
                                 WS_OVERLAPPEDWINDOW, 100, 100, 1600, 900, nullptr, nullptr,
@@ -63,6 +70,8 @@ int main(int argc, char** argv) {
     ::ShowWindow(hwnd, SW_SHOWDEFAULT);
     ::UpdateWindow(hwnd);
     ::DragAcceptFiles(hwnd, TRUE); // accept files dragged from Explorer
+    ::SendMessageW(hwnd, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hIconBig));
+    ::SendMessageW(hwnd, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hIconSmall));
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();

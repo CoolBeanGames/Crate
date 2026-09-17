@@ -1,0 +1,6 @@
+// Embeds the app icon into Crate.exe -- shows up as the exe's file icon in
+// Explorer/taskbar, and main.cpp loads IDI_APPICON explicitly to also set
+// the running window's title-bar and taskbar icon.
+#include "resource.h"
+
+IDI_APPICON ICON "../assets/icon/crate.ico"

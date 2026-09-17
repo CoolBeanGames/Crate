@@ -115,7 +115,7 @@ target_compile_definitions(crate_core PRIVATE
     CRATE_ENGINE_BUILD_DIR="${CMAKE_BINARY_DIR}")
 
 # --- Editor executable ---------------------------------------------------
-add_executable(Crate WIN32 src/main.cpp)
+add_executable(Crate WIN32 src/main.cpp src/app.rc)
 target_link_libraries(Crate PRIVATE crate_core shell32)
 
 if(MSVC)
