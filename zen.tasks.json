@@ -373,127 +373,6 @@
       "isLocked": false,
       "tasks": [
         {
-          "id": "ba0f43da80ad486b8210b83ddd27097a",
-          "index": 104,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Volumetric Fog / Spotlight brightness bug",
-          "task": "Spotlight brightness appears to scale INVERSELY with Volumetric Fog density -- the same spotlight looks weaker/dimmer at LOW fog density and stronger/brighter at HIGH fog density, which is backwards from expected (denser fog should scatter/obscure more, not make the light read as brighter). Separately, and worse: setting Volumetric Fog density to exactly 0 (which should mean \u0027no fog, fully invisible\u0027) instead makes the entire world render pure black and unusable, rather than just disabling the fog effect. Fog color in both repro screenshots: RGB(28,18,37) (dark blue-purple). Reported by the user while testing their game \u0027Aye\u0027 built on Crate; two comparison screenshots attached (low density vs. high density, same scene otherwise).",
-          "tags": [
-            "bug",
-            "rendering"
-          ],
-          "files": [
-            {
-              "id": "ff30089331b444839b6d66c162463a4d",
-              "name": "fog-bug-low-density.png",
-              "relativePath": "files/fog-bug-low-density.png",
-              "size": 121499
-            },
-            {
-              "id": "ef5824c84fdc49a4affc665f1ffc44fa",
-              "name": "fog-bug-high-density.png",
-              "relativePath": "files/fog-bug-high-density.png",
-              "size": 156367
-            }
-          ],
-          "customTypeId": "e361978d91d9447f97033586db3c87b0",
-          "customValues": {
-            "c474f092663247ebb286cc5b978853d3": "Volumetric Fog / Spotlight brightness bug",
-            "77f8b466f2874429a253d2256f62c42a": "Spotlight brightness appears to scale INVERSELY with Volumetric Fog density -- the same spotlight looks weaker/dimmer at LOW fog density and stronger/brighter at HIGH fog density, which is backwards from expected (denser fog should scatter/obscure more, not make the light read as brighter). Separately, and worse: setting Volumetric Fog density to exactly 0 (which should mean \u0027no fog, fully invisible\u0027) instead makes the entire world render pure black and unusable, rather than just disabling the fog effect. Fog color in both repro screenshots: RGB(28,18,37) (dark blue-purple). Reported by the user while testing their game \u0027Aye\u0027 built on Crate; two comparison screenshots attached (low density vs. high density, same scene otherwise).",
-            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude per explicit user instruction during a Scenes-task session -- user said to log it and defer, not fix immediately.\u0022]",
-            "203da294781c41a1b1e7f760ea47047e": "Rendering",
-            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
-            "ce370daef7e94671b0b947c000ce780e": "0",
-            "37571d4735f1403b85a48880a05ec554": "rendering"
-          },
-          "requirements": [
-            {
-              "id": "239b54e415884316b02b571cb81ef453",
-              "index": 1,
-              "text": "Reproduce: set Volumetric Fog density to 0 and confirm the world renders black instead of simply having no fog",
-              "isDone": true
-            },
-            {
-              "id": "22415fe23cb3438ea219de37065fb09b",
-              "index": 2,
-              "text": "Reproduce: compare a spotlight\u0027s visible brightness at low vs. high Volumetric Fog density and confirm the brightness inverts",
-              "isDone": true
-            },
-            {
-              "id": "0464491581ed446a8b1d3bc4011650ec",
-              "index": 3,
-              "text": "Find the root cause in the volumetric fog / lighting shader or compositing code",
-              "isDone": true
-            },
-            {
-              "id": "00371e83f3574e5789a972d976aef08a",
-              "index": 4,
-              "text": "Fix: density=0 must mean no visible fog effect (not black), and spotlight brightness must not invert with density",
-              "isDone": true
-            }
-          ],
-          "notes": [
-            {
-              "id": "4bc4a7ae330e4f628fe7aeb13ce251fa",
-              "text": "Fixed and verified (commit e09aae0 on main): density\u003C=0 now skips the fog draw entirely (was rendering solid black), and the haze\u0027s lit brightness is now clamped so higher density obscures/darkens rather than brightening -- verified via direct screenshots at both the engine\u0027s default fog color and the reported repro\u0027s dark color (28,18,37). Full 23-target test suite passes, zero regressions. Built to an isolated build-main-fixes/ tree deliberately -- build/ and build-Release/Crate.exe currently reflect the more feature-complete project-management branch (Scenes, prefab system, etc.) that main doesn\u0027t have yet, so latestExePath/latestReleasePath were intentionally left untouched to avoid regressing the build you\u0027re testing."
-            }
-          ],
-          "flags": {
-            "commit": false,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-17T05:55:12.0372408+00:00",
-          "updatedAt": "2026-09-21T22:14:10.6095266+00:00"
-        },
-        {
-          "id": "c006ee71d330451b9a76fc4e97d06138",
-          "index": 106,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Can\u0027t open .cscene files for editing",
-          "task": "Scene files are \u0027locked in\u0027 -- there\u0027s no way to open a .cscene for editing (beyond double-click loading it wholesale as the active scene). Need a real edit workflow.",
-          "tags": [
-            "bug",
-            "scene tree"
-          ],
-          "files": [],
-          "customTypeId": "e361978d91d9447f97033586db3c87b0",
-          "customValues": {
-            "c474f092663247ebb286cc5b978853d3": "Can\u0027t open .cscene files for editing",
-            "77f8b466f2874429a253d2256f62c42a": "Scene files are \u0027locked in\u0027 -- there\u0027s no way to open a .cscene for editing (beyond double-click loading it wholesale as the active scene). Need a real edit workflow.",
-            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
-            "203da294781c41a1b1e7f760ea47047e": "Crate",
-            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
-            "ce370daef7e94671b0b947c000ce780e": "0",
-            "37571d4735f1403b85a48880a05ec554": "bug,scene tree"
-          },
-          "requirements": [],
-          "notes": [],
-          "flags": {
-            "commit": false,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
-          "updatedAt": "2026-09-17T09:38:39.7338057+00:00"
-        },
-        {
           "id": "6b7fbb2dee8a41cf855904316ca2978f",
           "index": 122,
           "kind": "note",
@@ -520,45 +399,6 @@
           "isCollapsed": false,
           "createdAt": "2026-09-21T20:08:33.8158174+00:00",
           "updatedAt": "2026-09-21T20:09:21.2584376+00:00"
-        },
-        {
-          "id": "613adb44f6ec4217836690ab93326525",
-          "index": 88,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Transplation",
-          "task": "",
-          "tags": [
-            "Scripting",
-            "Backend"
-          ],
-          "files": [],
-          "customTypeId": "e361978d91d9447f97033586db3c87b0",
-          "customValues": {
-            "c474f092663247ebb286cc5b978853d3": "Transplation",
-            "77f8b466f2874429a253d2256f62c42a": "the job here is to change how the scripting backend works (I think) currently everything (I assume) runes through translation in the engine. Now we are going to compile to native C\u002B\u002B at save time. Meaning all code will be native when the game is actually run. This will probably break the inspector so that will need looked at, play mode tested. User facing everything will still be cscript but as soon as they hit save it should compile that script to C\u002B\u002B, replace any old compiled code, and thats what actually gets executed.",
-            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022make sure everything works exactly as it does now\u0022,\u0022Do not close this task until i tell you to, leave it open to test. Stop after this task so I can check everything before moving on to the next task\u0022,\u0022only move on to the next task when i approve this one\u0022]",
-            "203da294781c41a1b1e7f760ea47047e": "Scripting",
-            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
-            "ce370daef7e94671b0b947c000ce780e": "0",
-            "37571d4735f1403b85a48880a05ec554": "Scripting, Backend"
-          },
-          "requirements": [],
-          "notes": [],
-          "flags": {
-            "commit": false,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-16T04:58:58.2837385+00:00",
-          "updatedAt": "2026-09-17T10:06:17.0431536+00:00"
         },
         {
           "id": "310d7103bf8b48119cdbb85d245807c8",
@@ -818,6 +658,50 @@
       "isSystem": false,
       "isLocked": false,
       "tasks": [
+        {
+          "id": "c006ee71d330451b9a76fc4e97d06138",
+          "index": 106,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Can\u0027t open .cscene files for editing",
+          "task": "Scene files are \u0027locked in\u0027 -- there\u0027s no way to open a .cscene for editing (beyond double-click loading it wholesale as the active scene). Need a real edit workflow.",
+          "tags": [
+            "bug",
+            "scene tree"
+          ],
+          "files": [],
+          "customTypeId": "e361978d91d9447f97033586db3c87b0",
+          "customValues": {
+            "c474f092663247ebb286cc5b978853d3": "Can\u0027t open .cscene files for editing",
+            "77f8b466f2874429a253d2256f62c42a": "Scene files are \u0027locked in\u0027 -- there\u0027s no way to open a .cscene for editing (beyond double-click loading it wholesale as the active scene). Need a real edit workflow.",
+            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
+            "203da294781c41a1b1e7f760ea47047e": "Crate",
+            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
+            "ce370daef7e94671b0b947c000ce780e": "0",
+            "37571d4735f1403b85a48880a05ec554": "bug,scene tree"
+          },
+          "requirements": [],
+          "notes": [
+            {
+              "id": "78fc5160d79140619793cc14bf12609d",
+              "text": "BLOCKED, needs a decision: this task\u0027s whole premise (double-click a .cscene tile loads it wholesale as the active scene) does not exist on main branch\u0027s code at all. Checked directly: main has zero references to \u0027cscene\u0027 anywhere in src/, no src/scene/SceneIO.cpp, and File \u003E Save Scene on main is still the original stub (\u0027Scene serialization arrives with the Data branch\u0027). All real Scene serialization / Asset Browser .cscene integration / prefab workflow lives only on the project-management branch (commits efc14b4, 6ffa4d5, 176d1a5, 4734f03, 6b10446, f7af473, 4bc127c), which main has never merged. This task is filed on the main Zen board column but its prerequisite feature is project-management-only code. I did not implement anything to avoid inventing a fake/duplicate scene system on main. Recommend either moving this task card to the Project Management branch (where the real .cscene workflow lives and where item 107\u0027s prefab sub-view already shipped), or merging project-management into main first if that\u0027s imminent anyway. Left not-done, not archived, feedback set to waiting pending that decision."
+            }
+          ],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
+          "updatedAt": "2026-09-21T22:19:48.9143752+00:00"
+        },
         {
           "id": "6b1e718075e94ea19c201138934a7e96",
           "index": 100,
@@ -1801,6 +1685,88 @@
           "isCollapsed": true,
           "createdAt": "2026-09-17T09:38:39.7338057+00:00",
           "updatedAt": "2026-09-17T12:00:00+00:00"
+        },
+        {
+          "id": "ba0f43da80ad486b8210b83ddd27097a",
+          "index": 104,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Volumetric Fog / Spotlight brightness bug",
+          "task": "Spotlight brightness appears to scale INVERSELY with Volumetric Fog density -- the same spotlight looks weaker/dimmer at LOW fog density and stronger/brighter at HIGH fog density, which is backwards from expected (denser fog should scatter/obscure more, not make the light read as brighter). Separately, and worse: setting Volumetric Fog density to exactly 0 (which should mean \u0027no fog, fully invisible\u0027) instead makes the entire world render pure black and unusable, rather than just disabling the fog effect. Fog color in both repro screenshots: RGB(28,18,37) (dark blue-purple). Reported by the user while testing their game \u0027Aye\u0027 built on Crate; two comparison screenshots attached (low density vs. high density, same scene otherwise).",
+          "tags": [
+            "bug",
+            "rendering"
+          ],
+          "files": [
+            {
+              "id": "ff30089331b444839b6d66c162463a4d",
+              "name": "fog-bug-low-density.png",
+              "relativePath": "files/fog-bug-low-density.png",
+              "size": 121499
+            },
+            {
+              "id": "ef5824c84fdc49a4affc665f1ffc44fa",
+              "name": "fog-bug-high-density.png",
+              "relativePath": "files/fog-bug-high-density.png",
+              "size": 156367
+            }
+          ],
+          "customTypeId": "e361978d91d9447f97033586db3c87b0",
+          "customValues": {
+            "c474f092663247ebb286cc5b978853d3": "Volumetric Fog / Spotlight brightness bug",
+            "77f8b466f2874429a253d2256f62c42a": "Spotlight brightness appears to scale INVERSELY with Volumetric Fog density -- the same spotlight looks weaker/dimmer at LOW fog density and stronger/brighter at HIGH fog density, which is backwards from expected (denser fog should scatter/obscure more, not make the light read as brighter). Separately, and worse: setting Volumetric Fog density to exactly 0 (which should mean \u0027no fog, fully invisible\u0027) instead makes the entire world render pure black and unusable, rather than just disabling the fog effect. Fog color in both repro screenshots: RGB(28,18,37) (dark blue-purple). Reported by the user while testing their game \u0027Aye\u0027 built on Crate; two comparison screenshots attached (low density vs. high density, same scene otherwise).",
+            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude per explicit user instruction during a Scenes-task session -- user said to log it and defer, not fix immediately.\u0022]",
+            "203da294781c41a1b1e7f760ea47047e": "Rendering",
+            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
+            "ce370daef7e94671b0b947c000ce780e": "0",
+            "37571d4735f1403b85a48880a05ec554": "rendering"
+          },
+          "requirements": [
+            {
+              "id": "239b54e415884316b02b571cb81ef453",
+              "index": 1,
+              "text": "Reproduce: set Volumetric Fog density to 0 and confirm the world renders black instead of simply having no fog",
+              "isDone": true
+            },
+            {
+              "id": "22415fe23cb3438ea219de37065fb09b",
+              "index": 2,
+              "text": "Reproduce: compare a spotlight\u0027s visible brightness at low vs. high Volumetric Fog density and confirm the brightness inverts",
+              "isDone": true
+            },
+            {
+              "id": "0464491581ed446a8b1d3bc4011650ec",
+              "index": 3,
+              "text": "Find the root cause in the volumetric fog / lighting shader or compositing code",
+              "isDone": true
+            },
+            {
+              "id": "00371e83f3574e5789a972d976aef08a",
+              "index": 4,
+              "text": "Fix: density=0 must mean no visible fog effect (not black), and spotlight brightness must not invert with density",
+              "isDone": true
+            }
+          ],
+          "notes": [
+            {
+              "id": "4bc4a7ae330e4f628fe7aeb13ce251fa",
+              "text": "Fixed and verified (commit e09aae0 on main): density\u003C=0 now skips the fog draw entirely (was rendering solid black), and the haze\u0027s lit brightness is now clamped so higher density obscures/darkens rather than brightening -- verified via direct screenshots at both the engine\u0027s default fog color and the reported repro\u0027s dark color (28,18,37). Full 23-target test suite passes, zero regressions. Built to an isolated build-main-fixes/ tree deliberately -- build/ and build-Release/Crate.exe currently reflect the more feature-complete project-management branch (Scenes, prefab system, etc.) that main doesn\u0027t have yet, so latestExePath/latestReleasePath were intentionally left untouched to avoid regressing the build you\u0027re testing."
+            }
+          ],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-17T05:55:12.0372408+00:00",
+          "updatedAt": "2026-09-21T22:17:39.5485884+00:00"
         },
         {
           "id": "c9d4482b33c94eeda497726091ff6dbf",
@@ -5023,6 +4989,45 @@
           "isCollapsed": true,
           "createdAt": "2026-09-17T09:38:39.7338057+00:00",
           "updatedAt": "2026-09-17T13:15:00+00:00"
+        },
+        {
+          "id": "613adb44f6ec4217836690ab93326525",
+          "index": 88,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Transplation",
+          "task": "",
+          "tags": [
+            "Scripting",
+            "Backend"
+          ],
+          "files": [],
+          "customTypeId": "e361978d91d9447f97033586db3c87b0",
+          "customValues": {
+            "c474f092663247ebb286cc5b978853d3": "Transplation",
+            "77f8b466f2874429a253d2256f62c42a": "the job here is to change how the scripting backend works (I think) currently everything (I assume) runes through translation in the engine. Now we are going to compile to native C\u002B\u002B at save time. Meaning all code will be native when the game is actually run. This will probably break the inspector so that will need looked at, play mode tested. User facing everything will still be cscript but as soon as they hit save it should compile that script to C\u002B\u002B, replace any old compiled code, and thats what actually gets executed.",
+            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022make sure everything works exactly as it does now\u0022,\u0022Do not close this task until i tell you to, leave it open to test. Stop after this task so I can check everything before moving on to the next task\u0022,\u0022only move on to the next task when i approve this one\u0022]",
+            "203da294781c41a1b1e7f760ea47047e": "Scripting",
+            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
+            "ce370daef7e94671b0b947c000ce780e": "0",
+            "37571d4735f1403b85a48880a05ec554": "Scripting, Backend"
+          },
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-16T04:58:58.2837385+00:00",
+          "updatedAt": "2026-09-21T22:19:30.6685877+00:00"
         }
       ]
     }
