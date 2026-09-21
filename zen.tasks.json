@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "projectId": "8afe2a0217d7419db234ceda7ecb9dff",
   "name": "Crate",
-  "nextCardIndex": 122,
+  "nextCardIndex": 123,
   "latestExePath": "build/Crate.exe",
   "latestReleasePath": "build-Release/Crate.exe",
   "tagCatalog": [
@@ -383,7 +383,8 @@
           "task": "Spotlight brightness appears to scale INVERSELY with Volumetric Fog density -- the same spotlight looks weaker/dimmer at LOW fog density and stronger/brighter at HIGH fog density, which is backwards from expected (denser fog should scatter/obscure more, not make the light read as brighter). Separately, and worse: setting Volumetric Fog density to exactly 0 (which should mean \u0027no fog, fully invisible\u0027) instead makes the entire world render pure black and unusable, rather than just disabling the fog effect. Fog color in both repro screenshots: RGB(28,18,37) (dark blue-purple). Reported by the user while testing their game \u0027Aye\u0027 built on Crate; two comparison screenshots attached (low density vs. high density, same scene otherwise).",
           "tags": [
             "bug",
-            "rendering"
+            "rendering",
+            "in progress"
           ],
           "files": [
             {
@@ -487,6 +488,34 @@
           "isCollapsed": true,
           "createdAt": "2026-09-17T09:38:39.7338057+00:00",
           "updatedAt": "2026-09-17T09:38:39.7338057+00:00"
+        },
+        {
+          "id": "6b7fbb2dee8a41cf855904316ca2978f",
+          "index": 122,
+          "kind": "note",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Review",
+          "task": "Review project tasks, resume progress where we left off. After this branch move to project managment.",
+          "tags": [],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-21T20:08:33.8158174+00:00",
+          "updatedAt": "2026-09-21T20:09:21.2584376+00:00"
         },
         {
           "id": "613adb44f6ec4217836690ab93326525",
