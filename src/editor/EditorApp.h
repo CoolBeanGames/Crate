@@ -8,6 +8,7 @@
 #include "render/Camera.h"
 #include "render/Renderer.h"
 #include "scene/Scene.h"
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
@@ -99,9 +100,21 @@ private:
     // Scene file I/O (Scenes task, Phase 1: see scene/SceneIO.cpp). saveScene()
     // reuses currentScenePath_ if the scene was already Saved/Opened this
     // session, else behaves like saveSceneAs() (prompts for a path).
-    void saveSceneAs();
-    void saveScene();
+    bool saveSceneAs(); // false if the save dialog was cancelled or the write failed
+    bool saveScene();   // false if it fell through to saveSceneAs() and that was cancelled/failed
     void openScene();
+
+    // Unsaved-changes guard (item 106): every action that would replace
+    // scene_ wholesale (double-click a .cscene tile, File > Open/New/Load
+    // Sample Scene, "Edit Prefab") routes through this instead of mutating
+    // scene_ directly. If the current scene has changed since the last
+    // load/save it prompts Save/Discard/Cancel first; otherwise `doReplace`
+    // runs immediately. `doReplace` is responsible for actually swapping
+    // scene_ and updating currentScenePath_/prefabEditReturnPath_.
+    void requestReplaceScene(std::function<void()> doReplace);
+    void drawUnsavedScenePopup();
+    bool hasUnsavedSceneChanges() const;
+    void loadSceneNow(const std::string& path); // unconditional load, no guard, no snapshot update
 
     // Prefab extraction (Scenes task, Step 2): drag an actor onto the Asset
     // Browser -> prompt for a name -> saveSubtree() it as a new .cscene ->
@@ -193,6 +206,17 @@ private:
     // only its own subtree, Godot-style, until "Back" returns to the full
     // scene. nullptr = showing the whole scene as usual.
     Actor* hierarchyFocusRoot_ = nullptr;
+
+    // Unsaved-changes guard + "Edit Prefab" isolation workflow (item 106).
+    ui::Popup unsavedScenePopup_;
+    std::function<void()> pendingSceneReplace_; // set while unsavedScenePopup_ is open
+    enum class PendingSceneAction { Save, Discard };
+    PendingSceneAction pendingSceneAction_ = PendingSceneAction::Discard;
+    std::string savedSceneSnapshot_; // scene_'s serialized text as of the last load/save
+    // Non-empty while editing a .cscene opened via "Edit Prefab" in isolation
+    // from the Asset Browser (as opposed to the normal working scene) -- the
+    // path to return to, shown as a "< Back to X" banner in the Hierarchy.
+    std::string prefabEditReturnPath_;
 };
 
 } // namespace crate

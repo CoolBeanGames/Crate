@@ -204,7 +204,7 @@ std::string canonicalOrRaw(const std::string& path) {
 
 } // namespace
 
-bool Scene::save(const std::string& path, std::string* error) const {
+void Scene::writeTo(std::ostream& out) const {
     // Pass 1: number every actor (pre-order) before writing anything, so a
     // reference field can point at an actor that will only be WRITTEN later.
     std::unordered_map<const Actor*, int> ids;
@@ -218,16 +218,26 @@ bool Scene::save(const std::string& path, std::string* error) const {
     for (const auto& c : root_->children())
         number(*c);
 
+    out << "CRATE_SCENE " << kSceneFormatVersion << '\n';
+    out << "SCENE " << name_ << '\n';
+    for (const auto& c : root_->children())
+        writeActorRecursive(out, *c, ids.at(c.get()), -1, ids);
+}
+
+bool Scene::save(const std::string& path, std::string* error) const {
     std::ofstream out(path, std::ios::binary | std::ios::trunc);
     if (!out) {
         if (error) *error = "could not open '" + path + "' for writing";
         return false;
     }
-    out << "CRATE_SCENE " << kSceneFormatVersion << '\n';
-    out << "SCENE " << name_ << '\n';
-    for (const auto& c : root_->children())
-        writeActorRecursive(out, *c, ids.at(c.get()), -1, ids);
+    writeTo(out);
     return true;
+}
+
+std::string Scene::serializeToString() const {
+    std::ostringstream out;
+    writeTo(out);
+    return out.str();
 }
 
 bool Scene::saveSubtree(const Actor* subtreeRoot, const std::string& path, std::string* error) const {

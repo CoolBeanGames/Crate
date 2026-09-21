@@ -1,5 +1,6 @@
 #pragma once
 #include "scene/Actor.h"
+#include <iosfwd>
 #include <string>
 #include <utility>
 #include <vector>
@@ -76,6 +77,11 @@ public:
     // failure, e.g. an unwritable path.
     bool save(const std::string& path, std::string* error = nullptr) const;
 
+    // Same format as save(), built in memory instead of written to disk.
+    // Used to detect unsaved changes (diff against a snapshot taken at the
+    // last successful load/save) without touching the filesystem.
+    std::string serializeToString() const;
+
     // Saves `subtreeRoot` (which must belong to this scene) and everything
     // under it as a STANDALONE scene file, named after the actor itself --
     // the core of the prefab-extraction workflow (drag an actor onto the
@@ -120,6 +126,10 @@ private:
     // itself is detected and skipped rather than recursing forever.
     static Scene loadWithStack(const std::string& path, std::string* error,
                                std::vector<std::string>& stack);
+
+    // Shared writer for save() (to a file) and serializeToString() (in
+    // memory) so the two can never drift out of sync with each other.
+    void writeTo(std::ostream& out) const;
 
     std::string name_;
     std::unique_ptr<Actor> root_;

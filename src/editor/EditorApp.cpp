@@ -87,6 +87,7 @@ EditorApp::EditorApp() : scene_(Scene::makeSample()) {
     renderer_.setMeshLibrary(&meshLib_);
     renderer_.setMaterialLibrary(&materialLib_);
     renderer_.loadLightmap(scene_, assetDir_); // apply any lightmap baked for this scene
+    savedSceneSnapshot_ = scene_.serializeToString();
     CR_LOG("app", "Crate editor started");
     CR_LOG("scene", "Loaded sample scene with " + std::to_string(scene_.actorCount()) + " actors");
 }
@@ -249,6 +250,7 @@ void EditorApp::onFrame() {
 
     drawMenuBar();
     drawToolbar();
+    drawUnsavedScenePopup();
 
     ImGuiID dockspace_id = ImGui::GetID("CrateDockspace");
     if (ImGui::DockBuilderGetNode(dockspace_id) == nullptr) {
@@ -293,14 +295,26 @@ void EditorApp::drawMenuBar() {
 
     if (ImGui::BeginMenu("File")) {
         if (ImGui::MenuItem("New Scene")) {
-            scene_ = Scene("Untitled");
-            renderer_.loadLightmap(scene_, assetDir_);
-            CR_LOG("scene", "New scene created");
+            requestReplaceScene([this] {
+                scene_ = Scene("Untitled");
+                renderer_.loadLightmap(scene_, assetDir_);
+                currentScenePath_.clear(); // was previously left pointing at the OLD file --
+                                            // Ctrl+S would silently overwrite it with this
+                                            // blank scene (found while adding item 106's guard)
+                hierarchyFocusRoot_ = nullptr;
+                prefabEditReturnPath_.clear();
+                CR_LOG("scene", "New scene created");
+            });
         }
         if (ImGui::MenuItem("Load Sample Scene")) {
-            scene_ = Scene::makeSample();
-            renderer_.loadLightmap(scene_, assetDir_);
-            CR_LOG("scene", "Reloaded sample scene");
+            requestReplaceScene([this] {
+                scene_ = Scene::makeSample();
+                renderer_.loadLightmap(scene_, assetDir_);
+                currentScenePath_.clear(); // same stale-path issue as New Scene above
+                hierarchyFocusRoot_ = nullptr;
+                prefabEditReturnPath_.clear();
+                CR_LOG("scene", "Reloaded sample scene");
+            });
         }
         if (ImGui::MenuItem("Open Scene..."))
             openScene();
@@ -623,6 +637,26 @@ void EditorApp::drawHierarchyNode(Actor& actor) {
 
 void EditorApp::drawHierarchy() {
     if (ImGui::Begin("Hierarchy")) {
+        // "Edit Prefab" isolation (item 106): editing a .cscene opened
+        // standalone from the Asset Browser, distinct from item 107's
+        // in-scene sub-view below. One click back to the working scene you
+        // came from (re-guarded the same as any other scene swap).
+        if (!prefabEditReturnPath_.empty()) {
+            ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(64, 96, 210, 255));
+            std::string label =
+                "< Back to " + fs::path(prefabEditReturnPath_).filename().string();
+            if (ImGui::Button(label.c_str(), ImVec2(-1, 0))) {
+                std::string back = prefabEditReturnPath_;
+                requestReplaceScene([this, back] {
+                    loadSceneNow(back);
+                    prefabEditReturnPath_.clear();
+                });
+            }
+            ImGui::PopStyleColor();
+            ImGui::TextDisabled("Editing prefab: %s",
+                                fs::path(currentScenePath_).filename().string().c_str());
+            ImGui::Separator();
+        }
         // Prefab-instance sub-view (item 107): re-validate every frame in
         // case the focused instance was deleted/cut while open.
         Actor* focusRoot = hierarchyFocusRoot_;
@@ -1858,16 +1892,10 @@ void EditorApp::drawAssetFolders() {
                 selectedScript_.clear();
                 scene_.select(nullptr);
                 if (dbl) {
-                    std::string error;
-                    Scene loaded = Scene::load(path, &error);
-                    if (!error.empty()) {
-                        CR_ERROR("scene", "Open failed: " + error);
-                    } else {
-                        scene_ = std::move(loaded);
-                        currentScenePath_ = path;
-                        renderer_.loadLightmap(scene_, assetDir_);
-                        CR_LOG("scene", "Opened scene " + path);
-                    }
+                    requestReplaceScene([this, path] {
+                        loadSceneNow(path);
+                        prefabEditReturnPath_.clear();
+                    });
                 }
             } else {
                 ingestDroppedFile(f.path().string());
@@ -1911,6 +1939,25 @@ void EditorApp::drawAssetFolders() {
             ImGui::SetDragDropPayload("CRATE_SCENE_PATH", path.c_str(), path.size() + 1);
             ImGui::Text("Scene  %s", name.c_str());
             ImGui::EndDragDropSource();
+        }
+        // Item 106's "real edit workflow": open this .cscene in isolation
+        // without touching the current working scene. Distinct from
+        // double-click, which replaces the working scene outright (guarded
+        // the same way, but with nothing to come back to).
+        if (isScene) {
+            static ui::ContextMenu sceneCtx(nullptr);
+            if (sceneCtx.beginItemPopup()) {
+                if (sceneCtx.item("Edit Prefab")) {
+                    std::string prevPath = currentScenePath_;
+                    requestReplaceScene([this, path, prevPath] {
+                        loadSceneNow(path);
+                        prefabEditReturnPath_ = prevPath; // empty if the scene we're
+                                                          // leaving was never saved --
+                                                          // "Back" just won't show
+                    });
+                }
+                sceneCtx.end();
+            }
         }
         assetGridWrap(i + 1 < files.size());
     }
@@ -2191,30 +2238,104 @@ void EditorApp::deleteSelection() {
     }
 }
 
-void EditorApp::saveSceneAs() {
+bool EditorApp::saveSceneAs() {
     std::string path = platform::saveFileDialog("Save Scene", "Crate Scene\0*.cscene\0All\0*.*\0",
                                                 "cscene");
     if (path.empty())
-        return;
+        return false;
     std::string error;
     if (scene_.save(path, &error)) {
         currentScenePath_ = path;
+        savedSceneSnapshot_ = scene_.serializeToString();
         CR_LOG("scene", "Saved scene to " + path);
-    } else {
-        CR_ERROR("scene", "Save failed: " + error);
+        return true;
     }
+    CR_ERROR("scene", "Save failed: " + error);
+    return false;
 }
 
-void EditorApp::saveScene() {
-    if (currentScenePath_.empty()) {
-        saveSceneAs();
+bool EditorApp::saveScene() {
+    if (currentScenePath_.empty())
+        return saveSceneAs();
+    std::string error;
+    if (scene_.save(currentScenePath_, &error)) {
+        savedSceneSnapshot_ = scene_.serializeToString();
+        CR_LOG("scene", "Saved scene to " + currentScenePath_);
+        return true;
+    }
+    CR_ERROR("scene", "Save failed: " + error);
+    return false;
+}
+
+// Unconditional load: swaps scene_, no unsaved-changes guard, does not touch
+// prefabEditReturnPath_ or savedSceneSnapshot_ -- callers (via
+// requestReplaceScene) own those, since they differ per entry point (a
+// normal Open clears the "editing a prefab" banner; "Edit Prefab" sets it).
+void EditorApp::loadSceneNow(const std::string& path) {
+    std::string error;
+    Scene loaded = Scene::load(path, &error);
+    if (!error.empty()) {
+        CR_ERROR("scene", "Open failed: " + error);
         return;
     }
-    std::string error;
-    if (scene_.save(currentScenePath_, &error))
-        CR_LOG("scene", "Saved scene to " + currentScenePath_);
-    else
-        CR_ERROR("scene", "Save failed: " + error);
+    scene_ = std::move(loaded);
+    currentScenePath_ = path;
+    hierarchyFocusRoot_ = nullptr; // item 107's sub-view pointed into the OLD
+                                   // scene's tree -- stale now (found while
+                                   // adding item 106's guard: every one of
+                                   // these replace-scene_ call sites left this
+                                   // dangling before, a latent use-after-free)
+    renderer_.loadLightmap(scene_, assetDir_);
+    CR_LOG("scene", "Opened scene " + path);
+}
+
+bool EditorApp::hasUnsavedSceneChanges() const {
+    return scene_.serializeToString() != savedSceneSnapshot_;
+}
+
+void EditorApp::requestReplaceScene(std::function<void()> doReplace) {
+    if (!hasUnsavedSceneChanges()) {
+        doReplace();
+        savedSceneSnapshot_ = scene_.serializeToString();
+        return;
+    }
+    pendingSceneReplace_ = std::move(doReplace);
+    unsavedScenePopup_.title("Unsaved Changes")
+        .size(360, 0)
+        .defaultButtons(false)
+        .onBody([this](ui::Popup& p) {
+            p.label("The current scene has unsaved changes.");
+            p.spacing();
+            if (p.button("Save")) {
+                pendingSceneAction_ = PendingSceneAction::Save;
+                p.accept();
+            }
+            ImGui::SameLine();
+            if (p.button("Discard")) {
+                pendingSceneAction_ = PendingSceneAction::Discard;
+                p.accept();
+            }
+            ImGui::SameLine();
+            if (p.button("Cancel"))
+                p.cancel();
+        })
+        .open();
+}
+
+void EditorApp::drawUnsavedScenePopup() {
+    ui::Popup::Result r = unsavedScenePopup_.draw();
+    if (r == ui::Popup::Result::Open)
+        return;
+    if (r == ui::Popup::Result::Ok) {
+        bool proceed = true;
+        if (pendingSceneAction_ == PendingSceneAction::Save)
+            proceed = saveScene(); // false if Save fell through to a cancelled Save As
+        if (proceed && pendingSceneReplace_) {
+            pendingSceneReplace_();
+            savedSceneSnapshot_ = scene_.serializeToString();
+        }
+    }
+    pendingSceneReplace_ = nullptr;
 }
 
 void EditorApp::extractPrefabToScene(Actor* target, const std::string& name) {
@@ -2304,16 +2425,10 @@ void EditorApp::openScene() {
         platform::openFileDialog("Open Scene", "Crate Scene\0*.cscene\0All\0*.*\0");
     if (path.empty())
         return;
-    std::string error;
-    Scene loaded = Scene::load(path, &error);
-    if (!error.empty()) {
-        CR_ERROR("scene", "Open failed: " + error);
-        return;
-    }
-    scene_ = std::move(loaded);
-    currentScenePath_ = path;
-    renderer_.loadLightmap(scene_, assetDir_);
-    CR_LOG("scene", "Opened scene " + path);
+    requestReplaceScene([this, path] {
+        loadSceneNow(path);
+        prefabEditReturnPath_.clear();
+    });
 }
 
 void EditorApp::setPlaying(bool playing) {
