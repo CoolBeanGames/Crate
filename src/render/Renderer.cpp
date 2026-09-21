@@ -283,7 +283,17 @@ float4 PSVolume(VSOut i) : SV_TARGET
     // brightens/tints near lights (task 75: "reacts to light") without
     // needing a full participating-media scatter model.
     float3 midPoint = uCameraPos.xyz + toFrag * ((tNear + tFar) * 0.5);
-    float3 lit = uAmbient.rgb + shadeVertex(midPoint, float3(0, 1, 0));
+    // Clamped to 1: unclamped, a nearby bright light pushes `lit` well past 1
+    // (ambient + full-intensity spot contribution), which lets `col` exceed
+    // the fog's own set colour -- so a brighter/closer light silently
+    // overrides the artist's fog colour with its own, and since alpha (the
+    // fraction of `col` shown) scales with density, MORE density means MORE
+    // of that light-overridden colour dominates the frame: the volume reads
+    // as getting brighter as it gets denser, backwards from "denser fog
+    // obscures/dims more." Clamping keeps the haze's brightness capped by
+    // uBaseColor itself, so density only ever controls how much of that
+    // (fixed-brightness) fog colour is shown, never how bright it is.
+    float3 lit = saturate(uAmbient.rgb + shadeVertex(midPoint, float3(0, 1, 0)));
     float3 col = uBaseColor.rgb * lit;
     return float4(col, alpha);
 }
@@ -1052,7 +1062,15 @@ void Renderer::collectVolumeFog(Actor& actor) {
 // thing in the way".
 void Renderer::drawVolumeFogs(const Mat4& viewProj, const Vec3& cameraPos, float nearZ,
                               float farZ, const Options& opt) {
-    if (!volumeFogSample_.found || !psVolume_ || !depthSrv_)
+    // density<=0 means "no fog" and must draw nothing: at exactly 0, PSVolume's
+    // alpha (saturate(1 - exp(-density*thickness))) is mathematically 0 and
+    // should blend as a no-op, but empirically the pass instead renders solid
+    // black across the whole screen at that exact value (confirmed via direct
+    // screenshot repro; not fully root-caused at the shader-assembly level --
+    // skipping the draw entirely sidesteps whatever precision/edge-case
+    // produces that result, and is also strictly cheaper than drawing a
+    // full-screen pass guaranteed to contribute nothing).
+    if (!volumeFogSample_.found || !psVolume_ || !depthSrv_ || volumeFogSample_.density <= 0.0f)
         return;
     // No depth-stencil view bound (a resource can't be a depth target and a
     // shader resource at once): a hardware test here would compare against
