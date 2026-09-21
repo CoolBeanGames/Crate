@@ -575,50 +575,6 @@
       "isLocked": false,
       "tasks": [
         {
-          "id": "c006ee71d330451b9a76fc4e97d06138",
-          "index": 106,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Can\u0027t open .cscene files for editing",
-          "task": "Scene files are \u0027locked in\u0027 -- there\u0027s no way to open a .cscene for editing (beyond double-click loading it wholesale as the active scene). Need a real edit workflow.",
-          "tags": [
-            "bug",
-            "scene tree"
-          ],
-          "files": [],
-          "customTypeId": "e361978d91d9447f97033586db3c87b0",
-          "customValues": {
-            "c474f092663247ebb286cc5b978853d3": "Can\u0027t open .cscene files for editing",
-            "77f8b466f2874429a253d2256f62c42a": "Scene files are \u0027locked in\u0027 -- there\u0027s no way to open a .cscene for editing (beyond double-click loading it wholesale as the active scene). Need a real edit workflow.",
-            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
-            "203da294781c41a1b1e7f760ea47047e": "Crate",
-            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
-            "ce370daef7e94671b0b947c000ce780e": "0",
-            "37571d4735f1403b85a48880a05ec554": "bug,scene tree"
-          },
-          "requirements": [],
-          "notes": [
-            {
-              "id": "78fc5160d79140619793cc14bf12609d",
-              "text": "BLOCKED, needs a decision: this task\u0027s whole premise (double-click a .cscene tile loads it wholesale as the active scene) does not exist on main branch\u0027s code at all. Checked directly: main has zero references to \u0027cscene\u0027 anywhere in src/, no src/scene/SceneIO.cpp, and File \u003E Save Scene on main is still the original stub (\u0027Scene serialization arrives with the Data branch\u0027). All real Scene serialization / Asset Browser .cscene integration / prefab workflow lives only on the project-management branch (commits efc14b4, 6ffa4d5, 176d1a5, 4734f03, 6b10446, f7af473, 4bc127c), which main has never merged. This task is filed on the main Zen board column but its prerequisite feature is project-management-only code. I did not implement anything to avoid inventing a fake/duplicate scene system on main. Recommend either moving this task card to the Project Management branch (where the real .cscene workflow lives and where item 107\u0027s prefab sub-view already shipped), or merging project-management into main first if that\u0027s imminent anyway. Left not-done, not archived, feedback set to waiting pending that decision."
-            }
-          ],
-          "flags": {
-            "commit": false,
-            "build": false,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": true,
-          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
-          "updatedAt": "2026-09-21T22:19:48.9143752+00:00"
-        },
-        {
           "id": "6b1e718075e94ea19c201138934a7e96",
           "index": 100,
           "kind": "note",
@@ -1644,6 +1600,54 @@
           "isCollapsed": true,
           "createdAt": "2026-09-17T05:55:12.0372408+00:00",
           "updatedAt": "2026-09-21T22:17:39.5485884+00:00"
+        },
+        {
+          "id": "c006ee71d330451b9a76fc4e97d06138",
+          "index": 106,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Can\u0027t open .cscene files for editing",
+          "task": "Scene files are \u0027locked in\u0027 -- there\u0027s no way to open a .cscene for editing (beyond double-click loading it wholesale as the active scene). Need a real edit workflow.",
+          "tags": [
+            "bug",
+            "scene tree"
+          ],
+          "files": [],
+          "customTypeId": "e361978d91d9447f97033586db3c87b0",
+          "customValues": {
+            "c474f092663247ebb286cc5b978853d3": "Can\u0027t open .cscene files for editing",
+            "77f8b466f2874429a253d2256f62c42a": "Scene files are \u0027locked in\u0027 -- there\u0027s no way to open a .cscene for editing (beyond double-click loading it wholesale as the active scene). Need a real edit workflow.",
+            "0bd42f02c9ae40469818cbbd6986994f": "[\u0022Filed by Claude from a user-provided list during the Scenes-task session.\u0022]",
+            "203da294781c41a1b1e7f760ea47047e": "Crate",
+            "469fc66c5553490daed4c54f36ac81b4": "build\u002Bcommit",
+            "ce370daef7e94671b0b947c000ce780e": "0",
+            "37571d4735f1403b85a48880a05ec554": "bug,scene tree"
+          },
+          "requirements": [],
+          "notes": [
+            {
+              "id": "78fc5160d79140619793cc14bf12609d",
+              "text": "BLOCKED, needs a decision: this task\u0027s whole premise (double-click a .cscene tile loads it wholesale as the active scene) does not exist on main branch\u0027s code at all. Checked directly: main has zero references to \u0027cscene\u0027 anywhere in src/, no src/scene/SceneIO.cpp, and File \u003E Save Scene on main is still the original stub (\u0027Scene serialization arrives with the Data branch\u0027). All real Scene serialization / Asset Browser .cscene integration / prefab workflow lives only on the project-management branch (commits efc14b4, 6ffa4d5, 176d1a5, 4734f03, 6b10446, f7af473, 4bc127c), which main has never merged. This task is filed on the main Zen board column but its prerequisite feature is project-management-only code. I did not implement anything to avoid inventing a fake/duplicate scene system on main. Recommend either moving this task card to the Project Management branch (where the real .cscene workflow lives and where item 107\u0027s prefab sub-view already shipped), or merging project-management into main first if that\u0027s imminent anyway. Left not-done, not archived, feedback set to waiting pending that decision."
+            },
+            {
+              "id": "d8d77b0469d2410f93120540e91f5e59",
+              "text": "Shipped both rough edges (commit 24ef462, project-management): (1) every scene-replacing action (double-click a .cscene, File \u003E Open/New/Load Sample Scene) now diffs the scene\u0027s serialized content against a last-load/save snapshot and prompts Save/Discard/Cancel if it differs, instead of silently clobbering unsaved work; (2) right-click a .cscene tile -\u003E \u0027Edit Prefab\u0027 opens it in isolation (same guard protects your current scene on the way in) with a \u0027\u003C Back to X\u0027 one-click return banner in the Hierarchy -- didn\u0027t build a full tabbed multi-scene document system since nothing in this codebase has one yet and that\u0027s a much bigger feature than this card asked for; this narrower \u0027swap \u002B guaranteed way back\u0027 design gets the same real outcome (edit a prefab without losing your place) far more cheaply. Also fixed two related latent bugs found while wiring this up: New Scene/Load Sample Scene leaving currentScenePath_ pointing at the old file (Ctrl\u002BS would\u0027ve overwritten it), and hierarchyFocusRoot_ (item 107\u0027s sub-view) dangling after any scene swap. Verified live end-to-end with screenshots; full 28-target suite passes on Debug\u002BRelease; latestExePath/latestReleasePath updated."
+            }
+          ],
+          "flags": {
+            "commit": false,
+            "build": false,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": true,
+          "createdAt": "2026-09-17T09:38:39.7338057+00:00",
+          "updatedAt": "2026-09-21T22:58:59.4017074+00:00"
         },
         {
           "id": "c9d4482b33c94eeda497726091ff6dbf",
