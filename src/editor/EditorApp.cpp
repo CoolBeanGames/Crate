@@ -2459,12 +2459,15 @@ void EditorApp::openScene() {
 }
 
 // --- Projects (task 92) ----------------------------------------------------
-// The save dialog picks the .crate file's own location; its containing
-// folder becomes the project root, and an "assets" subfolder created right
-// beside it becomes the new assetDir_ -- exactly "a folder containing an
-// /assets folder", per the task's own description, with no separate
+// The save dialog picks a root LOCATION and a project name; a new subfolder
+// named after the project is created inside that location (task 123 --
+// originally this used the dialog's chosen folder directly as the project
+// root, which forced the user to pre-create a wrapper folder themselves
+// before running New Project). Both the .crate file and its "assets"
+// subfolder live inside that new project folder, with no separate
 // folder-picker dialog needed (this codebase has no folder-browse dialog to
-// reuse, only open/save-file ones).
+// reuse, only open/save-file ones) -- the Save dialog's own folder doubles as
+// "pick a root", and its filename becomes the new subfolder's name.
 void EditorApp::newProject() {
     if (playing_) {
         CR_WARN("project", "Stop Play before creating a new project");
@@ -2475,28 +2478,58 @@ void EditorApp::newProject() {
     if (path.empty())
         return;
     requestReplaceScene([this, path] {
-        fs::path projPath(path);
-        fs::path dir = projPath.parent_path();
+        fs::path chosen(path);
+        std::string projectName = chosen.stem().string();
+        fs::path projectDir = chosen.parent_path() / projectName;
+        fs::path projPath = projectDir / (projectName + ".crate");
+
         std::error_code ec;
-        fs::create_directories(dir / "assets", ec);
+        // Don't silently reuse/clobber a folder that already holds something
+        // -- an existing empty folder (e.g. one the user pre-made out of
+        // habit) is fine to build into, but any existing content there is
+        // someone else's, not this new project's to overwrite.
+        if (fs::exists(projectDir, ec)) {
+            std::error_code ec2;
+            bool nonEmpty = fs::directory_iterator(projectDir, ec2) != fs::directory_iterator();
+            if (nonEmpty) {
+                CR_ERROR("project", "New Project failed: '" + projectDir.generic_string() +
+                                        "' already exists and is not empty");
+                return;
+            }
+        }
+        fs::create_directories(projectDir / "assets", ec);
+        if (ec) {
+            CR_ERROR("project",
+                     "New Project failed: could not create '" + projectDir.generic_string() + "'");
+            return;
+        }
+
+        // A fresh project should have a real physical default asset from the
+        // start (task 124), not just in-memory state -- matches the file this
+        // same InputMap::save() format already produces via the "Create Input
+        // Map" asset-browser action, and the filename this repo's own
+        // long-standing default project has always used.
+        InputMap defaultInputMap;
+        defaultInputMap.buttons.push_back({"jump", 0});
+        defaultInputMap.save((projectDir / "assets" / "Default.inputmap").generic_string());
 
         ProjectInfo info;
-        info.name = projPath.stem().string();
+        info.name = projectName;
         std::string error;
-        if (!saveProjectFile(path, info, &error)) {
+        if (!saveProjectFile(projPath.generic_string(), info, &error)) {
             CR_ERROR("project", "New Project failed: " + error);
             return;
         }
 
-        currentProjectPath_ = path;
-        mountProjectAssets((dir / "assets").generic_string());
+        currentProjectPath_ = projPath.generic_string();
+        mountProjectAssets((projectDir / "assets").generic_string());
         scene_ = Scene("Untitled");
         renderer_.loadLightmap(scene_, assetDir_);
         currentScenePath_.clear();
         hierarchyFocusRoot_ = nullptr;
         prefabEditReturnPath_.clear();
         savedSceneSnapshot_ = scene_.serializeToString();
-        CR_LOG("project", "Created project '" + info.name + "' at " + path);
+        CR_LOG("project", "Created project '" + info.name + "' at " + currentProjectPath_);
     });
 }
 
