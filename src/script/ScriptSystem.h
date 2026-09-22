@@ -44,6 +44,18 @@ public:
     void loadFolder(const std::string& dir);
     const std::string& scriptsDir() const { return dir_; }
 
+    // Drops every loaded script's data (types, namespaces, files, autocomplete
+    // docs, retired classes, input-button signals) so a subsequent
+    // loadFolder() starts clean instead of merging with a PREVIOUS folder's
+    // content (task 92, "Projects": switching the Asset Browser to a
+    // different project's scripts folder). Deliberately does NOT touch
+    // statics_/nativeStatics_ or any already-loaded native script DLL from a
+    // prior Play session -- fully unloading a native module safely is
+    // Transplation-level complexity out of scope here; switching projects
+    // after having pressed Play earlier in the same editor session is a
+    // known limitation (restart the editor for a fully clean switch).
+    void unloadAll();
+
     // Re-scan the scripts folder: new files are loaded, changed files
     // recompiled, deleted files removed from the list / catalogue.
     void reload();

@@ -103,6 +103,7 @@ add_library(crate_core STATIC
     src/editor/ScriptBuild.cpp
     src/editor/ScriptEditor.cpp
     src/editor/Theme.cpp
+    src/editor/ProjectFile.cpp
     src/editor/EditorApp.cpp
 )
 target_include_directories(crate_core PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
@@ -289,3 +290,7 @@ target_link_libraries(actor_api_tests PRIVATE crate_core)
 target_compile_definitions(actor_api_tests PRIVATE
     CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
 add_test(NAME actor_api_tests COMMAND actor_api_tests)
+
+add_executable(project_file_tests tests/project_file_tests.cpp)
+target_link_libraries(project_file_tests PRIVATE crate_core)
+add_test(NAME project_file_tests COMMAND project_file_tests)

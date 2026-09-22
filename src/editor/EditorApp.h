@@ -3,6 +3,7 @@
 #include "assets/MeshLibrary.h"
 #include "editor/AssetPicker.h"
 #include "editor/Popup.h"
+#include "editor/ProjectFile.h"
 #include "editor/ScriptEditor.h"
 #include "input/InputMap.h"
 #include "render/Camera.h"
@@ -104,6 +105,22 @@ private:
     bool saveScene();   // false if it fell through to saveSceneAs() and that was cancelled/failed
     void openScene();
 
+    // Project file I/O (task 92, "Projects"): a .crate file marking a folder
+    // as a project root, sitting next to that folder's own "assets"
+    // subfolder. Minimal on purpose -- see ProjectFile.h and the "for now
+    // just get this working" scope note in the Zen task. With no project
+    // explicitly opened, the editor behaves exactly as it always has
+    // (assetDir_ defaults to "assets" next to the exe/cwd) -- there's always
+    // an implicit default project, never a "no project" state.
+    void newProject();  // prompts for a new .crate path, creates folder+assets/, mounts it
+    void openProject(); // prompts for an existing .crate file, mounts its assets/
+    void saveProject(); // re-writes the current project's .crate file; no-op if none is open
+    // Re-points assetDir_ at `newAssetDir` and reloads everything keyed off
+    // it (AssetDatabase, ScriptSystem, the Asset Browser scan, folder colors,
+    // the active input map) as if the editor had started up there. Shared by
+    // the constructor (mounts the default project) and by New/Open Project.
+    void mountProjectAssets(const std::string& newAssetDir);
+
     // Unsaved-changes guard (item 106): every action that would replace
     // scene_ wholesale (double-click a .cscene tile, File > Open/New/Load
     // Sample Scene, "Edit Prefab") routes through this instead of mutating
@@ -150,6 +167,9 @@ private:
     Scene scene_;
     Scene playBackup_;      // scene state captured when Play was pressed
     std::string currentScenePath_; // empty until Saved/Opened at least once
+    std::string currentProjectPath_; // path to the open .crate file; empty = no
+                                       // project explicitly opened (the implicit
+                                       // default project: assetDir_ as-is)
     float physicsAccum_ = 0.0f;
     MeshLibrary meshLib_;
     MaterialLibrary materialLib_;

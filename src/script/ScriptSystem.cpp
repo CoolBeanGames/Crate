@@ -554,6 +554,16 @@ void ScriptSystem::saveNamespaces() const {
         out << cname << '\t' << ns << '\n';
 }
 
+void ScriptSystem::unloadAll() {
+    types_.clear();
+    namespaces_.clear();
+    retired_.clear();
+    inputButtons_.clear();
+    files_.clear();
+    typeDocs_.clear();
+    dir_.clear();
+}
+
 void ScriptSystem::loadFolder(const std::string& dir) {
     dir_ = dir;
     loadNamespaces();
