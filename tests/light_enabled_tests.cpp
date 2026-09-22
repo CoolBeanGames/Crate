@@ -114,6 +114,75 @@ int main() {
         CHECK(r.activeLightCount(scene) == 1);
     }
 
+    // task 148: disabling a PARENT must exclude a light on an otherwise fully
+    // enabled/visible CHILD -- before the cascading fix, only the disabled
+    // actor's own light was excluded; a child underneath it kept
+    // contributing regardless of its ancestor's state.
+    {
+        Scene scene("parent-disabled-cascades");
+        Actor* parent = scene.add(std::make_unique<Actor3D>("Parent"));
+        Actor* child = parent->addChild(std::make_unique<Actor3D>("Child"));
+        auto lc = std::make_unique<LightComponent>();
+        lc->type = LightComponent::Type::Point;
+        lc->intensity = 1.0f;
+        child->addComponent(std::move(lc));
+        Renderer r;
+        CHECK(r.activeLightCount(scene) == 1);
+        parent->setEnabled(false);
+        CHECK(r.activeLightCount(scene) == 0);
+        parent->setEnabled(true);
+        CHECK(r.activeLightCount(scene) == 1); // re-enabling brings it back too
+    }
+
+    // Same cascading rule for actor-level Visible=false on a parent.
+    {
+        Scene scene("parent-invisible-cascades");
+        Actor* parent = scene.add(std::make_unique<Actor3D>("Parent"));
+        Actor* child = parent->addChild(std::make_unique<Actor3D>("Child"));
+        auto lc = std::make_unique<LightComponent>();
+        lc->type = LightComponent::Type::Point;
+        lc->intensity = 1.0f;
+        child->addComponent(std::move(lc));
+        Renderer r;
+        CHECK(r.activeLightCount(scene) == 1);
+        parent->setVisible(false);
+        CHECK(r.activeLightCount(scene) == 0);
+    }
+
+    // Cascading is per-subtree, not global: disabling one parent must not
+    // affect an unrelated sibling subtree's own light.
+    {
+        Scene scene("cascades-dont-leak-across-siblings");
+        Actor* parentA = scene.add(std::make_unique<Actor3D>("ParentA"));
+        Actor* childA = parentA->addChild(std::make_unique<Actor3D>("ChildA"));
+        auto lcA = std::make_unique<LightComponent>();
+        lcA->type = LightComponent::Type::Point;
+        lcA->intensity = 1.0f;
+        childA->addComponent(std::move(lcA));
+        addLight(scene, "Unrelated", LightComponent::Type::Directional);
+        Renderer r;
+        CHECK(r.activeLightCount(scene) == 2);
+        parentA->setEnabled(false);
+        CHECK(r.activeLightCount(scene) == 1);
+    }
+
+    // Three levels deep: disabling the top-most ancestor excludes a
+    // great-grandchild's light too, not just an immediate child's.
+    {
+        Scene scene("three-levels-deep");
+        Actor* grandparent = scene.add(std::make_unique<Actor3D>("Grandparent"));
+        Actor* parent = grandparent->addChild(std::make_unique<Actor3D>("Parent"));
+        Actor* child = parent->addChild(std::make_unique<Actor3D>("Child"));
+        auto lc = std::make_unique<LightComponent>();
+        lc->type = LightComponent::Type::Point;
+        lc->intensity = 1.0f;
+        child->addComponent(std::move(lc));
+        Renderer r;
+        CHECK(r.activeLightCount(scene) == 1);
+        grandparent->setEnabled(false);
+        CHECK(r.activeLightCount(scene) == 0);
+    }
+
     if (fails == 0)
         std::printf("light_enabled_tests: all checks passed\n");
     return fails == 0 ? 0 : 1;

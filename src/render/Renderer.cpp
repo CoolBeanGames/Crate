@@ -676,12 +676,23 @@ size_t Renderer::activeLightCount(Scene& scene) {
     return lights_.size();
 }
 
-void Renderer::drawActor(Actor& actor, const Mat4& viewProj, const Options& opt, bool shadowPass) {
+void Renderer::drawActor(Actor& actor, const Mat4& viewProj, const Options& opt, bool shadowPass,
+                         bool ancestorActive) {
+    // task 147/148: actor.enabled() was never checked here at all (only the
+    // MeshRenderer component's own `enabled` and the actor's `visible()`),
+    // so disabling an actor via the Inspector never stopped its mesh from
+    // rendering. Folding in ancestorActive too means a disabled/hidden
+    // parent now takes its whole subtree with it, same cascading rule as
+    // collectLights/collectFog/collectVolumeFog -- so this now has to gate
+    // the recursion itself, not just this actor's own draw.
+    bool active = ancestorActive && actor.enabled() && actor.visible();
+    if (!active)
+        return;
     for (const auto& child : actor.children())
-        drawActor(*child, viewProj, opt, shadowPass);
+        drawActor(*child, viewProj, opt, shadowPass, active);
 
     auto* mr = actor.getComponent<MeshRenderer>();
-    if (!mr || !mr->enabled || !actor.visible())
+    if (!mr || !mr->enabled)
         return;
     if (shadowPass && !mr->castShadows)
         return;
@@ -1011,16 +1022,20 @@ bool Renderer::loadLightmap(Scene& scene, const std::string& assetDir) {
     return any;
 }
 
-void Renderer::collectLights(Actor& actor) {
+void Renderer::collectLights(Actor& actor, bool ancestorActive) {
+    // task 148: a disabled/hidden ancestor takes its whole subtree with it --
+    // stop here rather than only skipping this one actor's own light, so a
+    // child's own enabled()/visible() can't "resurrect" a parent's disabled
+    // subtree.
+    bool active = ancestorActive && actor.enabled() && actor.visible();
+    if (!active)
+        return;
     if (auto* lc = actor.getComponent<LightComponent>()) {
         // Actor::enabled() was previously ignored here -- collectLights only
         // checked visible(), so unchecking the Inspector's actor-level
         // "Enabled" checkbox (as opposed to "Visible") had no effect on a
-        // light's contribution at all (task 146). visible() alone is kept
-        // too: an actor can still have a light with no rendered mesh
-        // representation, but a light on a genuinely disabled actor should
-        // not illuminate the scene.
-        if (lc->enabled && actor.enabled() && actor.visible() && lights_.size() < kMaxLights) {
+        // light's contribution at all (task 146).
+        if (lc->enabled && lights_.size() < kMaxLights) {
             Transform w = actor.worldTransform();
             Mat4 rot = Mat4::rotationEuler(w.rotationEuler);
             LightSample s;
@@ -1042,13 +1057,18 @@ void Renderer::collectLights(Actor& actor) {
             probes_.push_back({actor.worldTransform().position,
                                Vec3{lp->bakedLight[0], lp->bakedLight[1], lp->bakedLight[2]}});
     for (const auto& child : actor.children())
-        collectLights(*child);
+        collectLights(*child, active);
 }
 
 // First enabled FogComponent anywhere in the tree wins; siblings/descendants
 // past that point are left unvisited once found (there's only one scene fog).
-void Renderer::collectFog(Actor& actor) {
+// task 148: a disabled/hidden ancestor's fog (and its subtree generally)
+// doesn't count, same cascading rule as collectLights.
+void Renderer::collectFog(Actor& actor, bool ancestorActive) {
     if (fogSample_.found)
+        return;
+    bool active = ancestorActive && actor.enabled() && actor.visible();
+    if (!active)
         return;
     if (auto* fc = actor.getComponent<FogComponent>()) {
         if (fc->enabled) {
@@ -1062,14 +1082,18 @@ void Renderer::collectFog(Actor& actor) {
         }
     }
     for (const auto& child : actor.children())
-        collectFog(*child);
+        collectFog(*child, active);
 }
 
 // Like collectFog(): only the first enabled VolumetricFogComponent anywhere
 // in the tree matters, and its actor's transform is irrelevant (task 75,
-// redesigned to be global fog rather than a bounded shape).
-void Renderer::collectVolumeFog(Actor& actor) {
+// redesigned to be global fog rather than a bounded shape). Same task-148
+// cascading rule as collectLights/collectFog.
+void Renderer::collectVolumeFog(Actor& actor, bool ancestorActive) {
     if (volumeFogSample_.found)
+        return;
+    bool active = ancestorActive && actor.enabled() && actor.visible();
+    if (!active)
         return;
     if (auto* vf = actor.getComponent<VolumetricFogComponent>()) {
         if (vf->enabled) {
@@ -1080,7 +1104,7 @@ void Renderer::collectVolumeFog(Actor& actor) {
         }
     }
     for (const auto& child : actor.children())
-        collectVolumeFog(*child);
+        collectVolumeFog(*child, active);
 }
 
 // Fills the whole world with fog that reacts to light (task 75). There's no

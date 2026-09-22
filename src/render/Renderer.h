@@ -152,10 +152,17 @@ private:
     bool compileShaders();
     const GpuMesh& meshFor(const std::string& key, const std::string& primitiveFallback);
     GpuMesh upload(const MeshData& data);
-    void drawActor(Actor& actor, const Mat4& viewProj, const Options& opt, bool shadowPass);
-    void collectLights(Actor& actor); // fills lights_ (world space), capped
-    void collectFog(Actor& actor);    // fills fogSample_; first match wins
-    void collectVolumeFog(Actor& actor); // fills volumeFogSample_; first match wins
+    // ancestorActive folds in every enabled()/visible() check made by this
+    // actor's ancestors on the walk down from the scene root -- once false,
+    // the whole subtree is treated as off (no light/fog contribution, no
+    // mesh draw) and recursion stops immediately, matching the usual
+    // engine convention that disabling/hiding a parent implies its children
+    // too, regardless of their own flags (task 148).
+    void drawActor(Actor& actor, const Mat4& viewProj, const Options& opt, bool shadowPass,
+                   bool ancestorActive = true);
+    void collectLights(Actor& actor, bool ancestorActive = true); // fills lights_ (world space), capped
+    void collectFog(Actor& actor, bool ancestorActive = true);    // fills fogSample_; first match wins
+    void collectVolumeFog(Actor& actor, bool ancestorActive = true); // fills volumeFogSample_; first match wins
     void drawVolumeFogs(const Mat4& viewProj, const Vec3& cameraPos, float nearZ, float farZ,
                        const Options& opt);
     bool computeShadowVP(Mat4& out) const; // false if no shadow-casting light
