@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "projectId": "8afe2a0217d7419db234ceda7ecb9dff",
   "name": "Crate",
-  "nextCardIndex": 123,
+  "nextCardIndex": 126,
   "latestExePath": "build-Release/Crate.exe",
   "latestReleasePath": "build-Release/Crate.exe",
   "tagCatalog": [
@@ -685,6 +685,37 @@
           "isCollapsed": false,
           "createdAt": "2026-09-17T03:43:19.2725286+00:00",
           "updatedAt": "2026-09-17T03:43:19.2725286+00:00"
+        },
+        {
+          "id": "ecd8908158f54809a9c834a001d8b9f9",
+          "index": 125,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Projects Launcher (separate executable)",
+          "task": "Build a separate launcher executable for creating/opening/managing Crate projects, as originally scoped (deferred from task 92). Requirements: list every project the user has created; create a new project; open an existing project; delete an existing project (remove from the list, and ask whether to also delete the project\u0027s files from disk); open the current project\u0027s folder in the OS file explorer. Persist the known-projects list to disk (e.g. an AppData JSON file). Launching a project from the launcher should open the main Crate editor exe pointed at that project (a new command-line argument on the editor exe, e.g. --project \u003Cpath-to-.crate\u003E, which does not exist yet and needs adding).\n\nALSO: a \u0027crate\u0027 CLI tool that gets registered on PATH when the launcher runs (first run / on launch, similar to how zen-operator registers itself on PATH for the Zen tool -- check that project\u0027s approach for a reference pattern if useful, but don\u0027t take a dependency on it). Must support \u0027crate new \u0022path/to/folder\u0022\u0027 (create a new project at that folder, same behavior as the launcher\u0027s New Project) and \u0027crate open \u0022path/to/folder\u0022\u0027 (open an existing project there, launching the main editor pointed at it) directly from a regular terminal, without going through the launcher UI.",
+          "tags": [
+            "projects",
+            "ui"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-22T00:26:06.2033793+00:00",
+          "updatedAt": "2026-09-22T00:46:52.8486098+00:00"
         }
       ]
     },
@@ -4939,6 +4970,14 @@
             {
               "id": "d058a47ab7cd4d28989012a5b880455a",
               "text": "Minimal real implementation, per the task\u0027s \u0027for now just get this working\u0027 bar: File \u003E New/Open/Save Project, a hand-rolled .crate text format (editor/ProjectFile.h/.cpp), and EditorApp::mountProjectAssets() reloading AssetDatabase/ScriptSystem/Asset Browser/folder colors/input map for the chosen assets/ folder. Backward compatible -- no project opened means today\u0027s exact default behavior (verified live: fresh launch still boots the Sample Scene with 13 actors, unchanged). Known limitation: an already-loaded native script DLL from a prior Play session isn\u0027t unloaded on project switch (Transplation-level complexity, out of scope) -- restart the editor for a fully clean switch after pressing Play. No launcher/recent-projects list, per the task\u0027s own deferral. Verified live end to end (New/Open/Save all round-tripped correctly, screenshots in tmp_shots/) plus 29/29 tests passing on Debug and Release, zero regressions. Commit b858510 on project-management."
+            },
+            {
+              "id": "eb7da0462f3741778d175ee9a27be100",
+              "text": "Archived prematurely -- the user reports New Project does not actually work and that the verifying agent got stuck in a retry loop against the native Save dialog. Screenshots in tmp_shots/ (proj_02 through proj_05, spanning 16 minutes) show repeated \u0027typed\u0027/\u0027typed2\u0027/\u0027typed3\u0027 attempts consistent with dialog-automation flakiness, but this needs a real fix or at minimum a confirmed root cause before being marked done again."
+            },
+            {
+              "id": "ed30b2828bf046989c287637c4745fa7",
+              "text": "Corrected: the feature does work. User manually created a project (myCrate.crate \u002B assets/, both real, 1KB file) with no trouble, confirmed via screenshot. What actually failed was the verifying background agent\u0027s own UI automation getting stuck retrying the native Save dialog (see tmp_shots/proj_03_typed through proj_05_typed3, 16 minutes of retries) -- a test-tooling problem, not a bug in ProjectFile.cpp/EditorApp.cpp\u0027s New/Open/Save Project handlers, which were re-reviewed by hand and are correct. Re-archiving as genuinely done."
             }
           ],
           "flags": {
@@ -4952,7 +4991,67 @@
           "isAwaitingFeedback": false,
           "isCollapsed": true,
           "createdAt": "2026-09-16T05:12:29.9552007+00:00",
-          "updatedAt": "2026-09-22T00:10:56.5652408+00:00"
+          "updatedAt": "2026-09-22T00:18:53.5999061+00:00"
+        },
+        {
+          "id": "e18871565d52455ea1d795ce47f677e8",
+          "index": 123,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "New Project: auto-create a named project subfolder",
+          "task": "New Project currently puts assets/ and the .crate file directly inside whatever folder the Save dialog points at (fs::create_directories(dir / \u0022assets\u0022) where dir is the dialog\u0027s own chosen folder), forcing the user to manually pre-create a wrapper folder first. Fix: pick a root location, then auto-create a new subfolder named after the project (e.g. picking \u0027Documents\u0027 and naming it \u0027MyGame\u0027 creates Documents/MyGame/MyGame.crate \u002B Documents/MyGame/assets/), matching how similar tools structure a new project.",
+          "tags": [
+            "projects"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-22T00:26:05.5478929+00:00",
+          "updatedAt": "2026-09-22T00:46:57.4763129+00:00"
+        },
+        {
+          "id": "00eb676d68d34a4fb38d2dff5b1af1f2",
+          "index": 124,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "New Project: write default physical asset files (input map)",
+          "task": "New Project only sets an in-memory default InputMap with no file on disk (inputMapPath_ is cleared, nothing written). The existing default/implicit project has a real assets/Default.inputmap file (created manually, not auto-generated). Fix: New Project should write a real default input map file into the new project\u0027s assets/ folder, per the principle that anything in the asset library should exist as a physical file, not just in-memory state.",
+          "tags": [
+            "projects"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-22T00:26:05.8762057+00:00",
+          "updatedAt": "2026-09-22T00:46:58.1327866+00:00"
         }
       ]
     }
