@@ -591,10 +591,19 @@ void ScriptSystem::loadFolder(const std::string& dir) {
             f.error = err;
             CR_ERROR("script", "Failed to load " + entry.path().filename().string() + ": " + err);
         }
-        // replace existing entry with the same path
+        // Replace an existing entry for the same file. Compared with
+        // fs::equivalent(), not raw string equality: on Windows the
+        // filesystem is case-insensitive, so a path recorded earlier (e.g.
+        // newScript()'s own hardcoded lowercase "scripts" folder name) can
+        // differ only in case from what a later directory_iterator reports
+        // back for that identical on-disk file (whatever case the OS actually
+        // has stored) -- a plain std::string == would treat those as two
+        // different files and duplicate the entry on every reload().
+        std::error_code eqEc;
         bool replaced = false;
         for (auto& existing : files_)
-            if (existing.path == f.path) {
+            if (!existing.path.empty() &&
+                fs::equivalent(existing.path, f.path, eqEc) && !eqEc) {
                 existing = f;
                 replaced = true;
             }

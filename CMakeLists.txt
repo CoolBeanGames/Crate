@@ -332,3 +332,7 @@ add_test(NAME project_file_tests COMMAND project_file_tests)
 add_executable(project_ops_tests tests/project_ops_tests.cpp)
 target_link_libraries(project_ops_tests PRIVATE crate_core)
 add_test(NAME project_ops_tests COMMAND project_ops_tests)
+
+add_executable(scripting_new_and_reload_tests tests/scripting_new_and_reload_tests.cpp)
+target_link_libraries(scripting_new_and_reload_tests PRIVATE crate_core)
+add_test(NAME scripting_new_and_reload_tests COMMAND scripting_new_and_reload_tests)

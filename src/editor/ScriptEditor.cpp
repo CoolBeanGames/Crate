@@ -142,8 +142,15 @@ void ScriptEditor::pushToSystem() {
 
 void ScriptEditor::draw() {
     if (ScriptSystem::get().files().empty()) {
+        // Still run the New/Reload toolbar + popup even with zero scripts --
+        // this is the only place a request from beginNewScript() (e.g. the
+        // Asset Browser's right-click > Scripting > New Script) ever gets
+        // consumed, and it must exist even before the first script does
+        // (task 144: this early return used to skip it entirely, so New
+        // Script silently did nothing on an empty project).
+        drawNewScriptPopup();
         ImGui::TextWrapped("No scripts found in this project's assets folder. Create one with "
-                           "New below, or use the Asset Browser.");
+                           "New above, or use the Asset Browser.");
         return;
     }
     if (current_.empty())
@@ -171,7 +178,7 @@ void ScriptEditor::beginNewScript() {
     newRequested_ = true;
 }
 
-void ScriptEditor::drawSidebar() {
+void ScriptEditor::drawNewScriptPopup() {
     if (ImGui::SmallButton("New"))
         beginNewScript();
     ImGui::SameLine();
@@ -193,6 +200,10 @@ void ScriptEditor::drawSidebar() {
         if (!made.empty())
             openScript(made);
     }
+}
+
+void ScriptEditor::drawSidebar() {
+    drawNewScriptPopup();
 
     ImGui::TextDisabled("SCRIPTS");
     ImGui::BeginChild("scripts", ImVec2(0, 200), true);

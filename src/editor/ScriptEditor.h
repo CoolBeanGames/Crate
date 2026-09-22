@@ -40,6 +40,11 @@ public:
     const std::string& current() const { return current_; }
 
 private:
+    void drawNewScriptPopup(); // New/Reload toolbar + the New Script name popup --
+                                // shared by drawSidebar() and the empty-project state
+                                // (task 144: this must run even with zero scripts,
+                                // or "New Script" from the Asset Browser has nothing
+                                // to consume its request and silently does nothing)
     void drawSidebar();
     void drawCode();
     void pushToSystem();     // editor text -> ScriptSystem (recompile)
