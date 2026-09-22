@@ -669,6 +669,13 @@ void Renderer::invalidateTexture(const std::string& path) {
     }
 }
 
+size_t Renderer::activeLightCount(Scene& scene) {
+    lights_.clear();
+    for (const auto& child : scene.root().children())
+        collectLights(*child);
+    return lights_.size();
+}
+
 void Renderer::drawActor(Actor& actor, const Mat4& viewProj, const Options& opt, bool shadowPass) {
     for (const auto& child : actor.children())
         drawActor(*child, viewProj, opt, shadowPass);
@@ -1006,7 +1013,14 @@ bool Renderer::loadLightmap(Scene& scene, const std::string& assetDir) {
 
 void Renderer::collectLights(Actor& actor) {
     if (auto* lc = actor.getComponent<LightComponent>()) {
-        if (lc->enabled && actor.visible() && lights_.size() < kMaxLights) {
+        // Actor::enabled() was previously ignored here -- collectLights only
+        // checked visible(), so unchecking the Inspector's actor-level
+        // "Enabled" checkbox (as opposed to "Visible") had no effect on a
+        // light's contribution at all (task 146). visible() alone is kept
+        // too: an actor can still have a light with no rendered mesh
+        // representation, but a light on a genuinely disabled actor should
+        // not illuminate the scene.
+        if (lc->enabled && actor.enabled() && actor.visible() && lights_.size() < kMaxLights) {
             Transform w = actor.worldTransform();
             Mat4 rot = Mat4::rotationEuler(w.rotationEuler);
             LightSample s;

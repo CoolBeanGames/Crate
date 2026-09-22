@@ -95,6 +95,13 @@ public:
     void* loadTexture(const std::string& path);
     void invalidateTexture(const std::string& path);
 
+    // Pure-CPU light collection (no D3D11 device needed), exposed for
+    // headless testing of the enabled/visible gating in collectLights --
+    // mirrors bakeLighting()'s "no device attached" testability. Walks the
+    // same actor tree render() does and returns how many dynamic lights
+    // would be sent to the shader this frame.
+    size_t activeLightCount(Scene& scene);
+
 private:
     struct GpuMesh {
         ID3D11Buffer* vb = nullptr;

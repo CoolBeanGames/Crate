@@ -199,6 +199,10 @@ add_executable(lighting_bake_tests tests/lighting_bake_tests.cpp)
 target_link_libraries(lighting_bake_tests PRIVATE crate_core)
 add_test(NAME lighting_bake_tests COMMAND lighting_bake_tests)
 
+add_executable(light_enabled_tests tests/light_enabled_tests.cpp)
+target_link_libraries(light_enabled_tests PRIVATE crate_core)
+add_test(NAME light_enabled_tests COMMAND light_enabled_tests)
+
 add_executable(script_bug_tests tests/script_bug_tests.cpp)
 target_link_libraries(script_bug_tests PRIVATE crate_core)
 add_test(NAME script_bug_tests COMMAND script_bug_tests)
