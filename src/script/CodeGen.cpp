@@ -793,7 +793,7 @@ std::string Gen::expr(const Expr& e, FnCtx& fc) {
             // Input.Mouse.<member> -- structural, mirroring
             // Interpreter::evalMember's identical check exactly ("Input" is
             // pure namespace syntax, never a real Value, in either backend).
-            if (objExpr.kind == ExprKind::Member && objExpr.strVal == "Mouse" &&
+            if (objExpr.kind == ExprKind::Member && crate::script::isInputMouseSegment(objExpr.strVal) &&
                 objExpr.a->kind == ExprKind::Identifier && objExpr.a->strVal == "Input" &&
                 !fc.has("Input"))
                 return "crate::script::inputMouseMember(ctx_, " + cppStringLiteral(name) + ", " +

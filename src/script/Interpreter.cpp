@@ -355,7 +355,7 @@ Value Interpreter::evalMember(const Expr& e) {
     // evalCall: "Input" has no meaningful standalone Value (it's pure
     // namespace syntax), so this must be recognized on the AST directly,
     // before eval(*e.a) below would throw "unknown identifier 'Input'".
-    if (e.a->kind == ExprKind::Member && e.a->strVal == "Mouse" &&
+    if (e.a->kind == ExprKind::Member && crate::script::isInputMouseSegment(e.a->strVal) &&
         e.a->a->kind == ExprKind::Identifier && e.a->a->strVal == "Input" && !findVar("Input"))
         return crate::script::inputMouseMember(ctx_, name, e.line);
 

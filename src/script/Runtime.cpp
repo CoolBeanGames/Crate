@@ -5,6 +5,7 @@
 #include "scene/BuiltinComponents.h"
 #include "script/Interpreter.h" // ScriptContext's full definition (inputQuery)
 
+#include <cctype>
 #include <cmath>
 #include <cstdlib>
 #include <random>
@@ -590,6 +591,16 @@ crate::Actor* sceneRootOf(crate::Actor* a) {
     while (a && a->parent())
         a = a->parent();
     return a;
+}
+
+bool isInputMouseSegment(const std::string& s) {
+    if (s.size() != 5) // "mouse" / "Mouse" / etc. -- reject anything else fast
+        return false;
+    static const char kLower[] = "mouse";
+    for (size_t i = 0; i < 5; ++i)
+        if (std::tolower(static_cast<unsigned char>(s[i])) != kLower[i])
+            return false;
+    return true;
 }
 
 Value inputMouseMember(ScriptContext* ctx, const std::string& name, int line) {

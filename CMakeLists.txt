@@ -273,6 +273,12 @@ target_compile_definitions(input_mouse_parity_tests PRIVATE
     CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
 add_test(NAME input_mouse_parity_tests COMMAND input_mouse_parity_tests)
 
+add_executable(bug129_repro_tests tests/bug129_repro_tests.cpp)
+target_link_libraries(bug129_repro_tests PRIVATE crate_core)
+target_compile_definitions(bug129_repro_tests PRIVATE
+    CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
+add_test(NAME bug129_repro_tests COMMAND bug129_repro_tests)
+
 add_executable(signals_parity_tests tests/signals_parity_tests.cpp)
 target_link_libraries(signals_parity_tests PRIVATE crate_core)
 target_compile_definitions(signals_parity_tests PRIVATE

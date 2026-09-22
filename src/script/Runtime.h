@@ -137,6 +137,17 @@ Value vectorNormalize(const Value& v);
 // emission). Returns nullptr for a null actor.
 crate::Actor* sceneRootOf(crate::Actor* a);
 
+// Structural match for the "Mouse" segment of Input.Mouse.<member>. Case-
+// insensitive on purpose (task 129): a user writing Input.mouse.delta with a
+// lowercase 'm' got a confusing "unknown identifier 'Input'" instead of
+// reaching inputMouseMember at all, since "Input" alone is pure namespace
+// syntax with no real Value -- the exact case of "Mouse" shouldn't be a trap
+// nothing else in cScript's naming makes you expect (every other reserved
+// word here is either all-lowercase or, like this one, a type/namespace name
+// a user could reasonably type in either case). Both Interpreter::evalMember
+// and CodeGen's Member case call this instead of a direct "== \"Mouse\"".
+bool isInputMouseSegment(const std::string& s);
+
 // Input.Mouse.<member> -- a bare global chain read via member access
 // (parsed/evaluated structurally, like Camera.main and Input.<method>(...);
 // "Input"/"Mouse" are never themselves evaluated as values). Shares
