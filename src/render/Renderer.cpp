@@ -278,23 +278,41 @@ float4 PSVolume(VSOut i) : SV_TARGET
     // saturate instead of ~1.5).
     float alpha = saturate(1.0 - exp(-uBaseColor.a * thickness));
 
-    // No real surface normal inside a volume; sample lighting at the visible
-    // segment's midpoint with a fixed up-facing normal so it still visibly
-    // brightens/tints near lights (task 75: "reacts to light") without
-    // needing a full participating-media scatter model.
-    float3 midPoint = uCameraPos.xyz + toFrag * ((tNear + tFar) * 0.5);
-    // Clamped to 1: unclamped, a nearby bright light pushes `lit` well past 1
-    // (ambient + full-intensity spot contribution), which lets `col` exceed
-    // the fog's own set colour -- so a brighter/closer light silently
-    // overrides the artist's fog colour with its own, and since alpha (the
-    // fraction of `col` shown) scales with density, MORE density means MORE
-    // of that light-overridden colour dominates the frame: the volume reads
-    // as getting brighter as it gets denser, backwards from "denser fog
-    // obscures/dims more." Clamping keeps the haze's brightness capped by
-    // uBaseColor itself, so density only ever controls how much of that
-    // (fixed-brightness) fog colour is shown, never how bright it is.
-    float3 lit = saturate(uAmbient.rgb + shadeVertex(midPoint, float3(0, 1, 0)));
-    float3 col = uBaseColor.rgb * lit;
+    // No real surface normal inside a volume; sample lighting at a handful of
+    // points spread along the visible ray segment (not just its midpoint --
+    // task 133) with a fixed up-facing normal, taking the brightest sample.
+    // A single midpoint sample badly undersamples a beam that only crosses
+    // PART of a long ray (e.g. looking down a corridor with a spotlight off
+    // to one side): most rays' one sample point simply missed the cone
+    // entirely, which was the main reason a spotlight barely registered in
+    // fog even at high range -- increasing range grew the cone, but a
+    // single-point sample per ray still had to get lucky to land inside it.
+    // Taking the max across several samples means any ray that crosses the
+    // beam ANYWHERE along its length shows it.
+    const int kFogLightSamples = 5;
+    float3 brightestLight = float3(0, 0, 0);
+    [unroll]
+    for (int s = 0; s < kFogLightSamples; ++s)
+    {
+        float t = tNear + (tFar - tNear) * (float(s) + 0.5) / float(kFogLightSamples);
+        float3 samplePos = uCameraPos.xyz + toFrag * t;
+        brightestLight = max(brightestLight, shadeVertex(samplePos, float3(0, 1, 0)));
+    }
+
+    // Ambient-only fog colour (task 104): capped to the artist's own
+    // uBaseColor brightness, unchanged behaviour for fog that no light is
+    // reaching -- denser fog there still only ever obscures/dims, never
+    // brightens, exactly like before.
+    float3 ambientBase = uBaseColor.rgb * saturate(uAmbient.rgb);
+    // Direct light contribution is intentionally NOT multiplied by (or
+    // capped to) uBaseColor's dimness (task 133): fog scatters a light's OWN
+    // colour toward the viewer, it doesn't just make the artist's dim
+    // ambient fog tint slightly less dim -- a bright spotlight punching
+    // through dark fog should read as a genuinely bright, visibly-coloured
+    // beam, which is what actually makes it useful as a flashlight. Only
+    // guarded against runaway values feeding the render target, not capped
+    // to look dim.
+    float3 col = min(ambientBase + brightestLight, float3(4.0, 4.0, 4.0));
     return float4(col, alpha);
 }
 )";
@@ -1070,7 +1088,16 @@ void Renderer::drawVolumeFogs(const Mat4& viewProj, const Vec3& cameraPos, float
     // skipping the draw entirely sidesteps whatever precision/edge-case
     // produces that result, and is also strictly cheaper than drawing a
     // full-screen pass guaranteed to contribute nothing).
-    if (!volumeFogSample_.found || !psVolume_ || !depthSrv_ || volumeFogSample_.density <= 0.0f)
+    // opt.fogEnabled is the Scene/Game View "Fog" checkbox (task 143): before
+    // this fix it only gated the older plain distance/height Fog component's
+    // uFogParams.z term (see the fogParams[2] write in render()) and this
+    // volumetric pass ignored it entirely, so toggling the checkbox visibly
+    // did nothing whenever a VolumetricFogComponent was present -- which is
+    // the common case (the default sample scene uses one). The checkbox is
+    // now a genuine master on/off for whichever fog system is actually in
+    // the scene.
+    if (!opt.fogEnabled || !volumeFogSample_.found || !psVolume_ || !depthSrv_ ||
+        volumeFogSample_.density <= 0.0f)
         return;
     // No depth-stencil view bound (a resource can't be a depth target and a
     // shader resource at once): a hardware test here would compare against

@@ -209,7 +209,12 @@ private:
     int gizmoOp_ = 0;
     bool gizmoLocal_ = true; // local vs world axes
     bool gizmoInit_ = false;
-    bool fog_ = false;       // viewport distance fog
+    // Master fog on/off (task 143) -- gates BOTH the plain distance/height Fog
+    // component and Volumetric Fog. Defaults on: the sample scene's fog was
+    // always visually on regardless of this checkbox before the bug fix, so
+    // starting true preserves that default look now that the checkbox
+    // actually does something.
+    bool fog_ = true;
     bool shadows_ = true;    // viewport real-time shadows
 
     // Input Map editing.
