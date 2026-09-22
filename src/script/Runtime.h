@@ -1,4 +1,5 @@
 #pragma once
+#include "core/Math.h"
 #include "script/Token.h"
 #include "script/Value.h"
 
@@ -12,6 +13,8 @@ class CameraComponent;
 } // namespace crate
 
 namespace crate::script {
+
+struct ScriptContext;
 
 // Thrown for any script-runtime failure (bad operator, out-of-range index,
 // division by zero, unknown identifier, ...). Shared by the tree-walking
@@ -106,6 +109,51 @@ bool setNativeField(ScriptObject& o, const std::string& name, const Value& v);
 // the statically-known bare `transform`/`actor` identifiers CodeGen already
 // special-cases. Throws RuntimeError for a null actor or an unknown member.
 Value actorMember(crate::Actor* a, const std::string& name, int line);
+
+// A live view onto `owner`'s own Transform (builtin "Transform", same
+// reflection table Scene serialization's actor-reference fields already
+// use) -- the shared implementation behind both actor.transform and any
+// native-component-view's .transform (see getNativeField).
+Value makeTransformView(crate::Actor* owner);
+
+// Sets `a`'s rotation so its forward/right/up axis points along `dir`
+// (`which` is "forward"/"right"/"up"). See Runtime.cpp for the derivation
+// and its documented "roll always resets to 0" / ".right can't determine
+// pitch" limitations.
+void setActorDirection(crate::Actor* a, const std::string& which, const crate::Vec3& dir);
+
+// In-place vector normalization (Value.normalize()): rescales a Vector2/
+// Vector3 Value to unit length and returns the SAME Value (mutated, for
+// chaining) -- matches this engine's existing reference-semantic Vector
+// aliasing (see makeVector's own doc). No-ops (leaves the vector at zero)
+// for a non-vector or a zero-length input.
+Value vectorNormalize(const Value& v);
+
+// Walks up an actor's parent chain to the top -- the scene's implicit root
+// Actor (see Scene::root()). Shared by Camera.main's resolution and, since
+// get_root() is a bare global (like Camera.main) reached by walking up from
+// the CALLING script's own actor rather than from an explicit receiver, by
+// get_root() itself (see Interpreter::builtinCall / CodeGen's global-call
+// emission). Returns nullptr for a null actor.
+crate::Actor* sceneRootOf(crate::Actor* a);
+
+// Input.Mouse.<member> -- a bare global chain read via member access
+// (parsed/evaluated structurally, like Camera.main and Input.<method>(...);
+// "Input"/"Mouse" are never themselves evaluated as values). Shares
+// ScriptContext::inputQuery's existing what-codes: 0/1/2 = pressed/
+// just_pressed/just_released for a reserved button name ("mouse_left"/
+// "mouse_right"/"mouse_middle"), 5/6 = mouse delta x/y, 7/8 = scroll delta
+// x/y (see ScriptSystem.cpp's inputQuery lambda and Input::pollMouse()).
+// Throws RuntimeError for an unrecognized member.
+Value inputMouseMember(ScriptContext* ctx, const std::string& name, int line);
+
+// Value.instantiate() -- called on a "Scene"-typed field (a plain string
+// holding a .cscene asset path; see ScriptComponent's Inspector asset-
+// picker for such a field). Loads that scene and attaches it as a new
+// child under `callerOwner`'s scene root (i.e. sceneRootOf(callerOwner),
+// matching get_root()'s own anchor point), returning an Actor reference to
+// the new instance, or Null on failure (a bad/empty path, most commonly).
+Value valueInstantiate(ScriptContext* ctx, const Value& pathValue, crate::Actor* callerOwner, int line);
 
 // ---- Camera.main resolution (task 77) ----
 // Camera.main isn't reached from a specific actor -- it's a bare global, so

@@ -1,15 +1,13 @@
-// Crate — platform bootstrap (Win32 + Direct3D 11).
-//
-// This file is deliberately thin: it owns the OS window and the swap chain,
-// pumps the message loop, and hands each frame to EditorApp. Everything else
-// lives in the engine/editor layers and never touches the platform API.
-//
-// Adapted from the Dear ImGui example_win32_directx11 sample (MIT licensed).
+// CrateLauncher — a small separate executable for creating/opening/managing
+// Crate projects (task 125). Deliberately mirrors src/main.cpp's Win32 +
+// Direct3D 11 bootstrap (same reasons: thin platform shell, everything else
+// in LauncherApp) rather than inventing a different UI toolkit for a tool
+// this small.
 
-#include "editor/EditorApp.h"
+#include "core/Log.h"
 #include "editor/PathRegistry.h"
 #include "editor/Theme.h"
-#include "core/Log.h"
+#include "launcher/LauncherApp.h"
 #include "resource.h"
 
 #include "imgui.h"
@@ -17,60 +15,39 @@
 #include "backends/imgui_impl_dx11.h"
 
 #include <d3d11.h>
-#include <shellapi.h>
 #include <tchar.h>
 
-#include <string>
-#include <vector>
-
-static ID3D11Device*            g_pd3dDevice = nullptr;
-static ID3D11DeviceContext*     g_pd3dDeviceContext = nullptr;
-static IDXGISwapChain*          g_pSwapChain = nullptr;
-static bool                     g_SwapChainOccluded = false;
-static UINT                     g_ResizeWidth = 0, g_ResizeHeight = 0;
-static ID3D11RenderTargetView*  g_mainRenderTargetView = nullptr;
-static std::vector<std::string> g_droppedFiles; // filled by WM_DROPFILES, drained each frame
+static ID3D11Device*           g_pd3dDevice = nullptr;
+static ID3D11DeviceContext*    g_pd3dDeviceContext = nullptr;
+static IDXGISwapChain*         g_pSwapChain = nullptr;
+static bool                    g_SwapChainOccluded = false;
+static UINT                    g_ResizeWidth = 0, g_ResizeHeight = 0;
+static ID3D11RenderTargetView* g_mainRenderTargetView = nullptr;
 
 bool CreateDeviceD3D(HWND hWnd);
 void CleanupDeviceD3D();
 void CreateRenderTarget();
 void CleanupRenderTarget();
-LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+LRESULT WINAPI LauncherWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam,
                                                              LPARAM lParam);
 
-int main(int argc, char** argv) {
-    bool startInScriptMode = false;
-    std::string startupProjectPath; // set by --project <path-to-.crate> (task 125)
-    for (int i = 1; i < argc; ++i) {
-        std::string arg = argv[i];
-        if (arg == "--script") {
-            startInScriptMode = true;
-        } else if (arg == "--project" && i + 1 < argc) {
-            startupProjectPath = argv[++i];
-        } else {
-            g_droppedFiles.push_back(arg); // treat other CLI args like dropped files
-        }
-    }
+int main(int, char**) {
+    crate::writeSelfPathPointer("launcher_path.txt");
 
-    // Refreshed every launch so `crate open`/the launcher can always find the
-    // CURRENT Crate.exe -- see PathRegistry.h for why this beats a
-    // hardcoded path.
-    crate::writeSelfPathPointer("editor_path.txt");
     HICON hIconBig = static_cast<HICON>(::LoadImageW(
         GetModuleHandle(nullptr), MAKEINTRESOURCEW(IDI_APPICON), IMAGE_ICON,
         ::GetSystemMetrics(SM_CXICON), ::GetSystemMetrics(SM_CYICON), LR_DEFAULTCOLOR));
     HICON hIconSmall = static_cast<HICON>(::LoadImageW(
         GetModuleHandle(nullptr), MAKEINTRESOURCEW(IDI_APPICON), IMAGE_ICON,
         ::GetSystemMetrics(SM_CXSMICON), ::GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR));
-    WNDCLASSEXW wc = {sizeof(wc), CS_CLASSDC, WndProc, 0L, 0L,
+    WNDCLASSEXW wc = {sizeof(wc), CS_CLASSDC, LauncherWndProc, 0L, 0L,
                       GetModuleHandle(nullptr), hIconBig, nullptr, nullptr, nullptr,
-                      L"CrateEngine", hIconSmall};
+                      L"CrateLauncherWnd", hIconSmall};
     ::RegisterClassExW(&wc);
-    HWND hwnd = ::CreateWindowW(wc.lpszClassName, L"Crate - PSX Horror Engine",
-                                WS_OVERLAPPEDWINDOW, 100, 100, 1600, 900, nullptr, nullptr,
-                                wc.hInstance, nullptr);
+    HWND hwnd = ::CreateWindowW(wc.lpszClassName, L"Crate Projects", WS_OVERLAPPEDWINDOW, 200, 150,
+                                900, 560, nullptr, nullptr, wc.hInstance, nullptr);
 
     if (!CreateDeviceD3D(hwnd)) {
         CleanupDeviceD3D();
@@ -80,30 +57,21 @@ int main(int argc, char** argv) {
 
     ::ShowWindow(hwnd, SW_SHOWDEFAULT);
     ::UpdateWindow(hwnd);
-    ::DragAcceptFiles(hwnd, TRUE); // accept files dragged from Explorer
     ::SendMessageW(hwnd, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hIconBig));
     ::SendMessageW(hwnd, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hIconSmall));
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    io.IniFilename = "crate_editor.ini";
+    io.IniFilename = nullptr; // no persisted layout for a single fixed window
 
     crate::ApplyZenTheme();
     crate::log::enableStdoutMirror();
-    CR_LOG("platform", "D3D11 device + swap chain created");
 
     ImGui_ImplWin32_Init(hwnd);
     ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
 
-    crate::EditorApp app;
-    app.attachDevice(g_pd3dDevice, g_pd3dDeviceContext);
-    if (startInScriptMode)
-        app.setScriptMode(true);
-    if (!startupProjectPath.empty())
-        app.openProjectAt(startupProjectPath);
+    crate::LauncherApp app;
 
     const ImVec4 clear_col = ImVec4(0.043f, 0.051f, 0.070f, 1.0f);
     bool running = true;
@@ -131,10 +99,6 @@ int main(int argc, char** argv) {
             CreateRenderTarget();
         }
 
-        for (const auto& f : g_droppedFiles)
-            app.ingestDroppedFile(f);
-        g_droppedFiles.clear();
-
         ImGui_ImplDX11_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
@@ -151,8 +115,6 @@ int main(int argc, char** argv) {
         g_SwapChainOccluded = (hr == DXGI_STATUS_OCCLUDED);
     }
 
-    CR_LOG("platform", "Shutting down");
-    app.attachDevice(nullptr, nullptr); // release renderer GPU objects before the device
     ImGui_ImplDX11_Shutdown();
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
@@ -221,28 +183,11 @@ void CleanupRenderTarget() {
     }
 }
 
-LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+LRESULT WINAPI LauncherWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
         return true;
 
     switch (msg) {
-        case WM_DROPFILES: {
-            HDROP drop = reinterpret_cast<HDROP>(wParam);
-            UINT count = ::DragQueryFileW(drop, 0xFFFFFFFF, nullptr, 0);
-            for (UINT i = 0; i < count; ++i) {
-                wchar_t wpath[MAX_PATH];
-                if (::DragQueryFileW(drop, i, wpath, MAX_PATH)) {
-                    int len = ::WideCharToMultiByte(CP_UTF8, 0, wpath, -1, nullptr, 0, nullptr, nullptr);
-                    if (len > 1) {
-                        std::string path(static_cast<size_t>(len - 1), '\0');
-                        ::WideCharToMultiByte(CP_UTF8, 0, wpath, -1, path.data(), len, nullptr, nullptr);
-                        g_droppedFiles.push_back(std::move(path));
-                    }
-                }
-            }
-            ::DragFinish(drop);
-            return 0;
-        }
         case WM_SIZE:
             if (wParam == SIZE_MINIMIZED)
                 return 0;

@@ -349,9 +349,18 @@ Value Interpreter::actorMember(crate::Actor* a, const std::string& name, int lin
 }
 
 Value Interpreter::evalMember(const Expr& e) {
+    const std::string& name = e.strVal;
+
+    // Input.Mouse.<member> -- structural, like Input.<method>(...) in
+    // evalCall: "Input" has no meaningful standalone Value (it's pure
+    // namespace syntax), so this must be recognized on the AST directly,
+    // before eval(*e.a) below would throw "unknown identifier 'Input'".
+    if (e.a->kind == ExprKind::Member && e.a->strVal == "Mouse" &&
+        e.a->a->kind == ExprKind::Identifier && e.a->a->strVal == "Input" && !findVar("Input"))
+        return crate::script::inputMouseMember(ctx_, name, e.line);
+
     // this.base.method(...)  -> handled in evalCall; a bare this.base is just this.
     Value obj = eval(*e.a);
-    const std::string& name = e.strVal;
 
     if (obj.t == Value::T::Object && obj.obj) {
         // Generic dispatch: correctly handles an interpreted script
@@ -456,17 +465,8 @@ Value Interpreter::evalCall(const Expr& e) {
             // Mouse buttons ride the same is_pressed/is_just_pressed/
             // is_just_released/get_button API above under reserved names:
             // "mouse_left" / "mouse_right" / "mouse_middle" (see Input::
-            // pollMouse). Delta/scroll have no button identity of their own.
-            if (method == "get_mouse_delta") {
-                double x = ctx_->inputQuery ? ctx_->inputQuery(n, 5) : 0.0;
-                double y = ctx_->inputQuery ? ctx_->inputQuery(n, 6) : 0.0;
-                return makeVector("Vector2", x, y, 0);
-            }
-            if (method == "get_scroll_delta") {
-                double x = ctx_->inputQuery ? ctx_->inputQuery(n, 7) : 0.0;
-                double y = ctx_->inputQuery ? ctx_->inputQuery(n, 8) : 0.0;
-                return makeVector("Vector2", x, y, 0);
-            }
+            // pollMouse). Delta/scroll/button-state convenience live at
+            // Input.Mouse.<member> instead (see evalMember).
             if (method == "is_pressed")
                 return Value::Bool(ctx_->inputQuery && ctx_->inputQuery(n, 0) != 0.0);
             if (method == "is_just_pressed")
@@ -521,14 +521,50 @@ Value Interpreter::evalCall(const Expr& e) {
                         return Value::Obj(so);
                 return Value::Null_();
             }
+            if (method == "add_component") {
+                std::string typeName;
+                if (!args.empty())
+                    typeName = args[0].t == Value::T::TypeRef ? args[0].s : args[0].str();
+                if (ctx_->addComponent)
+                    if (auto so = ctx_->addComponent(obj.actor, typeName))
+                        return Value::Obj(so);
+                return Value::Null_();
+            }
+            if (method == "destroy") {
+                if (ctx_->destroyActor)
+                    ctx_->destroyActor(obj.actor);
+                return Value::Null_();
+            }
             throw RuntimeError("Actor has no method '" + method + "'", e.line);
         }
+        // Kind 2 (native BuiltinComponent live view: Fog/Camera/Light/.../
+        // Transform): the only method it supports is .remove() (Transform
+        // isn't itself a removable Component, so it's a no-op there).
+        if (obj.t == Value::T::Object && obj.obj && obj.obj->nativePtr && !obj.obj->cls &&
+            !obj.obj->compiledInfo) {
+            if (method == "remove") {
+                if (ctx_->removeComponent)
+                    ctx_->removeComponent(obj.obj->owner, obj.obj);
+                return Value::Null_();
+            }
+        }
+        // Vector method: normalize() (mutates in place, returns itself).
+        if (crate::script::isVec(obj) && method == "normalize")
+            return crate::script::vectorNormalize(obj);
         if (obj.t == Value::T::Array) {
             if (method == "add" && !args.empty() && crate::script::arrayAdd(obj, args[0]))
                 return Value::Null_();
             if (method == "length" && obj.arr)
                 return crate::script::arrayLength(obj);
         }
+        // Value.instantiate(): a "Scene"-typed field is a plain string
+        // holding a .cscene asset path (see ScriptComponent's Inspector
+        // asset-picker for that declared type) -- calling .instantiate() on
+        // it loads and attaches that scene under the CALLING script's own
+        // scene root, returning an Actor reference to the new instance.
+        if (obj.t == Value::T::String && method == "instantiate")
+            return crate::script::valueInstantiate(ctx_, obj, self_ ? self_->owner : nullptr, e.line);
+
         // universal .str()
         if (method == "str")
             return Value::Str(obj.str());
@@ -585,6 +621,13 @@ Value Interpreter::builtinCall(const std::string& name, std::vector<Value>& args
         if (args[0].t == Value::T::TypeRef)
             return args[0];
         return Value::Type(args[0].typeName());
+    }
+    // A bare global (like Camera.main): the scene it reaches into is found
+    // by walking up from the CALLING script's own actor, not an explicit
+    // receiver (Scenes task -- see zen.tasks.json's "Scenes" card).
+    if (name == "get_root") {
+        crate::Actor* root = crate::script::sceneRootOf(self_ ? self_->owner : nullptr);
+        return root ? Value::ActorRef(root) : Value::Null_();
     }
     // Godot-3 style: emit_signal("name", args...) on `this`.
     if (name == "emit_signal") {
@@ -682,6 +725,14 @@ void Interpreter::assign(const Expr& target, Value v) {
             if (target.strVal == "position") { setVec(a->transform().position); return; }
             if (target.strVal == "rotation") { setVec(a->transform().rotationEuler); return; }
             if (target.strVal == "scale") { setVec(a->transform().scale); return; }
+            if (target.strVal == "forward" || target.strVal == "right" || target.strVal == "up") {
+                if (v.t == Value::T::Object && v.obj) {
+                    Vec3 dir{(float)v.obj->fields["x"].num(), (float)v.obj->fields["y"].num(),
+                            (float)v.obj->fields["z"].num()};
+                    crate::script::setActorDirection(a, target.strVal, dir);
+                }
+                return;
+            }
             throw RuntimeError("cannot assign Actor." + target.strVal, target.line);
         }
         if (obj.t == Value::T::TypeRef && obj.s == "Camera" && target.strVal == "main") {

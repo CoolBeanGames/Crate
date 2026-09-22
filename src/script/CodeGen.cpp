@@ -325,6 +325,14 @@ std::string Gen::identifierCallDispatch(const std::string& name, const std::vect
         }
         return "crate::script::Value::Str((" + args[0] + ").str())";
     }
+    if (name == "get_root") {
+        // Bare global (like Camera.main): walks up from THIS instance's own
+        // actor, mirroring Interpreter::builtinCall's identical case.
+        return "[&]() -> crate::script::Value {\n" + ind(1) +
+               "crate::Actor* __r = crate::script::sceneRootOf(owner_);\n" + ind(1) +
+               "return __r ? crate::script::Value::ActorRef(__r) : crate::script::Value::Null_();\n" +
+               ind(0) + "}()";
+    }
     if (name == "Vector3" || name == "Vector2") {
         std::string x = args.size() > 0 ? "(" + args[0] + ").num()" : "0.0";
         std::string y = args.size() > 1 ? "(" + args[1] + ").num()" : "0.0";
@@ -678,16 +686,6 @@ std::string Gen::expr(const Expr& e, FnCtx& fc) {
                                "ctx_->inputQuery(" +
                                n + ", 3) : 0.0, ctx_ && ctx_->inputQuery ? ctx_->inputQuery(" + n +
                                ", 4) : 0.0, 0.0)";
-                    if (method == "get_mouse_delta")
-                        return "crate::script::makeVector(\"Vector2\", ctx_ && ctx_->inputQuery ? "
-                               "ctx_->inputQuery(" +
-                               n + ", 5) : 0.0, ctx_ && ctx_->inputQuery ? ctx_->inputQuery(" + n +
-                               ", 6) : 0.0, 0.0)";
-                    if (method == "get_scroll_delta")
-                        return "crate::script::makeVector(\"Vector2\", ctx_ && ctx_->inputQuery ? "
-                               "ctx_->inputQuery(" +
-                               n + ", 7) : 0.0, ctx_ && ctx_->inputQuery ? ctx_->inputQuery(" + n +
-                               ", 8) : 0.0, 0.0)";
                     if (method == "is_pressed")
                         return "crate::script::Value::Bool(ctx_ && ctx_->inputQuery && "
                                "ctx_->inputQuery(" +
@@ -746,7 +744,7 @@ std::string Gen::expr(const Expr& e, FnCtx& fc) {
                             out += ", ";
                         out += "(" + args[i] + ")";
                     }
-                    out += "}, " + std::to_string(e.line) + ")";
+                    out += "}, " + std::to_string(e.line) + ", owner_)";
                     return out;
                 }
 
@@ -779,7 +777,7 @@ std::string Gen::expr(const Expr& e, FnCtx& fc) {
                 o << "};\n";
                 o << ind(1) << "return crate::script::callValueMethod(ctx_, " << tmp << ", "
                   << cppStringLiteral(method) << ", std::move(" << tmp << "_args), " << e.line
-                  << ");\n";
+                  << ", owner_);\n";
                 o << ind(0) << "}()";
                 return o.str();
             }
@@ -791,6 +789,15 @@ std::string Gen::expr(const Expr& e, FnCtx& fc) {
         case ExprKind::Member: {
             const Expr& objExpr = *e.a;
             const std::string& name = e.strVal;
+
+            // Input.Mouse.<member> -- structural, mirroring
+            // Interpreter::evalMember's identical check exactly ("Input" is
+            // pure namespace syntax, never a real Value, in either backend).
+            if (objExpr.kind == ExprKind::Member && objExpr.strVal == "Mouse" &&
+                objExpr.a->kind == ExprKind::Identifier && objExpr.a->strVal == "Input" &&
+                !fc.has("Input"))
+                return "crate::script::inputMouseMember(ctx_, " + cppStringLiteral(name) + ", " +
+                       std::to_string(e.line) + ")";
 
             if (objExpr.kind == ExprKind::This) {
                 if (isField(name))

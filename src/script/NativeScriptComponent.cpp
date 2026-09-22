@@ -2,6 +2,7 @@
 
 #include "core/Log.h"
 #include "scene/Actor.h"
+#include "script/ScriptFieldIO.h"
 
 #include "imgui.h"
 
@@ -32,12 +33,6 @@ crate::Actor* findActorById(crate::Actor& node, uint64_t id) {
         if (crate::Actor* hit = findActorById(*c, id))
             return hit;
     return nullptr;
-}
-
-crate::Actor* sceneRootOf(crate::Actor* a) {
-    while (a && a->parent())
-        a = a->parent();
-    return a;
 }
 
 void collectActors(crate::Actor& node, const std::function<bool(crate::Actor&)>& test,
@@ -171,6 +166,23 @@ void NativeScriptComponent::physicsUpdate(float dt) {
     pullFieldsFromNative();
 }
 
+void NativeScriptComponent::writeFields(std::ostream& out, const std::function<int(const Actor*)>& idOf) const {
+    const_cast<NativeScriptComponent*>(this)->ensureObject();
+    if (!obj_)
+        return;
+    for (const auto& [name, val] : obj_->fields)
+        writeValueField(out, name, val, idOf);
+}
+
+void NativeScriptComponent::readField(const std::string& key, const std::string& kind,
+                                      const std::string& value,
+                                      const std::function<Actor*(int)>& actorById) {
+    ensureObject();
+    if (!obj_)
+        return;
+    obj_->fields[key] = readValueField(kind, value, actorById, ctx_);
+}
+
 // ---------------------------------------------------------------------------
 // drawRefField / drawInspector -- copied from ScriptComponent.cpp, see the
 // note at the top of this file.
@@ -242,6 +254,21 @@ void NativeScriptComponent::drawRefField(const std::string& label, const std::st
     ImGui::PopID();
 }
 
+void NativeScriptComponent::drawSceneRefField(const std::string& label, Value& val) {
+    std::string current = (val.t == Value::T::String && !val.s.empty()) ? val.s : std::string("(none)");
+    ImGui::PushID(label.c_str());
+    ImGui::SetNextItemWidth(-70);
+    ImGui::Button(current.c_str());
+    if (ImGui::BeginDragDropTarget()) {
+        if (const ImGuiPayload* p = ImGui::AcceptDragDropPayload("CRATE_SCENE_PATH"))
+            val = Value::Str(std::string(static_cast<const char*>(p->Data)));
+        ImGui::EndDragDropTarget();
+    }
+    ImGui::SameLine();
+    ImGui::TextUnformatted(label.c_str());
+    ImGui::PopID();
+}
+
 void NativeScriptComponent::drawInspector() {
     if (!cls_) {
         ImGui::TextDisabled("(script type missing)");
@@ -258,7 +285,9 @@ void NativeScriptComponent::drawInspector() {
                         declType = fd.type;
                         break;
                     }
-            if (!isPlainValueType(declType)) {
+            if (declType == "Scene") {
+                drawSceneRefField(name, val);
+            } else if (!isPlainValueType(declType)) {
                 drawRefField(name, declType, val);
             } else if (val.t == Value::T::Int) {
                 int v = (int)val.i;

@@ -3,6 +3,7 @@
 #include "core/Math.h"
 #include "scene/Actor.h"
 #include "scene/BuiltinComponents.h"
+#include "script/Interpreter.h" // ScriptContext's full definition (inputQuery)
 
 #include <cmath>
 #include <cstdlib>
@@ -34,6 +35,21 @@ void vfieldSet(const Value& v, const char* f, double x) {
     if (!isVec(v))
         return;
     v.obj->fields[f] = Value::Float(x);
+}
+
+Value vectorNormalize(const Value& v) {
+    if (!isVec(v))
+        return v;
+    const bool is3 = v.obj->builtin == "Vector3";
+    double x = vfield(v, "x"), y = vfield(v, "y"), z = is3 ? vfield(v, "z") : 0.0;
+    double len = std::sqrt(x * x + y * y + z * z);
+    if (len > 1e-9) {
+        vfieldSet(v, "x", x / len);
+        vfieldSet(v, "y", y / len);
+        if (is3)
+            vfieldSet(v, "z", z / len);
+    }
+    return v;
 }
 
 Value negate(const Value& a) {
@@ -85,6 +101,36 @@ Value mathCall(const std::string& fn, std::vector<Value>& args, int line) {
     }
     if (fn == "lerp")
         return Value::Float(n(0) + (n(1) - n(0)) * n(2));
+    if (fn == "slerp") {
+        // Vector form: spherical interpolation along the great-circle arc
+        // between two directions, with magnitude linearly interpolated.
+        if (args.size() >= 3 && isVec(args[0]) && isVec(args[1])) {
+            const bool is3 = args[0].obj->builtin == "Vector3";
+            double ax = vfield(args[0], "x"), ay = vfield(args[0], "y");
+            double az = is3 ? vfield(args[0], "z") : 0.0;
+            double bx = vfield(args[1], "x"), by = vfield(args[1], "y");
+            double bz = is3 ? vfield(args[1], "z") : 0.0;
+            double t = n(2);
+            double alen = std::sqrt(ax * ax + ay * ay + az * az);
+            double blen = std::sqrt(bx * bx + by * by + bz * bz);
+            if (alen < 1e-9 || blen < 1e-9)
+                return args[0];
+            double anx = ax / alen, any = ay / alen, anz = az / alen;
+            double bnx = bx / blen, bny = by / blen, bnz = bz / blen;
+            double dot = anx * bnx + any * bny + anz * bnz;
+            dot = dot < -1.0 ? -1.0 : (dot > 1.0 ? 1.0 : dot);
+            double theta = std::acos(dot) * t;
+            double rx = bnx - anx * dot, ry = bny - any * dot, rz = bnz - anz * dot;
+            double rlen = std::sqrt(rx * rx + ry * ry + rz * rz);
+            if (rlen > 1e-9) { rx /= rlen; ry /= rlen; rz /= rlen; }
+            double ct = std::cos(theta), st = std::sin(theta);
+            double resx = anx * ct + rx * st, resy = any * ct + ry * st, resz = anz * ct + rz * st;
+            double mag = alen + (blen - alen) * t;
+            return makeVector(args[0].obj->builtin, resx * mag, resy * mag, resz * mag);
+        }
+        // Scalar fallback: no direction to interpolate, behaves like lerp.
+        return Value::Float(n(0) + (n(1) - n(0)) * n(2));
+    }
     if (fn == "sine" || fn == "sin")
         return Value::Float(std::sin(n(0)));
     if (fn == "cos" || fn == "cosine")
@@ -501,7 +547,24 @@ const NativeTypeEntry* findNativeType(const std::string& builtin) {
 
 } // namespace
 
+Value makeTransformView(crate::Actor* owner) {
+    auto o = std::make_shared<ScriptObject>();
+    o->builtin = "Transform";
+    o->nativePtr = &owner->transform();
+    o->owner = owner;
+    return Value::Obj(o);
+}
+
 bool getNativeField(const ScriptObject& o, const std::string& name, Value& out) {
+    // Generic across EVERY native component view (Fog/Camera/Light/.../
+    // Transform itself included, harmlessly): the owning actor's transform
+    // is always reachable as `.transform`, matching how a Component
+    // inherits its actor's transform conceptually -- one place instead of
+    // duplicating this field into every kXxxFields table.
+    if (name == "transform" && o.owner) {
+        out = makeTransformView(o.owner);
+        return true;
+    }
     const NativeTypeEntry* t = findNativeType(o.builtin);
     if (!t)
         return false;
@@ -523,11 +586,56 @@ bool setNativeField(ScriptObject& o, const std::string& name, const Value& v) {
     return false;
 }
 
+crate::Actor* sceneRootOf(crate::Actor* a) {
+    while (a && a->parent())
+        a = a->parent();
+    return a;
+}
+
+Value inputMouseMember(ScriptContext* ctx, const std::string& name, int line) {
+    auto iq = [&](const std::string& btn, int what) -> double {
+        return ctx && ctx->inputQuery ? ctx->inputQuery(btn, what) : 0.0;
+    };
+    if (name == "delta")
+        return makeVector("Vector2", iq("", 5), iq("", 6), 0);
+    if (name == "scroll")
+        return makeVector("Vector2", iq("", 7), iq("", 8), 0);
+    struct BtnMap {
+        const char* member;
+        const char* button;
+        int what;
+    };
+    static const BtnMap kMap[] = {
+        {"left_down", "mouse_left", 0},        {"left_just_down", "mouse_left", 1},
+        {"left_just_up", "mouse_left", 2},     {"right_down", "mouse_right", 0},
+        {"right_just_down", "mouse_right", 1}, {"right_just_up", "mouse_right", 2},
+        {"middle_down", "mouse_middle", 0},    {"middle_just_down", "mouse_middle", 1},
+        {"middle_just_up", "mouse_middle", 2},
+    };
+    for (const auto& m : kMap)
+        if (name == m.member)
+            return Value::Bool(iq(m.button, m.what) != 0.0);
+    throw RuntimeError("Input.Mouse has no member '" + name + "'", line);
+}
+
+Value valueInstantiate(ScriptContext* ctx, const Value& pathValue, crate::Actor* callerOwner, int line) {
+    (void)line;
+    if (!ctx || !ctx->instantiateScene || pathValue.s.empty())
+        return Value::Null_();
+    crate::Actor* parent = sceneRootOf(callerOwner);
+    if (!parent)
+        return Value::Null_();
+    crate::Actor* inst = ctx->instantiateScene(pathValue.s, parent);
+    return inst ? Value::ActorRef(inst) : Value::Null_();
+}
+
 Value actorMember(crate::Actor* a, const std::string& name, int line) {
     if (!a)
         throw RuntimeError("null actor", line);
     if (name == "name")
         return Value::Str(a->name());
+    if (name == "transform")
+        return makeTransformView(a);
     Transform& t = a->transform();
     if (name == "position")
         return makeVector("Vector3", t.position.x, t.position.y, t.position.z);
@@ -545,6 +653,43 @@ Value actorMember(crate::Actor* a, const std::string& name, int line) {
         return makeVector("Vector3", dir.x, dir.y, dir.z);
     }
     throw RuntimeError("Actor has no member '" + name + "'", line);
+}
+
+// Sets `a`'s rotation so its forward/right/up axis points along `dir`
+// (assigning to actor.forward / .right / .up). Solved against this engine's
+// own rotationEuler = Rx(x)*Ry(y)*Rz(z) row-vector convention (see Math.h),
+// with roll (z) always reset to 0 -- inverting a single direction is
+// inherently under-determined for a full 3-axis orientation, so this picks
+// the same "zero roll" convention already used elsewhere (e.g. deriving a
+// look-at camera rotation). A consequence for .right specifically: under
+// this convention `right = (cos y, 0, -sin y)` has NO dependence on pitch
+// at all (rotating about X first never moves the X axis), so setting
+// .right only ever determines yaw -- pitch is reset to 0 too, not solved.
+void setActorDirection(crate::Actor* a, const std::string& which, const Vec3& dirIn) {
+    if (!a)
+        return;
+    Vec3 d = normalize(dirIn);
+    if (length(d) < 1e-6f)
+        return; // degenerate input, leave rotation unchanged
+    float xDeg = 0, yDeg = 0;
+    if (which == "forward") {
+        // fwd = (cos(x)sin(y), -sin(x), cos(x)cos(y))
+        xDeg = std::asin(std::max(-1.0f, std::min(1.0f, -d.y))) * (180.0f / kPi);
+        yDeg = std::atan2(d.x, d.z) * (180.0f / kPi);
+    } else if (which == "right") {
+        // right = (cos(y), 0, -sin(y)) -- independent of pitch/roll.
+        xDeg = 0;
+        yDeg = std::atan2(-d.z, d.x) * (180.0f / kPi);
+    } else if (which == "up") {
+        // up = (sin(x)sin(y), cos(x), sin(x)cos(y))
+        float uy = std::max(-1.0f, std::min(1.0f, d.y));
+        xDeg = std::acos(uy) * (180.0f / kPi);
+        float sx = std::sin(xDeg * (kPi / 180.0f));
+        yDeg = (std::fabs(sx) > 1e-4f) ? std::atan2(d.x, d.z) * (180.0f / kPi) : 0.0f;
+    } else {
+        return;
+    }
+    a->transform().rotationEuler = {xDeg, yDeg, 0.0f};
 }
 
 // ---------------------------------------------------------------------------
@@ -569,12 +714,6 @@ void disableOtherCameraComps(crate::Actor& node, CameraComponent* keep) {
             cc->enabled = false;
     for (const auto& c : node.children())
         disableOtherCameraComps(*c, keep);
-}
-
-crate::Actor* sceneRootOf(crate::Actor* a) {
-    while (a && a->parent())
-        a = a->parent();
-    return a;
 }
 
 } // namespace

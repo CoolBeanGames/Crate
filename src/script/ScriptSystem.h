@@ -6,7 +6,12 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
+
+namespace crate {
+class Scene;
+}
 
 namespace crate::script {
 
@@ -38,6 +43,18 @@ public:
     // the folder is remembered for newScript() / reload().
     void loadFolder(const std::string& dir);
     const std::string& scriptsDir() const { return dir_; }
+
+    // Drops every loaded script's data (types, namespaces, files, autocomplete
+    // docs, retired classes, input-button signals) so a subsequent
+    // loadFolder() starts clean instead of merging with a PREVIOUS folder's
+    // content (task 92, "Projects": switching the Asset Browser to a
+    // different project's scripts folder). Deliberately does NOT touch
+    // statics_/nativeStatics_ or any already-loaded native script DLL from a
+    // prior Play session -- fully unloading a native module safely is
+    // Transplation-level complexity out of scope here; switching projects
+    // after having pressed Play earlier in the same editor session is a
+    // known limitation (restart the editor for a fully clean switch).
+    void unloadAll();
 
     // Re-scan the scripts folder: new files are loaded, changed files
     // recompiled, deleted files removed from the list / catalogue.
@@ -95,6 +112,16 @@ public:
     void physicsStatics(float dt);
     void resetStatics(); // re-instantiate (called on Stop)
 
+    // Actually performs every Actor.destroy() / Component.remove() call
+    // queued (via ctx_.destroyActor/removeComponent) since the last flush
+    // -- call once per tick, AFTER every script's update/physics_update has
+    // run, so nothing is ever freed while still on the call stack that
+    // triggered its own removal. See Interpreter.h's ScriptContext doc.
+    // Takes the live Scene so actor destruction goes through Scene::remove()
+    // (clears a dangling Inspector selection, logs it) rather than a bare
+    // tree-level removeChild().
+    void flushPending(crate::Scene& scene);
+
 private:
     ScriptSystem();
     void resolveBases();
@@ -135,6 +162,8 @@ private:
     std::unordered_map<std::string, std::shared_ptr<ScriptObject>> inputButtons_;
     std::vector<ScriptFile> files_;
     std::vector<TypeDoc> typeDocs_;
+    std::vector<crate::Actor*> pendingDestroy_;
+    std::vector<std::pair<crate::Actor*, crate::Component*>> pendingComponentRemove_;
 };
 
 } // namespace crate::script

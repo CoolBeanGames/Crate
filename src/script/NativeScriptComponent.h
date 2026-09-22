@@ -72,6 +72,10 @@ public:
         return std::make_unique<NativeScriptComponent>(ctx_, cls_, exp_);
     }
 
+    void writeFields(std::ostream& out, const std::function<int(const Actor*)>& idOf) const override;
+    void readField(const std::string& key, const std::string& kind, const std::string& value,
+                   const std::function<Actor*(int)>& actorById) override;
+
 private:
     void ensureNative(); // lazily CreateInstance_<Class>(ctx_, actor())
     void ensureObject();  // lazily Interpreter::instantiate (mirrors ScriptComponent)
@@ -79,6 +83,8 @@ private:
     void pullFieldsFromNative(); // native_ -> obj_->fields (incl. overflow)
     // Byte-for-byte copy of ScriptComponent::drawRefField -- see .cpp.
     void drawRefField(const std::string& label, const std::string& declType, Value& val);
+    // Byte-for-byte copy of ScriptComponent::drawSceneRefField -- see .cpp.
+    void drawSceneRefField(const std::string& label, Value& val);
 
     ScriptContext* ctx_ = nullptr;
     const ClassInfo* cls_ = nullptr; // interpreted ClassInfo; Inspector declared-type lookups only

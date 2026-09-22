@@ -2,12 +2,15 @@
 #include "assets/MaterialLibrary.h"
 #include "assets/MeshLibrary.h"
 #include "editor/AssetPicker.h"
+#include "editor/PathRegistry.h"
 #include "editor/Popup.h"
+#include "editor/ProjectFile.h"
 #include "editor/ScriptEditor.h"
 #include "input/InputMap.h"
 #include "render/Camera.h"
 #include "render/Renderer.h"
 #include "scene/Scene.h"
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
@@ -20,7 +23,7 @@ namespace crate {
 class CameraComponent;
 
 // What an asset-browser tile represents, for icon drawing purposes.
-enum class AssetIconKind { Folder, Material, Script, Image, Fbx, InputMap, Generic };
+enum class AssetIconKind { Folder, Material, Script, Image, Fbx, InputMap, Scene, Generic };
 
 // The editor shell. Owns the active Scene and draws every panel each frame.
 // Windowing is handled by the platform layer (see src/main.cpp); the D3D11
@@ -39,6 +42,14 @@ public:
     void ingestDroppedFile(const std::string& path);
 
     void setScriptMode(bool on) { openScriptsTab_ = on; }
+
+    // Opens the project at `crateFilePath` unconditionally (no unsaved-changes
+    // guard, no dialog) -- used by main.cpp's `--project <path>` startup
+    // argument (task 125, the launcher/`crate open` CLI) to mount a specific
+    // project non-interactively before the first frame. The interactive
+    // File > Open Project menu item wraps this same logic in the usual
+    // requestReplaceScene() guard.
+    void openProjectAt(const std::string& crateFilePath);
 
     // Draw one editor frame. Call between ImGui::NewFrame() and ImGui::Render().
     void onFrame();
@@ -96,6 +107,57 @@ private:
     Actor* pasteInto(Actor* parent);
     void reparentToNewNode(Actor* a);
 
+    // Scene file I/O (Scenes task, Phase 1: see scene/SceneIO.cpp). saveScene()
+    // reuses currentScenePath_ if the scene was already Saved/Opened this
+    // session, else behaves like saveSceneAs() (prompts for a path).
+    bool saveSceneAs(); // false if the save dialog was cancelled or the write failed
+    bool saveScene();   // false if it fell through to saveSceneAs() and that was cancelled/failed
+    void openScene();
+
+    // Project file I/O (task 92, "Projects"): a .crate file marking a folder
+    // as a project root, sitting next to that folder's own "assets"
+    // subfolder. Minimal on purpose -- see ProjectFile.h and the "for now
+    // just get this working" scope note in the Zen task. With no project
+    // explicitly opened, the editor behaves exactly as it always has
+    // (assetDir_ defaults to "assets" next to the exe/cwd) -- there's always
+    // an implicit default project, never a "no project" state.
+    void newProject();  // prompts for a new .crate path, creates folder+assets/, mounts it
+    void openProject(); // prompts for an existing .crate file; guard + openProjectAt()
+    void saveProject(); // re-writes the current project's .crate file; no-op if none is open
+    // Re-points assetDir_ at `newAssetDir` and reloads everything keyed off
+    // it (AssetDatabase, ScriptSystem, the Asset Browser scan, folder colors,
+    // the active input map) as if the editor had started up there. Shared by
+    // the constructor (mounts the default project) and by New/Open Project.
+    void mountProjectAssets(const std::string& newAssetDir);
+
+    // Unsaved-changes guard (item 106): every action that would replace
+    // scene_ wholesale (double-click a .cscene tile, File > Open/New/Load
+    // Sample Scene, "Edit Prefab") routes through this instead of mutating
+    // scene_ directly. If the current scene has changed since the last
+    // load/save it prompts Save/Discard/Cancel first; otherwise `doReplace`
+    // runs immediately. `doReplace` is responsible for actually swapping
+    // scene_ and updating currentScenePath_/prefabEditReturnPath_.
+    void requestReplaceScene(std::function<void()> doReplace);
+    void drawUnsavedScenePopup();
+    bool hasUnsavedSceneChanges() const;
+    void loadSceneNow(const std::string& path); // unconditional load, no guard, no snapshot update
+
+    // Prefab extraction (Scenes task, Step 2): drag an actor onto the Asset
+    // Browser -> prompt for a name -> saveSubtree() it as a new .cscene ->
+    // remove the original and instantiate() the new scene in its place, at
+    // the same parent/sibling position/transform, so nothing visibly moves.
+    void extractPrefabToScene(Actor* target, const std::string& name);
+
+    // Moves the file or folder at `srcOsPath` into `destFolderRel` (a
+    // folder path relative to assetDir_, "" = the assets root) -- the drop
+    // side of every asset tile's CRATE_ASSET_MOVE drag source (item 15/15b:
+    // all asset types, and folders themselves, are draggable into a
+    // folder). No-ops on a same-location drop or a folder dropped into its
+    // own descendant. Keeps AssetDatabase's id tracking correct
+    // (moved()/movedPrefix()) and, for a moved script, reloads ScriptSystem
+    // so it re-discovers the file at its new path.
+    void moveAssetToFolder(const std::string& srcOsPath, const std::string& destFolderRel);
+
     void setPlaying(bool playing);
 
     // Camera activation (task 77): enforces "only one CameraComponent in the
@@ -113,6 +175,10 @@ private:
 
     Scene scene_;
     Scene playBackup_;      // scene state captured when Play was pressed
+    std::string currentScenePath_; // empty until Saved/Opened at least once
+    std::string currentProjectPath_; // path to the open .crate file; empty = no
+                                       // project explicitly opened (the implicit
+                                       // default project: assetDir_ as-is)
     float physicsAccum_ = 0.0f;
     MeshLibrary meshLib_;
     MaterialLibrary materialLib_;
@@ -151,6 +217,9 @@ private:
     std::string assetDlgBuf_;      // name entry
     float assetDlgColor_[4] = {0.55f, 0.49f, 1.0f, 1.0f};
     ui::Popup assetPopup_;
+    ui::Popup extractPrefabPopup_;
+    std::string extractPrefabName_;
+    Actor* extractPrefabTarget_ = nullptr; // valid only while the popup above is open
     std::unique_ptr<Actor> clipboard_; // deep clone from copy/cut
     bool playing_ = false;
     bool showDemo_ = false;
@@ -159,6 +228,24 @@ private:
 
     // Drag/drop bookkeeping for the hierarchy.
     uint64_t dragActorId_ = 0; // actor currently being dragged (0 = none)
+
+    // Prefab-instance sub-view (item 107): a scene instance's children are
+    // hidden inline in the normal tree (it draws as a leaf) until double-
+    // clicked, which focuses the Hierarchy panel on that instance -- showing
+    // only its own subtree, Godot-style, until "Back" returns to the full
+    // scene. nullptr = showing the whole scene as usual.
+    Actor* hierarchyFocusRoot_ = nullptr;
+
+    // Unsaved-changes guard + "Edit Prefab" isolation workflow (item 106).
+    ui::Popup unsavedScenePopup_;
+    std::function<void()> pendingSceneReplace_; // set while unsavedScenePopup_ is open
+    enum class PendingSceneAction { Save, Discard };
+    PendingSceneAction pendingSceneAction_ = PendingSceneAction::Discard;
+    std::string savedSceneSnapshot_; // scene_'s serialized text as of the last load/save
+    // Non-empty while editing a .cscene opened via "Edit Prefab" in isolation
+    // from the Asset Browser (as opposed to the normal working scene) -- the
+    // path to return to, shown as a "< Back to X" banner in the Hierarchy.
+    std::string prefabEditReturnPath_;
 };
 
 } // namespace crate

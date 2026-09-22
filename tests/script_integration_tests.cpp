@@ -164,6 +164,45 @@ int main() {
         std::printf("ok  class rename: old component entry removed, new one added\n");
     }
 
+    // --- get_root(): bare global returns the scene's implicit root actor,
+    // found by walking up from the CALLING script's own actor (Scenes task).
+    {
+        const std::string dir = sys.scriptsDir();
+        const std::string p = dir + "/GetRootProbe.cscript";
+        {
+            std::ofstream o(p, std::ios::binary);
+            o << "class GetRootProbe : Actor3D {\n"
+                 "    var rootName = \"\";\n"
+                 "    func start() {\n"
+                 "        var r = get_root();\n"
+                 "        rootName = r.name;\n"
+                 "    }\n"
+                 "}\n";
+        }
+        sys.reload();
+        Scene rootScene("root-test");
+        Actor* top = rootScene.add(std::make_unique<Actor3D>("TopLevel"));
+        Actor* child = rootScene.add(std::make_unique<Actor3D>("Child"), top);
+        auto comp = ComponentRegistry::get().create("GetRootProbe");
+        if (!comp) {
+            std::printf("FAIL: could not create GetRootProbe component\n");
+            std::remove(p.c_str());
+            return 1;
+        }
+        Component* raw = child->addComponent(std::move(comp));
+        rootScene.startPlay();
+        auto* sc = dynamic_cast<script::ScriptComponent*>(raw);
+        std::string rootName = sc ? sc->object()->fields["rootName"].str() : "";
+        std::remove(p.c_str());
+        sys.reload();
+        if (rootName != rootScene.root().name()) {
+            std::printf("FAIL: get_root() returned name '%s', expected scene root name '%s'\n",
+                        rootName.c_str(), rootScene.root().name().c_str());
+            return 1;
+        }
+        std::printf("ok  get_root() returns the scene's implicit root actor from a nested script\n");
+    }
+
     std::printf("ok  Mover ran: rotation.y = %.1f after play\n", y);
     return 0;
 }

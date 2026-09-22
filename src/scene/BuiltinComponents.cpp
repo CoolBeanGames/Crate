@@ -1,5 +1,6 @@
 #include "scene/BuiltinComponents.h"
 #include "core/Log.h"
+#include "scene/FieldCodec.h"
 
 #include "imgui.h"
 #include "misc/cpp/imgui_stdlib.h"
@@ -42,6 +43,38 @@ void MeshRenderer::drawInspector() {
     ImGui::Checkbox("Receive Shadows", &receiveShadows);
 }
 
+void MeshRenderer::writeFields(std::ostream& out, const std::function<int(const Actor*)>&) const {
+    writeFieldBool(out, "usePrimitive", usePrimitive);
+    writeFieldString(out, "primitive", primitive);
+    writeFieldString(out, "meshPath", meshPath);
+    writeFieldString(out, "materialRef", materialRef);
+    writeFieldString(out, "texturePath", texturePath);
+    writeFieldVec3(out, "tint", tint[0], tint[1], tint[2]);
+    writeFieldFloat(out, "tintA", tint[3]);
+    writeFieldBool(out, "castShadows", castShadows);
+    writeFieldBool(out, "receiveShadows", receiveShadows);
+    writeFieldVec3(out, "boxSize", boxSize[0], boxSize[1], boxSize[2]);
+    writeFieldFloat(out, "radius", radius);
+    writeFieldFloat(out, "height", height);
+    writeFieldVec2(out, "planeSize", planeSize[0], planeSize[1]);
+}
+void MeshRenderer::readField(const std::string& key, const std::string&, const std::string& value,
+                             const std::function<Actor*(int)>&) {
+    if (key == "usePrimitive") usePrimitive = fieldB(value);
+    else if (key == "primitive") primitive = value;
+    else if (key == "meshPath") meshPath = value;
+    else if (key == "materialRef") materialRef = value;
+    else if (key == "texturePath") texturePath = value;
+    else if (key == "tint") { float v[3]; parseFieldVec3(value, v); tint[0]=v[0]; tint[1]=v[1]; tint[2]=v[2]; }
+    else if (key == "tintA") tint[3] = (float)fieldF(value);
+    else if (key == "castShadows") castShadows = fieldB(value);
+    else if (key == "receiveShadows") receiveShadows = fieldB(value);
+    else if (key == "boxSize") { float v[3]; parseFieldVec3(value, v); boxSize[0]=v[0]; boxSize[1]=v[1]; boxSize[2]=v[2]; }
+    else if (key == "radius") radius = (float)fieldF(value);
+    else if (key == "height") height = (float)fieldF(value);
+    else if (key == "planeSize") { float v[2]; parseFieldVec2(value, v); planeSize[0]=v[0]; planeSize[1]=v[1]; }
+}
+
 void LightComponent::drawInspector() {
     const char* kinds[] = {"Directional", "Point", "Spot"};
     int k = static_cast<int>(type);
@@ -63,6 +96,26 @@ void LightComponent::drawInspector() {
         ImGui::TextDisabled("Static: only affects meshes/probes via Bake Lightmaps");
 }
 
+void LightComponent::writeFields(std::ostream& out, const std::function<int(const Actor*)>&) const {
+    writeFieldInt(out, "type", (long long)type);
+    writeFieldVec3(out, "color", color[0], color[1], color[2]);
+    writeFieldFloat(out, "intensity", intensity);
+    writeFieldFloat(out, "range", range);
+    writeFieldFloat(out, "spotInnerDeg", spotInnerDeg);
+    writeFieldFloat(out, "spotOuterDeg", spotOuterDeg);
+    writeFieldBool(out, "isStatic", isStatic);
+}
+void LightComponent::readField(const std::string& key, const std::string&, const std::string& value,
+                               const std::function<Actor*(int)>&) {
+    if (key == "type") type = (Type)fieldI(value);
+    else if (key == "color") { float v[3]; parseFieldVec3(value, v); color[0]=v[0]; color[1]=v[1]; color[2]=v[2]; }
+    else if (key == "intensity") intensity = (float)fieldF(value);
+    else if (key == "range") range = (float)fieldF(value);
+    else if (key == "spotInnerDeg") spotInnerDeg = (float)fieldF(value);
+    else if (key == "spotOuterDeg") spotOuterDeg = (float)fieldF(value);
+    else if (key == "isStatic") isStatic = fieldB(value);
+}
+
 void FogComponent::drawInspector() {
     ImGui::ColorEdit3("Color", color);
     ImGui::DragFloat("Start", &start, 0.1f, 0.0f, 1000.0f);
@@ -76,11 +129,35 @@ void FogComponent::drawInspector() {
     ImGui::TextDisabled("Only the first Fog found in the scene is used.");
 }
 
+void FogComponent::writeFields(std::ostream& out, const std::function<int(const Actor*)>&) const {
+    writeFieldVec3(out, "color", color[0], color[1], color[2]);
+    writeFieldFloat(out, "start", start);
+    writeFieldFloat(out, "end", end);
+    writeFieldFloat(out, "heightRange", heightRange);
+}
+void FogComponent::readField(const std::string& key, const std::string&, const std::string& value,
+                             const std::function<Actor*(int)>&) {
+    if (key == "color") { float v[3]; parseFieldVec3(value, v); color[0]=v[0]; color[1]=v[1]; color[2]=v[2]; }
+    else if (key == "start") start = (float)fieldF(value);
+    else if (key == "end") end = (float)fieldF(value);
+    else if (key == "heightRange") heightRange = (float)fieldF(value);
+}
+
 void VolumetricFogComponent::drawInspector() {
     ImGui::ColorEdit3("Color", color);
     ImGui::DragFloat("Density", &density, 0.01f, 0.0f, 1.0f);
     ImGui::TextDisabled("Applies to the whole world; this actor's transform is unused.");
     ImGui::TextDisabled("Only the first Volumetric Fog found in the scene is used.");
+}
+
+void VolumetricFogComponent::writeFields(std::ostream& out, const std::function<int(const Actor*)>&) const {
+    writeFieldVec3(out, "color", color[0], color[1], color[2]);
+    writeFieldFloat(out, "density", density);
+}
+void VolumetricFogComponent::readField(const std::string& key, const std::string&, const std::string& value,
+                                       const std::function<Actor*(int)>&) {
+    if (key == "color") { float v[3]; parseFieldVec3(value, v); color[0]=v[0]; color[1]=v[1]; color[2]=v[2]; }
+    else if (key == "density") density = (float)fieldF(value);
 }
 
 void CameraComponent::drawInspector() {
@@ -94,9 +171,31 @@ void CameraComponent::drawInspector() {
     ImGui::TextDisabled("Only one Camera in the scene is ever active at a time.");
 }
 
+void CameraComponent::writeFields(std::ostream& out, const std::function<int(const Actor*)>&) const {
+    writeFieldFloat(out, "fovY", fovY);
+    writeFieldFloat(out, "nearZ", nearZ);
+    writeFieldFloat(out, "farZ", farZ);
+}
+void CameraComponent::readField(const std::string& key, const std::string&, const std::string& value,
+                                const std::function<Actor*(int)>&) {
+    if (key == "fovY") fovY = (float)fieldF(value);
+    else if (key == "nearZ") nearZ = (float)fieldF(value);
+    else if (key == "farZ") farZ = (float)fieldF(value);
+}
+
 void LightProbeComponent::drawInspector() {
     ImGui::TextDisabled(bakedValid ? "baked" : "not baked yet - Object > Bake Lightmaps");
     ImGui::ColorButton("##baked", ImVec4(bakedLight[0], bakedLight[1], bakedLight[2], 1.0f));
+}
+
+void LightProbeComponent::writeFields(std::ostream& out, const std::function<int(const Actor*)>&) const {
+    writeFieldVec3(out, "bakedLight", bakedLight[0], bakedLight[1], bakedLight[2]);
+    writeFieldBool(out, "bakedValid", bakedValid);
+}
+void LightProbeComponent::readField(const std::string& key, const std::string&, const std::string& value,
+                                    const std::function<Actor*(int)>&) {
+    if (key == "bakedLight") { float v[3]; parseFieldVec3(value, v); bakedLight[0]=v[0]; bakedLight[1]=v[1]; bakedLight[2]=v[2]; }
+    else if (key == "bakedValid") bakedValid = fieldB(value);
 }
 
 void SpinnerComponent::start() {
@@ -113,6 +212,16 @@ void SpinnerComponent::drawInspector() {
     ImGui::DragFloat("Deg / sec", &degreesPerSecond, 1.0f);
     const char* axes[] = {"X", "Y", "Z"};
     ImGui::Combo("Axis", &axis, axes, 3);
+}
+
+void SpinnerComponent::writeFields(std::ostream& out, const std::function<int(const Actor*)>&) const {
+    writeFieldFloat(out, "degreesPerSecond", degreesPerSecond);
+    writeFieldInt(out, "axis", axis);
+}
+void SpinnerComponent::readField(const std::string& key, const std::string&, const std::string& value,
+                                 const std::function<Actor*(int)>&) {
+    if (key == "degreesPerSecond") degreesPerSecond = (float)fieldF(value);
+    else if (key == "axis") axis = (int)fieldI(value);
 }
 
 } // namespace crate

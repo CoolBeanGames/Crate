@@ -8,4 +8,9 @@ namespace crate::platform {
 // user cancels or the dialog is unavailable.
 std::string openFileDialog(const char* title, const char* filterSpec);
 
+// Native "save file" dialog. `defaultExt` (no dot, e.g. "cscene") is
+// appended when the user doesn't type one. Returns an empty string if the
+// user cancels or the dialog is unavailable.
+std::string saveFileDialog(const char* title, const char* filterSpec, const char* defaultExt);
+
 } // namespace crate::platform

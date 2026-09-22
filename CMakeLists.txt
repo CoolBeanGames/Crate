@@ -75,6 +75,7 @@ endif()
 add_library(crate_core STATIC
     src/core/Log.cpp
     src/scene/Scene.cpp
+    src/scene/SceneIO.cpp
     src/scene/ComponentRegistry.cpp
     src/scene/BuiltinComponents.cpp
     src/script/Lexer.cpp
@@ -85,6 +86,7 @@ add_library(crate_core STATIC
     src/script/NativeScriptComponent.cpp
     src/script/Format.cpp
     src/script/ScriptComponent.cpp
+    src/script/ScriptFieldIO.cpp
     src/script/ScriptSystem.cpp
     src/render/Mesh.cpp
     src/render/Renderer.cpp
@@ -101,6 +103,8 @@ add_library(crate_core STATIC
     src/editor/ScriptBuild.cpp
     src/editor/ScriptEditor.cpp
     src/editor/Theme.cpp
+    src/editor/ProjectFile.cpp
+    src/editor/PathRegistry.cpp
     src/editor/EditorApp.cpp
 )
 target_include_directories(crate_core PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
@@ -113,7 +117,7 @@ target_compile_definitions(crate_core PRIVATE
     CRATE_ENGINE_BUILD_DIR="${CMAKE_BINARY_DIR}")
 
 # --- Editor executable ---------------------------------------------------
-add_executable(Crate WIN32 src/main.cpp)
+add_executable(Crate WIN32 src/main.cpp src/app.rc)
 target_link_libraries(Crate PRIVATE crate_core shell32)
 
 if(MSVC)
@@ -133,6 +137,33 @@ set_target_properties(Crate PROPERTIES
 add_custom_command(TARGET Crate POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_CURRENT_SOURCE_DIR}/assets $<TARGET_FILE_DIR:Crate>/assets)
+
+# --- Projects Launcher + `crate` CLI (task 125) ---------------------------
+add_executable(CrateLauncher WIN32 src/launcher/LauncherMain.cpp src/launcher/LauncherApp.cpp src/app.rc)
+target_link_libraries(CrateLauncher PRIVATE crate_core shell32)
+
+# Console tool, not a GUI subsystem app -- no WIN32 keyword, plain int main().
+# Built into its own subdirectory (cli-tool/), NOT the main build output
+# root: Windows filenames are case-insensitive, so an OUTPUT_NAME of "crate"
+# sitting next to "Crate.exe" is THE SAME FILE on disk as far as the
+# filesystem is concerned -- whichever target linked last would silently
+# overwrite the other. Kept apart so both exist independently; the launcher
+# (LauncherApp.cpp) knows to look in cli-tool/ for it when copying it to the
+# stable PATH-registered location.
+add_executable(crate_cli src/launcher/CrateCli.cpp)
+target_link_libraries(crate_cli PRIVATE crate_core)
+set_target_properties(crate_cli PROPERTIES
+    OUTPUT_NAME crate
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/cli-tool")
+
+if(MSVC)
+    target_compile_definitions(CrateLauncher PRIVATE UNICODE _UNICODE)
+    target_link_options(CrateLauncher PRIVATE /ENTRY:mainCRTStartup)
+    target_compile_definitions(crate_cli PRIVATE UNICODE _UNICODE)
+endif()
+
+set_target_properties(CrateLauncher crate_cli PROPERTIES
+    VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 # --- Tests ---------------------------------------------------------------
 enable_testing()
@@ -236,6 +267,12 @@ target_compile_definitions(camera_main_parity_tests PRIVATE
     CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
 add_test(NAME camera_main_parity_tests COMMAND camera_main_parity_tests)
 
+add_executable(input_mouse_parity_tests tests/input_mouse_parity_tests.cpp)
+target_link_libraries(input_mouse_parity_tests PRIVATE crate_core)
+target_compile_definitions(input_mouse_parity_tests PRIVATE
+    CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
+add_test(NAME input_mouse_parity_tests COMMAND input_mouse_parity_tests)
+
 add_executable(signals_parity_tests tests/signals_parity_tests.cpp)
 target_link_libraries(signals_parity_tests PRIVATE crate_core)
 target_compile_definitions(signals_parity_tests PRIVATE
@@ -259,3 +296,33 @@ target_link_libraries(cross_namespace_inheritance_tests PRIVATE crate_core)
 target_compile_definitions(cross_namespace_inheritance_tests PRIVATE
     CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
 add_test(NAME cross_namespace_inheritance_tests COMMAND cross_namespace_inheritance_tests)
+
+add_executable(scene_io_tests tests/scene_io_tests.cpp)
+target_link_libraries(scene_io_tests PRIVATE crate_core)
+target_compile_definitions(scene_io_tests PRIVATE
+    CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
+add_test(NAME scene_io_tests COMMAND scene_io_tests)
+
+add_executable(scene_instancing_tests tests/scene_instancing_tests.cpp)
+target_link_libraries(scene_instancing_tests PRIVATE crate_core)
+add_test(NAME scene_instancing_tests COMMAND scene_instancing_tests)
+
+add_executable(scene_instantiate_script_tests tests/scene_instantiate_script_tests.cpp)
+target_link_libraries(scene_instantiate_script_tests PRIVATE crate_core)
+target_compile_definitions(scene_instantiate_script_tests PRIVATE
+    CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
+add_test(NAME scene_instantiate_script_tests COMMAND scene_instantiate_script_tests)
+
+add_executable(actor_api_tests tests/actor_api_tests.cpp)
+target_link_libraries(actor_api_tests PRIVATE crate_core)
+target_compile_definitions(actor_api_tests PRIVATE
+    CRATE_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/scripts")
+add_test(NAME actor_api_tests COMMAND actor_api_tests)
+
+add_executable(project_file_tests tests/project_file_tests.cpp)
+target_link_libraries(project_file_tests PRIVATE crate_core)
+add_test(NAME project_file_tests COMMAND project_file_tests)
+
+add_executable(project_ops_tests tests/project_ops_tests.cpp)
+target_link_libraries(project_ops_tests PRIVATE crate_core)
+add_test(NAME project_ops_tests COMMAND project_ops_tests)

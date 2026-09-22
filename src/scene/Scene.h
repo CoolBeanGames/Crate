@@ -1,5 +1,6 @@
 #pragma once
 #include "scene/Actor.h"
+#include <iosfwd>
 #include <string>
 #include <utility>
 #include <vector>
@@ -69,7 +70,67 @@ public:
     // Build a small default scene so the editor is not empty on first launch.
     static Scene makeSample();
 
+    // --- Serialization (Scenes task, Phase 1: see scene/SceneIO.cpp for the
+    // file format and its documented limitations) ---------------------------
+    // Writes the full actor hierarchy, transforms, and every component's
+    // fields to a text file. Returns false (and sets *error, if given) on
+    // failure, e.g. an unwritable path.
+    bool save(const std::string& path, std::string* error = nullptr) const;
+
+    // Same format as save(), built in memory instead of written to disk.
+    // Used to detect unsaved changes (diff against a snapshot taken at the
+    // last successful load/save) without touching the filesystem.
+    std::string serializeToString() const;
+
+    // Saves `subtreeRoot` (which must belong to this scene) and everything
+    // under it as a STANDALONE scene file, named after the actor itself --
+    // the core of the prefab-extraction workflow (drag an actor onto the
+    // Asset Browser to turn it into a reusable saved scene; see EditorApp's
+    // extractPrefabToScene()). Returns false (*error set) on failure.
+    bool saveSubtree(const Actor* subtreeRoot, const std::string& path,
+                     std::string* error = nullptr) const;
+
+    // Reads a file previously written by save(). Returns a scene named
+    // "Untitled" with nothing in it (and sets *error) on failure -- never
+    // partially-loaded silent corruption.
+    static Scene load(const std::string& path, std::string* error = nullptr);
+
+    // Nested scene instancing (Godot-style): loads `sourcePath` as a fresh
+    // sub-scene and inserts its root as a new child under `parent` (or this
+    // scene's own root). The new actor is tagged Actor::isInstanceRoot() ==
+    // true, so save() writes it back as a single INSTANCE reference (see
+    // SceneIO.cpp) instead of a full recursive copy, and its children are
+    // whatever the source scene currently contains -- rebuilt fresh on
+    // every load, not frozen at instancing time. `name` overrides the
+    // node's default name (empty = the source file's stem). Returns
+    // nullptr (and sets *error) on failure, including a source that would
+    // (directly or transitively) instance itself.
+    Actor* instantiate(const std::string& sourcePath, Actor* parent = nullptr,
+                       const std::string& name = std::string(), std::string* error = nullptr);
+
+    // Like instantiate(), but attaches directly under a given LIVE parent
+    // actor without needing the owning Scene object at all -- `parent` must
+    // be non-null. Used by the script-facing Value.instantiate() API (see
+    // Runtime.cpp's valueInstantiate / a "Scene"-typed field holding an
+    // asset path), which only ever has an Actor* to anchor onto, never a
+    // Scene&. instantiate() itself is just this with parent defaulted to
+    // the scene's own root.
+    static Actor* instantiateUnder(Actor* parent, const std::string& sourcePath,
+                                   const std::string& name = std::string(),
+                                   std::string* error = nullptr);
+
 private:
+    // Shared by load() and instantiate(): `stack` carries the canonical
+    // paths of every scene file currently being loaded, up the recursion
+    // chain, so a source that would (directly or transitively) instance
+    // itself is detected and skipped rather than recursing forever.
+    static Scene loadWithStack(const std::string& path, std::string* error,
+                               std::vector<std::string>& stack);
+
+    // Shared writer for save() (to a file) and serializeToString() (in
+    // memory) so the two can never drift out of sync with each other.
+    void writeTo(std::ostream& out) const;
+
     std::string name_;
     std::unique_ptr<Actor> root_;
     Actor* selected_ = nullptr;

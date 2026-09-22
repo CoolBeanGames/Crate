@@ -67,12 +67,40 @@ static void disableOtherCameras(Actor& node, CameraComponent* keep) {
 
 EditorApp::EditorApp() : scene_(Scene::makeSample()) {
     registerBuiltinComponents();
+    mountProjectAssets(assetDir_); // assetDir_'s in-class default ("assets") is
+                                     // the implicit default project
+    renderer_.setMeshLibrary(&meshLib_);
+    renderer_.setMaterialLibrary(&materialLib_);
+    renderer_.loadLightmap(scene_, assetDir_); // apply any lightmap baked for this scene
+    savedSceneSnapshot_ = scene_.serializeToString();
+    CR_LOG("app", "Crate editor started");
+    CR_LOG("scene", "Loaded sample scene with " + std::to_string(scene_.actorCount()) + " actors");
+}
+
+// Shared by startup (mounts the implicit default project) and by New/Open
+// Project (task 92) -- re-points assetDir_ at `newAssetDir` and reloads
+// everything keyed off it exactly as if the editor had just started up
+// there: the asset database, every script (via ScriptSystem::unloadAll()
+// first, so a PREVIOUS project's scripts don't linger merged in), the Asset
+// Browser's own scanned-image list, folder colors, and the active input map.
+// Known limitation: does not unload an already-loaded native script DLL from
+// a prior Play session in this same editor run (see ScriptSystem::unloadAll's
+// doc comment) -- switching projects after pressing Play earlier in the same
+// session is not fully clean; restart the editor for that case.
+void EditorApp::mountProjectAssets(const std::string& newAssetDir) {
+    assetDir_ = newAssetDir;
+    assetCwd_.clear();
+    importedAssets_.clear();
     AssetDatabase::get().load(assetDir_);
+    script::ScriptSystem::get().unloadAll();
     script::ScriptSystem::get().loadFolder(assetDir_ + "/scripts");
     scanAssets();
     loadFolderColors();
 
-    // Load the first input map found under assets/ as the active one.
+    inputMap_ = InputMap();
+    inputMapPath_.clear();
+    Input::get().setMap(nullptr);
+    // Load the first input map found under assetDir_ as the active one.
     {
         std::error_code ec;
         if (fs::exists(assetDir_, ec))
@@ -84,11 +112,6 @@ EditorApp::EditorApp() : scene_(Scene::makeSample()) {
                     break;
                 }
     }
-    renderer_.setMeshLibrary(&meshLib_);
-    renderer_.setMaterialLibrary(&materialLib_);
-    renderer_.loadLightmap(scene_, assetDir_); // apply any lightmap baked for this scene
-    CR_LOG("app", "Crate editor started");
-    CR_LOG("scene", "Loaded sample scene with " + std::to_string(scene_.actorCount()) + " actors");
 }
 
 EditorApp::~EditorApp() = default;
@@ -209,6 +232,9 @@ void EditorApp::onFrame() {
             script::ScriptSystem::get().physicsStatics(step);
             physicsAccum_ -= step;
         }
+        // Actor.destroy() / Component.remove(): actually applied here, once
+        // every script this frame has finished running, never mid-hook.
+        script::ScriptSystem::get().flushPending(scene_);
     }
 
     // Global editor shortcuts (skipped while typing in a field).
@@ -246,6 +272,7 @@ void EditorApp::onFrame() {
 
     drawMenuBar();
     drawToolbar();
+    drawUnsavedScenePopup();
 
     ImGuiID dockspace_id = ImGui::GetID("CrateDockspace");
     if (ImGui::DockBuilderGetNode(dockspace_id) == nullptr) {
@@ -289,19 +316,40 @@ void EditorApp::drawMenuBar() {
         return;
 
     if (ImGui::BeginMenu("File")) {
+        if (ImGui::MenuItem("New Project...")) newProject();
+        if (ImGui::MenuItem("Open Project...")) openProject();
+        if (ImGui::MenuItem("Save Project", nullptr, false, !currentProjectPath_.empty()))
+            saveProject();
+        ImGui::Separator();
         if (ImGui::MenuItem("New Scene")) {
-            scene_ = Scene("Untitled");
-            renderer_.loadLightmap(scene_, assetDir_);
-            CR_LOG("scene", "New scene created");
+            requestReplaceScene([this] {
+                scene_ = Scene("Untitled");
+                renderer_.loadLightmap(scene_, assetDir_);
+                currentScenePath_.clear(); // was previously left pointing at the OLD file --
+                                            // Ctrl+S would silently overwrite it with this
+                                            // blank scene (found while adding item 106's guard)
+                hierarchyFocusRoot_ = nullptr;
+                prefabEditReturnPath_.clear();
+                CR_LOG("scene", "New scene created");
+            });
         }
         if (ImGui::MenuItem("Load Sample Scene")) {
-            scene_ = Scene::makeSample();
-            renderer_.loadLightmap(scene_, assetDir_);
-            CR_LOG("scene", "Reloaded sample scene");
+            requestReplaceScene([this] {
+                scene_ = Scene::makeSample();
+                renderer_.loadLightmap(scene_, assetDir_);
+                currentScenePath_.clear(); // same stale-path issue as New Scene above
+                hierarchyFocusRoot_ = nullptr;
+                prefabEditReturnPath_.clear();
+                CR_LOG("scene", "Reloaded sample scene");
+            });
         }
+        if (ImGui::MenuItem("Open Scene..."))
+            openScene();
         ImGui::Separator();
-        if (ImGui::MenuItem("Save", "Ctrl+S"))
-            CR_WARN("scene", "Scene serialization arrives with the Data branch");
+        if (ImGui::MenuItem("Save Scene", "Ctrl+S"))
+            saveScene();
+        if (ImGui::MenuItem("Save Scene As..."))
+            saveSceneAs();
         ImGui::EndMenu();
     }
     if (ImGui::BeginMenu("Edit")) {
@@ -497,9 +545,16 @@ void EditorApp::drawHierarchyNode(Actor& actor) {
     // "Where it will go" boundary target before this row.
     drawReparentDropTarget(*actor.parent(), actor.indexInParent());
 
+    // Scene instances are blue (Scenes task spec: "Scene prefabs are blue in
+    // color"), so an instanced subtree reads as distinct from plain actors
+    // at a glance.
+    const bool isInstance = actor.isInstanceRoot();
+
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanFullWidth |
                                ImGuiTreeNodeFlags_DefaultOpen;
-    if (actor.children().empty())
+    // A prefab instance's children stay hidden inline (item 107) -- double-
+    // click focuses the panel on it instead of expanding inline, Godot-style.
+    if (actor.children().empty() || isInstance)
         flags |= ImGuiTreeNodeFlags_Leaf;
     if (scene_.selected() == &actor)
         flags |= ImGuiTreeNodeFlags_Selected;
@@ -508,10 +563,12 @@ void EditorApp::drawHierarchyNode(Actor& actor) {
     const bool dimmed = isDragSource || !actor.visible() || !actor.enabled();
     if (dimmed)
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+    else if (isInstance)
+        ImGui::PushStyleColor(ImGuiCol_Text, ImColor(0x5A, 0x9C, 0xF5).Value);
 
     bool open = ImGui::TreeNodeEx(actor.name().c_str(), flags);
 
-    if (dimmed)
+    if (dimmed || isInstance)
         ImGui::PopStyleColor();
 
     // IsItemClicked() fires on mouse-DOWN, before any drag has a chance to
@@ -523,6 +580,10 @@ void EditorApp::drawHierarchyNode(Actor& actor) {
     if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left) &&
         !ImGui::IsItemToggledOpen())
         scene_.select(&actor);
+    // Double-click an instance root to drill into its own sub-view (item 107)
+    // instead of inline-expanding -- the normal tree never shows its children.
+    if (isInstance && ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+        hierarchyFocusRoot_ = &actor;
 
     // Drag source: carries the actor id, shows a ghost label ("where it was").
     if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoHoldToOpenOthers)) {
@@ -554,6 +615,15 @@ void EditorApp::drawHierarchyNode(Actor& actor) {
                        ImGui::AcceptDragDropPayload(pickPayloadId(PickKind::Material))) {
             if (auto* mr = actor.getComponent<MeshRenderer>())
                 mr->materialRef = payloadStr(pm);
+        } else if (const ImGuiPayload* ps = ImGui::AcceptDragDropPayload("CRATE_SCENE_PATH")) {
+            std::string scenePath = payloadStr(ps);
+            std::string error;
+            if (Actor* inst = scene_.instantiate(scenePath, &actor, "", &error)) {
+                scene_.select(inst);
+                CR_LOG("scene", "Instantiated '" + scenePath + "' under '" + actor.name() + "'");
+            } else {
+                CR_ERROR("scene", "Instantiate failed: " + error);
+            }
         }
         ImGui::EndDragDropTarget();
     }
@@ -569,17 +639,24 @@ void EditorApp::drawHierarchyNode(Actor& actor) {
 
     // Trailing metadata.
     ImGui::SameLine();
-    ImGui::TextDisabled("%s%s%s", actor.typeName(), actor.visible() ? "" : "  (hidden)",
-                        actor.enabled() ? "" : "  (disabled)");
+    ImGui::TextDisabled("%s%s%s%s", actor.typeName(), actor.visible() ? "" : "  (hidden)",
+                        actor.enabled() ? "" : "  (disabled)",
+                        (isInstance && !actor.children().empty()) ? "  (dbl-click to open)" : "");
 
     if (open) {
-        std::vector<Actor*> kids;
-        for (const auto& c : actor.children())
-            kids.push_back(c.get());
-        for (Actor* c : kids)
-            drawHierarchyNode(*c);
-        // Boundary target after the last child = append under `actor`.
-        drawReparentDropTarget(actor, static_cast<int>(actor.children().size()));
+        // Leaf-flagged nodes (no children, or a collapsed instance root)
+        // still return open=true from TreeNodeEx and still need the matching
+        // TreePop() below -- only the recursive child-drawing is instance-
+        // gated, never the push/pop balance itself.
+        if (!isInstance) {
+            std::vector<Actor*> kids;
+            for (const auto& c : actor.children())
+                kids.push_back(c.get());
+            for (Actor* c : kids)
+                drawHierarchyNode(*c);
+            // Boundary target after the last child = append under `actor`.
+            drawReparentDropTarget(actor, static_cast<int>(actor.children().size()));
+        }
         ImGui::TreePop();
     }
     ImGui::PopID();
@@ -587,6 +664,41 @@ void EditorApp::drawHierarchyNode(Actor& actor) {
 
 void EditorApp::drawHierarchy() {
     if (ImGui::Begin("Hierarchy")) {
+        // "Edit Prefab" isolation (item 106): editing a .cscene opened
+        // standalone from the Asset Browser, distinct from item 107's
+        // in-scene sub-view below. One click back to the working scene you
+        // came from (re-guarded the same as any other scene swap).
+        if (!prefabEditReturnPath_.empty()) {
+            ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(64, 96, 210, 255));
+            std::string label =
+                "< Back to " + fs::path(prefabEditReturnPath_).filename().string();
+            if (ImGui::Button(label.c_str(), ImVec2(-1, 0))) {
+                std::string back = prefabEditReturnPath_;
+                requestReplaceScene([this, back] {
+                    loadSceneNow(back);
+                    prefabEditReturnPath_.clear();
+                });
+            }
+            ImGui::PopStyleColor();
+            ImGui::TextDisabled("Editing prefab: %s",
+                                fs::path(currentScenePath_).filename().string().c_str());
+            ImGui::Separator();
+        }
+        // Prefab-instance sub-view (item 107): re-validate every frame in
+        // case the focused instance was deleted/cut while open.
+        Actor* focusRoot = hierarchyFocusRoot_;
+        if (focusRoot && !findById(scene_.root(), focusRoot->id()))
+            focusRoot = hierarchyFocusRoot_ = nullptr;
+        if (focusRoot) {
+            if (ImGui::SmallButton("< Back"))
+                focusRoot = hierarchyFocusRoot_ = nullptr;
+            ImGui::SameLine();
+            ImGui::TextDisabled("Scene /");
+            ImGui::SameLine();
+            ImGui::TextColored(ImColor(0x5A, 0x9C, 0xF5).Value, "%s",
+                               hierarchyFocusRoot_ ? hierarchyFocusRoot_->name().c_str() : "");
+            ImGui::Separator();
+        }
         if (ImGui::Button("+ Add")) ImGui::OpenPopup("add_actor");
         {
             static ui::ContextMenu addMenu("add_actor");
@@ -618,21 +730,36 @@ void EditorApp::drawHierarchy() {
             dragActorId_ = 0;
 
         if (ImGui::BeginChild("tree")) {
+            Actor& viewRoot = focusRoot ? *focusRoot : scene_.root();
             std::vector<Actor*> roots;
-            for (const auto& c : scene_.root().children())
+            for (const auto& c : viewRoot.children())
                 roots.push_back(c.get());
             for (Actor* c : roots)
                 drawHierarchyNode(*c);
 
             // Trailing target under the root (append at end).
-            drawReparentDropTarget(scene_.root(), static_cast<int>(scene_.root().children().size()));
+            drawReparentDropTarget(viewRoot, static_cast<int>(viewRoot.children().size()));
 
-            // Empty space below the tree: drop here to unparent to the root.
+            // Empty space below the tree: drop here to unparent to the
+            // current view's root (the scene root normally, or the focused
+            // instance while inside its sub-view -- so a drag never
+            // "escapes" the sub-view unexpectedly).
             ImVec2 avail = ImGui::GetContentRegionAvail();
             if (avail.y > 4.0f) {
                 ImGui::InvisibleButton("##empty_drop", ImVec2(-1, avail.y));
                 if (ImGui::BeginDragDropTarget()) {
-                    acceptActorDrop(nullptr, -1);
+                    acceptActorDrop(focusRoot, -1);
+                    if (const ImGuiPayload* ps = ImGui::AcceptDragDropPayload("CRATE_SCENE_PATH")) {
+                        std::string scenePath(static_cast<const char*>(ps->Data));
+                        std::string error;
+                        if (Actor* inst = scene_.instantiate(scenePath, focusRoot, "", &error)) {
+                            scene_.select(inst);
+                            CR_LOG("scene", "Instantiated '" + scenePath + "' as '" +
+                                                inst->name() + "'");
+                        } else {
+                            CR_ERROR("scene", "Instantiate failed: " + error);
+                        }
+                    }
                     ImGui::EndDragDropTarget();
                 }
                 if (ImGui::IsItemClicked())
@@ -924,6 +1051,17 @@ void EditorApp::drawViewport() {
                             mr->meshPath = key;
                             a->addComponent(std::move(mr));
                             scene_.select(scene_.add(std::move(a)));
+                        } else if (const ImGuiPayload* ps =
+                                       ImGui::AcceptDragDropPayload("CRATE_SCENE_PATH")) {
+                            std::string scenePath(static_cast<const char*>(ps->Data));
+                            std::string error;
+                            if (Actor* inst = scene_.instantiate(scenePath, nullptr, "", &error)) {
+                                scene_.select(inst);
+                                CR_LOG("scene", "Instantiated '" + scenePath + "' as '" +
+                                                    inst->name() + "'");
+                            } else {
+                                CR_ERROR("scene", "Instantiate failed: " + error);
+                            }
                         }
                         ImGui::EndDragDropTarget();
                     }
@@ -1415,6 +1553,23 @@ void EditorApp::assetBrowserMenu() {
         scene_.select(nullptr);
         CR_LOG("assets", "Created material '" + m.name + "'");
     }
+    if (menu.item("Create Scene")) {
+        std::error_code ec;
+        fs::path dir = fs::path(assetDir_) / assetCwd_;
+        fs::create_directories(dir, ec);
+        fs::path p = dir / "New Scene.cscene";
+        for (int n = 2; fs::exists(p, ec); ++n)
+            p = dir / ("New Scene " + std::to_string(n) + ".cscene");
+        Scene fresh(p.stem().string());
+        std::string error;
+        if (fresh.save(p.generic_string(), &error)) {
+            AssetDatabase::get().idFor(p.generic_string());
+            selectedAsset_ = p.generic_string();
+            CR_LOG("assets", "Created scene " + p.filename().string());
+        } else {
+            CR_ERROR("assets", "Create Scene failed: " + error);
+        }
+    }
     if (menu.item("Create Input Map")) {
         std::error_code ec;
         fs::path dir = fs::path(assetDir_) / assetCwd_;
@@ -1573,6 +1728,22 @@ void EditorApp::drawAssetIconGlyph(ImDrawList* dl, ImVec2 iconMin, ImVec2 iconMa
         dl->AddCircleFilled(ImVec2(bMax.x - bw * 0.34f, c.y + bh * 0.15f), btnR, accent, 12);
         break;
     }
+    case AssetIconKind::Scene: {
+        // Small hierarchy glyph (a scene is a tree of actors): one root node
+        // with two children, matching the task's "scenes are blue" note via
+        // the tile's accent color rather than the glyph itself.
+        float r = h * 0.09f;
+        ImVec2 root(c.x, iconMin.y + h * 0.30f);
+        ImVec2 leftChild(c.x - w * 0.22f, iconMax.y - h * 0.24f);
+        ImVec2 rightChild(c.x + w * 0.22f, iconMax.y - h * 0.24f);
+        unsigned int line = IM_COL32(235, 235, 240, 200);
+        dl->AddLine(root, leftChild, line, 1.5f);
+        dl->AddLine(root, rightChild, line, 1.5f);
+        dl->AddCircleFilled(root, r * 1.15f, IM_COL32(255, 255, 255, 255), 16);
+        dl->AddCircleFilled(leftChild, r, IM_COL32(255, 255, 255, 230), 12);
+        dl->AddCircleFilled(rightChild, r, IM_COL32(255, 255, 255, 230), 12);
+        break;
+    }
     case AssetIconKind::Generic: {
         float pw = w * 0.46f, ph = h * 0.60f;
         ImVec2 pMin(c.x - pw * 0.5f, c.y - ph * 0.5f), pMax(c.x + pw * 0.5f, c.y + ph * 0.5f);
@@ -1652,6 +1823,7 @@ void EditorApp::drawAssetFolders() {
         const auto& d = dirs[i];
         std::string name = d.path().filename().string();
         std::string rel = assetCwd_.empty() ? name : assetCwd_ + "/" + name;
+        std::string osPath = d.path().generic_string();
         unsigned int col = folderColor(rel);
         bool dbl = false;
         assetIconTile(rel.c_str(), AssetIconKind::Folder, col ? col : IM_COL32(120, 110, 200, 255),
@@ -1659,6 +1831,19 @@ void EditorApp::drawAssetFolders() {
         if (dbl)
             assetCwd_ = rel;
         folderContextMenu(rel);
+        // Folders are draggable too (item 15b): drag one onto another to
+        // nest it there.
+        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoHoldToOpenOthers)) {
+            ImGui::SetDragDropPayload("CRATE_ASSET_MOVE", osPath.c_str(), osPath.size() + 1);
+            ImGui::Text("Folder  %s", name.c_str());
+            ImGui::EndDragDropSource();
+        }
+        // Any asset (file or folder) can be dropped here to move it in.
+        if (ImGui::BeginDragDropTarget()) {
+            if (const ImGuiPayload* p = ImGui::AcceptDragDropPayload("CRATE_ASSET_MOVE"))
+                moveAssetToFolder(std::string(static_cast<const char*>(p->Data)), rel);
+            ImGui::EndDragDropTarget();
+        }
         assetGridWrap(i + 1 < dirs.size() || !files.empty());
     }
 
@@ -1671,15 +1856,18 @@ void EditorApp::drawAssetFolders() {
         bool isFbx = ext == "fbx";
         bool isMap = ext == "inputmap";
         bool isScript = ext == "cscript";
+        bool isScene = ext == "cscene";
         AssetIconKind kind = isImg      ? AssetIconKind::Image
                             : isFbx     ? AssetIconKind::Fbx
                             : isMap     ? AssetIconKind::InputMap
                             : isScript  ? AssetIconKind::Script
+                            : isScene   ? AssetIconKind::Scene
                                         : AssetIconKind::Generic;
         unsigned int col = isImg      ? IM_COL32(70, 150, 170, 255)
                           : isFbx     ? IM_COL32(150, 110, 190, 255)
                           : isMap     ? IM_COL32(90, 130, 200, 255)
                           : isScript  ? IM_COL32(56, 109, 154, 255)
+                          : isScene   ? IM_COL32(64, 96, 210, 255)
                                       : IM_COL32(90, 94, 104, 255);
         // Resolve which registered script class (if any) this file currently
         // holds, once per frame, for both the tile's "selected" highlight
@@ -1725,9 +1913,34 @@ void EditorApp::drawAssetFolders() {
                         scriptEditor_.openScript(scriptClassName);
                     }
                 }
+            } else if (isScene) {
+                selectedAsset_ = path;
+                selectedMaterial_.clear();
+                selectedScript_.clear();
+                scene_.select(nullptr);
+                if (dbl) {
+                    requestReplaceScene([this, path] {
+                        loadSceneNow(path);
+                        prefabEditReturnPath_.clear();
+                    });
+                }
             } else {
                 ingestDroppedFile(f.path().string());
             }
+        }
+        // Every asset type is draggable, to move it into a folder (item 15):
+        // a plain drag (no modifier needed) carries CRATE_ASSET_MOVE, caught
+        // by a folder tile's drop target above. This is a SEPARATE
+        // BeginDragDropSource call from the type-specific ones below (e.g.
+        // Texture/CRATE_FBX_PATH/CRATE_SCENE_PATH) -- only one drag source
+        // actually activates per frame (whichever's payload a drop target
+        // asks for), so having both registered on the same item is safe:
+        // the folder-move target only ever looks for CRATE_ASSET_MOVE, and
+        // the field/viewport targets only ever look for their own type.
+        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoHoldToOpenOthers)) {
+            ImGui::SetDragDropPayload("CRATE_ASSET_MOVE", path.c_str(), path.size() + 1);
+            ImGui::Text("%s", name.c_str());
+            ImGui::EndDragDropSource();
         }
         // Drag a texture straight onto a component's Texture field.
         if (isImg && ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoHoldToOpenOthers)) {
@@ -1745,6 +1958,33 @@ void EditorApp::drawAssetFolders() {
             ImGui::SetDragDropPayload("CRATE_FBX_PATH", osPath.c_str(), osPath.size() + 1);
             ImGui::Text("Model  %s", name.c_str());
             ImGui::EndDragDropSource();
+        }
+        // Drag a scene into the viewport to place an INSTANCE of it (Scenes
+        // task, Step 4: nesting works through the UI too, not just code --
+        // this is the natural counterpart to the extraction workflow).
+        if (isScene && ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoHoldToOpenOthers)) {
+            ImGui::SetDragDropPayload("CRATE_SCENE_PATH", path.c_str(), path.size() + 1);
+            ImGui::Text("Scene  %s", name.c_str());
+            ImGui::EndDragDropSource();
+        }
+        // Item 106's "real edit workflow": open this .cscene in isolation
+        // without touching the current working scene. Distinct from
+        // double-click, which replaces the working scene outright (guarded
+        // the same way, but with nothing to come back to).
+        if (isScene) {
+            static ui::ContextMenu sceneCtx(nullptr);
+            if (sceneCtx.beginItemPopup()) {
+                if (sceneCtx.item("Edit Prefab")) {
+                    std::string prevPath = currentScenePath_;
+                    requestReplaceScene([this, path, prevPath] {
+                        loadSceneNow(path);
+                        prefabEditReturnPath_ = prevPath; // empty if the scene we're
+                                                          // leaving was never saved --
+                                                          // "Back" just won't show
+                    });
+                }
+                sceneCtx.end();
+            }
         }
         assetGridWrap(i + 1 < files.size());
     }
@@ -1884,6 +2124,42 @@ void EditorApp::drawBottomPanel() {
         ImGui::Separator();
 
         ImGui::BeginChild("files");
+        // Drag an actor from the Hierarchy onto the Asset Browser to turn it
+        // (and its children) into a reusable saved scene, replacing it with
+        // an instance of that scene (Scenes task, Step 2). An invisible
+        // button spanning the whole child is a more reliable drop target
+        // than BeginDragDropTarget() called bare right after BeginChild()
+        // (which depends on child-window last-item tracking); the cursor is
+        // reset afterward so the button sits underneath the real content.
+        ImVec2 dropAreaMin = ImGui::GetCursorScreenPos();
+        ImGui::SetNextItemAllowOverlap(); // let the real tiles drawn after it (below) still
+                                          // receive hover/click instead of this button eating them
+        ImGui::InvisibleButton("##prefab_extract_drop", ImGui::GetContentRegionAvail());
+        if (ImGui::BeginDragDropTarget()) {
+            if (const ImGuiPayload* p = ImGui::AcceptDragDropPayload(kActorPayload)) {
+                uint64_t id = *static_cast<const uint64_t*>(p->Data);
+                if (Actor* dragged = findById(scene_.root(), id)) {
+                    extractPrefabTarget_ = dragged;
+                    extractPrefabName_ = dragged->name();
+                    extractPrefabPopup_.title("Create Scene From Actor")
+                        .size(360, 0)
+                        .onBody([this](ui::Popup& pop) {
+                            pop.help(
+                                "Saves this actor and its children as a new scene, then "
+                                "replaces it here with an instance of that scene.");
+                            pop.inputText("Name", &extractPrefabName_, /*focusOnAppear=*/true);
+                        })
+                        .open();
+                }
+            }
+            ImGui::EndDragDropTarget();
+        }
+        if (extractPrefabPopup_.draw() == ui::Popup::Result::Ok && !extractPrefabName_.empty() &&
+            extractPrefabTarget_) {
+            extractPrefabToScene(extractPrefabTarget_, extractPrefabName_);
+            extractPrefabTarget_ = nullptr;
+        }
+        ImGui::SetCursorScreenPos(dropAreaMin); // draw the real content over the invisible button
         assetBrowserMenu(); // right-click empty space
         drawAssetFolders();
 
@@ -1987,6 +2263,292 @@ void EditorApp::deleteSelection() {
         }
         selectedAsset_.clear();
     }
+}
+
+bool EditorApp::saveSceneAs() {
+    std::string path = platform::saveFileDialog("Save Scene", "Crate Scene\0*.cscene\0All\0*.*\0",
+                                                "cscene");
+    if (path.empty())
+        return false;
+    std::string error;
+    if (scene_.save(path, &error)) {
+        currentScenePath_ = path;
+        savedSceneSnapshot_ = scene_.serializeToString();
+        CR_LOG("scene", "Saved scene to " + path);
+        return true;
+    }
+    CR_ERROR("scene", "Save failed: " + error);
+    return false;
+}
+
+bool EditorApp::saveScene() {
+    if (currentScenePath_.empty())
+        return saveSceneAs();
+    std::string error;
+    if (scene_.save(currentScenePath_, &error)) {
+        savedSceneSnapshot_ = scene_.serializeToString();
+        CR_LOG("scene", "Saved scene to " + currentScenePath_);
+        return true;
+    }
+    CR_ERROR("scene", "Save failed: " + error);
+    return false;
+}
+
+// Unconditional load: swaps scene_, no unsaved-changes guard, does not touch
+// prefabEditReturnPath_ or savedSceneSnapshot_ -- callers (via
+// requestReplaceScene) own those, since they differ per entry point (a
+// normal Open clears the "editing a prefab" banner; "Edit Prefab" sets it).
+void EditorApp::loadSceneNow(const std::string& path) {
+    std::string error;
+    Scene loaded = Scene::load(path, &error);
+    if (!error.empty()) {
+        CR_ERROR("scene", "Open failed: " + error);
+        return;
+    }
+    scene_ = std::move(loaded);
+    currentScenePath_ = path;
+    hierarchyFocusRoot_ = nullptr; // item 107's sub-view pointed into the OLD
+                                   // scene's tree -- stale now (found while
+                                   // adding item 106's guard: every one of
+                                   // these replace-scene_ call sites left this
+                                   // dangling before, a latent use-after-free)
+    renderer_.loadLightmap(scene_, assetDir_);
+    CR_LOG("scene", "Opened scene " + path);
+}
+
+bool EditorApp::hasUnsavedSceneChanges() const {
+    return scene_.serializeToString() != savedSceneSnapshot_;
+}
+
+void EditorApp::requestReplaceScene(std::function<void()> doReplace) {
+    if (!hasUnsavedSceneChanges()) {
+        doReplace();
+        savedSceneSnapshot_ = scene_.serializeToString();
+        return;
+    }
+    pendingSceneReplace_ = std::move(doReplace);
+    unsavedScenePopup_.title("Unsaved Changes")
+        .size(360, 0)
+        .defaultButtons(false)
+        .onBody([this](ui::Popup& p) {
+            p.label("The current scene has unsaved changes.");
+            p.spacing();
+            if (p.button("Save")) {
+                pendingSceneAction_ = PendingSceneAction::Save;
+                p.accept();
+            }
+            ImGui::SameLine();
+            if (p.button("Discard")) {
+                pendingSceneAction_ = PendingSceneAction::Discard;
+                p.accept();
+            }
+            ImGui::SameLine();
+            if (p.button("Cancel"))
+                p.cancel();
+        })
+        .open();
+}
+
+void EditorApp::drawUnsavedScenePopup() {
+    ui::Popup::Result r = unsavedScenePopup_.draw();
+    if (r == ui::Popup::Result::Open)
+        return;
+    if (r == ui::Popup::Result::Ok) {
+        bool proceed = true;
+        if (pendingSceneAction_ == PendingSceneAction::Save)
+            proceed = saveScene(); // false if Save fell through to a cancelled Save As
+        if (proceed && pendingSceneReplace_) {
+            pendingSceneReplace_();
+            savedSceneSnapshot_ = scene_.serializeToString();
+        }
+    }
+    pendingSceneReplace_ = nullptr;
+}
+
+void EditorApp::extractPrefabToScene(Actor* target, const std::string& name) {
+    if (!target || !scene_.contains(target))
+        return;
+    std::error_code ec;
+    fs::path dir = fs::path(assetDir_) / assetCwd_;
+    fs::create_directories(dir, ec);
+    fs::path p = dir / (name + ".cscene");
+    for (int n = 2; fs::exists(p, ec); ++n)
+        p = dir / (name + " " + std::to_string(n) + ".cscene");
+
+    std::string error;
+    if (!scene_.saveSubtree(target, p.generic_string(), &error)) {
+        CR_ERROR("assets", "Create Scene From Actor failed: " + error);
+        return;
+    }
+    AssetDatabase::get().idFor(p.generic_string());
+
+    Actor* parent = target->parent();
+    if (parent == &scene_.root())
+        parent = nullptr;
+    int index = target->indexInParent();
+    Transform savedTransform = target->transform();
+    bool wasVisible = target->visible();
+    bool wasEnabled = target->enabled();
+    scene_.remove(target); // target is destroyed by this call
+    target = nullptr;
+
+    Actor* inst = scene_.instantiate(p.generic_string(), parent, name, &error);
+    if (!inst) {
+        CR_ERROR("assets", "Create Scene From Actor: instantiate failed: " + error);
+        return;
+    }
+    inst->transform() = savedTransform;
+    inst->setVisible(wasVisible);
+    inst->setEnabled(wasEnabled);
+    scene_.reparent(inst, parent, index, /*keepWorld=*/false); // restore original sibling order
+    scene_.select(inst);
+    CR_LOG("assets", "Created " + p.filename().string() + " from '" + name +
+                         "' and replaced it with an instance");
+}
+
+void EditorApp::moveAssetToFolder(const std::string& srcOsPath, const std::string& destFolderRel) {
+    std::error_code ec;
+    fs::path src(srcOsPath);
+    if (!fs::exists(src, ec))
+        return;
+    fs::path destDir = fs::path(assetDir_) / destFolderRel;
+    fs::path dest = destDir / src.filename();
+    if (src == dest)
+        return; // dropped onto its own current folder -- no-op
+    if (fs::is_directory(src, ec)) {
+        // Refuse moving a folder into itself or one of its own descendants.
+        fs::path destAbs = fs::absolute(destDir, ec);
+        fs::path srcAbs = fs::absolute(src, ec);
+        auto rel = destAbs.lexically_relative(srcAbs).generic_string();
+        if (rel.rfind("..", 0) != 0 && !ec) {
+            CR_WARN("assets", "Can't move a folder into itself or its own subfolder");
+            return;
+        }
+    }
+    fs::create_directories(destDir, ec);
+    if (fs::exists(dest, ec)) {
+        CR_WARN("assets", "Move failed: '" + dest.filename().string() + "' already exists there");
+        return;
+    }
+    const bool wasScript = src.extension() == ".cscript";
+    const bool wasDir = fs::is_directory(src, ec);
+    fs::rename(src, dest, ec);
+    if (ec) {
+        CR_ERROR("assets", "Move failed: " + ec.message());
+        return;
+    }
+    if (wasDir)
+        AssetDatabase::get().movedPrefix(src.generic_string() + "/", dest.generic_string() + "/");
+    else
+        AssetDatabase::get().moved(src.generic_string(), dest.generic_string());
+    if (wasScript)
+        script::ScriptSystem::get().reload(); // re-discover the file at its new path
+    CR_LOG("assets", "Moved '" + src.filename().string() + "' to '" +
+                         (destFolderRel.empty() ? std::string("assets") : destFolderRel) + "'");
+}
+
+void EditorApp::openScene() {
+    std::string path =
+        platform::openFileDialog("Open Scene", "Crate Scene\0*.cscene\0All\0*.*\0");
+    if (path.empty())
+        return;
+    requestReplaceScene([this, path] {
+        loadSceneNow(path);
+        prefabEditReturnPath_.clear();
+    });
+}
+
+// --- Projects (task 92) ----------------------------------------------------
+// The save dialog picks a root LOCATION and a project name; a new subfolder
+// named after the project is created inside that location (task 123 --
+// originally this used the dialog's chosen folder directly as the project
+// root, which forced the user to pre-create a wrapper folder themselves
+// before running New Project). Both the .crate file and its "assets"
+// subfolder live inside that new project folder, with no separate
+// folder-picker dialog needed (this codebase has no folder-browse dialog to
+// reuse, only open/save-file ones) -- the Save dialog's own folder doubles as
+// "pick a root", and its filename becomes the new subfolder's name.
+void EditorApp::newProject() {
+    if (playing_) {
+        CR_WARN("project", "Stop Play before creating a new project");
+        return;
+    }
+    std::string path =
+        platform::saveFileDialog("New Project", "Crate Project\0*.crate\0All\0*.*\0", "crate");
+    if (path.empty())
+        return;
+    requestReplaceScene([this, path] {
+        fs::path chosen(path);
+        std::string projectName = chosen.stem().string();
+        fs::path projectDir = chosen.parent_path() / projectName;
+
+        CreateProjectResult result = createProjectInFolder(projectDir.generic_string(), projectName);
+        if (!result.ok) {
+            CR_ERROR("project", "New Project failed: " + result.error);
+            return;
+        }
+
+        currentProjectPath_ = result.crateFilePath;
+        registerKnownProject(currentProjectPath_); // so the launcher lists it too
+        mountProjectAssets(result.assetsDir);
+        scene_ = Scene("Untitled");
+        renderer_.loadLightmap(scene_, assetDir_);
+        currentScenePath_.clear();
+        hierarchyFocusRoot_ = nullptr;
+        prefabEditReturnPath_.clear();
+        savedSceneSnapshot_ = scene_.serializeToString();
+        CR_LOG("project", "Created project '" + projectName + "' at " + currentProjectPath_);
+    });
+}
+
+void EditorApp::openProjectAt(const std::string& crateFilePath) {
+    ProjectInfo info;
+    std::string error;
+    if (!loadProjectFile(crateFilePath, &info, &error)) {
+        CR_ERROR("project", "Open Project failed: " + error);
+        return;
+    }
+    fs::path dir = fs::path(crateFilePath).parent_path();
+
+    currentProjectPath_ = crateFilePath;
+    registerKnownProject(currentProjectPath_); // so the launcher lists it too
+    mountProjectAssets((dir / "assets").generic_string());
+    // No "last open scene" is persisted in the (deliberately minimal) .crate
+    // file yet -- start from a blank scene; the project's own saved .cscene
+    // files are reachable from the Asset Browser as usual.
+    scene_ = Scene("Untitled");
+    renderer_.loadLightmap(scene_, assetDir_);
+    currentScenePath_.clear();
+    hierarchyFocusRoot_ = nullptr;
+    prefabEditReturnPath_.clear();
+    savedSceneSnapshot_ = scene_.serializeToString();
+    CR_LOG("project", "Opened project '" + info.name + "' from " + crateFilePath);
+}
+
+void EditorApp::openProject() {
+    if (playing_) {
+        CR_WARN("project", "Stop Play before opening a different project");
+        return;
+    }
+    std::string path =
+        platform::openFileDialog("Open Project", "Crate Project\0*.crate\0All\0*.*\0");
+    if (path.empty())
+        return;
+    requestReplaceScene([this, path] { openProjectAt(path); });
+}
+
+void EditorApp::saveProject() {
+    if (currentProjectPath_.empty()) {
+        CR_WARN("project", "No project open -- use File > New Project first");
+        return;
+    }
+    ProjectInfo info;
+    info.name = fs::path(currentProjectPath_).stem().string();
+    std::string error;
+    if (saveProjectFile(currentProjectPath_, info, &error))
+        CR_LOG("project", "Saved project to " + currentProjectPath_);
+    else
+        CR_ERROR("project", "Save Project failed: " + error);
 }
 
 void EditorApp::setPlaying(bool playing) {
