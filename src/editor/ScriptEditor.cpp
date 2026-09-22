@@ -10,11 +10,18 @@
 #include <algorithm>
 #include <cctype>
 #include <climits>
+#include <regex>
 
 namespace crate {
 
 using script::ScriptSystem;
 
+// Known-type highlighting (task 127): every current entry in ScriptSystem's
+// typeDoc registry (every builtin type AND every user-defined script class)
+// gets marked as a known identifier, generically -- not a hardcoded list of
+// a few names that drifts out of date as new types are added. Called once at
+// construction and again whenever the type registry could have changed (a
+// script compiled, a different script opened -- see refreshLanguageIdentifiers()).
 static TextEditor::LanguageDefinition makeCScriptLang() {
     TextEditor::LanguageDefinition d;
     d.mName = "cScript";
@@ -23,8 +30,10 @@ static TextEditor::LanguageDefinition makeCScriptLang() {
           "do_async", "true", "false", "null", "static", "abstract", "this", "base", "break",
           "continue"})
         d.mKeywords.insert(k);
-    for (const char* t : {"int", "float", "bool", "char", "string", "array", "Vector2", "Vector3",
-                          "Actor", "Actor2D", "Actor3D", "print", "type_of"}) {
+    // A few globals that aren't types but read the same way (highlighted as
+    // "a known name") -- the actual type list is added by
+    // refreshLanguageIdentifiers() below, from the live registry.
+    for (const char* t : {"print", "type_of", "transform", "actor", "get_root"}) {
         TextEditor::Identifier id;
         id.mDeclaration = "built-in";
         d.mIdentifiers.insert({t, id});
@@ -46,7 +55,7 @@ static TextEditor::LanguageDefinition makeCScriptLang() {
 }
 
 ScriptEditor::ScriptEditor() {
-    editor_.SetLanguageDefinition(makeCScriptLang());
+    refreshLanguageIdentifiers();
     editor_.SetPalette(TextEditor::GetDarkPalette());
     editor_.SetTabSize(4);
     editor_.SetShowWhitespaces(false);
@@ -62,7 +71,23 @@ void ScriptEditor::openScript(const std::string& name) {
     suppressSync_ = false;
     syncGrace_ = 2;
     refreshFunctions();
+    refreshLanguageIdentifiers(); // a different project/script may know different types
     acOpen_ = false;
+}
+
+// Rebuilds the language definition's identifier set (task 127) from
+// ScriptSystem's live typeDoc registry -- every builtin type and every
+// currently-compiled script class, so highlighting always reflects reality
+// (a newly-defined class, or a different project's classes after Open
+// Project) instead of a fixed list captured once at construction.
+void ScriptEditor::refreshLanguageIdentifiers() {
+    TextEditor::LanguageDefinition d = makeCScriptLang();
+    for (const auto& doc : ScriptSystem::get().typeDocs()) {
+        TextEditor::Identifier id;
+        id.mDeclaration = doc.isScript ? "script class" : "built-in";
+        d.mIdentifiers[doc.name] = id;
+    }
+    editor_.SetLanguageDefinition(d);
 }
 
 void ScriptEditor::refreshFunctions() {
@@ -112,12 +137,13 @@ void ScriptEditor::pushToSystem() {
     if (!nowName.empty())
         current_ = nowName; // follow a class rename
     refreshFunctions();
+    refreshLanguageIdentifiers(); // a class/field/method may have just been added or renamed
 }
 
 void ScriptEditor::draw() {
     if (ScriptSystem::get().files().empty()) {
-        ImGui::TextWrapped("No scripts found in assets/scripts/. Create a .cscript file there, "
-                           "or use the Asset Browser.");
+        ImGui::TextWrapped("No scripts found in this project's assets folder. Create one with "
+                           "New below, or use the Asset Browser.");
         return;
     }
     if (current_.empty())
@@ -285,7 +311,30 @@ void ScriptEditor::applyAutoBrackets() {
         // matching closer right after and step back in between.
         editor_.InsertText(c == '{' ? "}" : ")");
         auto cur = editor_.GetCursorPosition();
-        editor_.SetCursorPosition(TextEditor::Coordinates(cur.mLine, cur.mColumn - 1));
+        auto betweenParens = TextEditor::Coordinates(cur.mLine, cur.mColumn - 1);
+        editor_.SetCursorPosition(betweenParens);
+
+        // Task 131: "func name(" gets its whole skeleton in one shot --
+        // closing ')', newline, '{', an indented blank line, then a
+        // dedented '}' -- with the cursor left between the parens (ready
+        // for parameters), not down in the body. preLine_/preCursor_ are
+        // the line/caret as they were *before* this '(' was typed (see
+        // drawCode()'s snapshot, taken before Render() consumes input) --
+        // applyAutoBrackets() elsewhere in this file already indexes
+        // preLine_ with preCursor_.mColumn directly, so this follows the
+        // same convention.
+        if (c == '(' && preCursor_.mColumn >= 0 && preCursor_.mColumn <= (int)preLine_.size()) {
+            static const std::regex kFuncDecl(R"(^[ \t]*func[ \t]+[A-Za-z_][A-Za-z0-9_]*$)");
+            std::string beforeCaret = preLine_.substr(0, preCursor_.mColumn);
+            if (std::regex_match(beforeCaret, kFuncDecl)) {
+                int indent = leadingTabs(preLine_);
+                editor_.SetCursorPosition(TextEditor::Coordinates(cur.mLine, cur.mColumn));
+                editor_.InsertText("\n" + std::string(indent, '\t') + "{\n" +
+                                   std::string(indent + 1, '\t') + "\n" + std::string(indent, '\t') +
+                                   "}");
+                editor_.SetCursorPosition(betweenParens);
+            }
+        }
         return;
     }
     if (c == '}' || c == ')') {
@@ -630,7 +679,12 @@ void ScriptEditor::updateAutocomplete() {
             for (const auto& fd : it->second->decl->fields)
                 consider(fd.name);
             for (const auto& fn : it->second->decl->functions) {
-                consider(fn.name);
+                // "()" suffix -- see acItems_ consumption below: it's inserted
+                // verbatim past the typed prefix, so this is what makes
+                // calling a function you just defined yourself auto-insert
+                // its parens too (task 126), the same way every other known
+                // function does via ScriptSystem's typeDocs()/completions().
+                consider(fn.name + "()");
                 for (const auto& p : fn.params)
                     consider(p.name);
             }

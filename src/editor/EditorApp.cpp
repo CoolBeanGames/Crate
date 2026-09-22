@@ -93,7 +93,15 @@ void EditorApp::mountProjectAssets(const std::string& newAssetDir) {
     importedAssets_.clear();
     AssetDatabase::get().load(assetDir_);
     script::ScriptSystem::get().unloadAll();
-    script::ScriptSystem::get().loadFolder(assetDir_ + "/scripts");
+    // Recursively scans the WHOLE project asset tree, not just a "scripts"
+    // subfolder (task 132) -- ScriptSystem::newScript() still defaults new
+    // files into <assetDir>/scripts for tidiness, but any .cscript file
+    // anywhere under assetDir_ is recognized and editable. scriptsDir()
+    // (== assetDir_ after this) is also the native-build pipeline's base
+    // directory (ScriptBuild.cpp) -- it only uses that as an absolute cwd,
+    // never assumes scripts sit flat inside it, so this is safe for Play
+    // too.
+    script::ScriptSystem::get().loadFolder(assetDir_);
     scanAssets();
     loadFolderColors();
 
@@ -172,14 +180,19 @@ void EditorApp::ingestDroppedFile(const std::string& path) {
         }
     } else if (ext == "cscript") {
         // Copy the script into the project's scripts folder and load it.
+        // Always targets <assetDir>/scripts specifically (not sys.scriptsDir(),
+        // which is now the whole project asset root, task 132) so imports
+        // land somewhere tidy by default; reload() picks it up without
+        // narrowing the editor's broader scan scope back down the way a bare
+        // loadFolder(dir) would.
         auto& sys = script::ScriptSystem::get();
-        std::string dir = sys.scriptsDir().empty() ? (assetDir_ + "/scripts") : sys.scriptsDir();
+        std::string dir = assetDir_ + "/scripts";
         std::error_code ec;
         fs::create_directories(dir, ec);
         fs::path dst = fs::path(dir) / fs::path(path).filename();
         if (fs::path(path) != dst)
             fs::copy_file(path, dst, fs::copy_options::overwrite_existing, ec);
-        sys.loadFolder(dir);
+        sys.reload();
         AssetDatabase::get().idFor(dst.generic_string());
         CR_LOG("assets", "Imported script " + dst.filename().string());
     } else {

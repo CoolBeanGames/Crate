@@ -605,9 +605,15 @@ void ScriptSystem::loadFolder(const std::string& dir) {
 
 std::string ScriptSystem::newScript(const std::string& className) {
     if (dir_.empty())
-        dir_ = "assets/scripts";
+        dir_ = "assets";
+    // New scripts always land in a "scripts" subfolder of the project's
+    // asset root for tidiness, even though dir_ itself is now that whole
+    // root (task 132: the editor is aware of .cscript files anywhere under
+    // it, but that doesn't mean newly-created ones should scatter loose in
+    // the root).
+    const std::string newScriptDir = dir_ + "/scripts";
     std::error_code ec;
-    fs::create_directories(dir_, ec);
+    fs::create_directories(newScriptDir, ec);
 
     // Sanitize to a valid class identifier.
     std::string base;
@@ -621,7 +627,8 @@ std::string ScriptSystem::newScript(const std::string& className) {
 
     // Make it unique.
     std::string name = base;
-    for (int n = 2; (types_.count(name) || fs::exists(fs::path(dir_) / (name + ".cscript"), ec));
+    for (int n = 2;
+         (types_.count(name) || fs::exists(fs::path(newScriptDir) / (name + ".cscript"), ec));
          ++n)
         name = base + std::to_string(n);
 
@@ -641,7 +648,7 @@ std::string ScriptSystem::newScript(const std::string& className) {
         "\t}\n"
         "}\n";
 
-    const std::string path = (fs::path(dir_) / (name + ".cscript")).string();
+    const std::string path = (fs::path(newScriptDir) / (name + ".cscript")).string();
     std::ofstream out(path, std::ios::binary);
     if (!out) {
         CR_ERROR("script", "Could not create " + path);
@@ -727,54 +734,68 @@ const ScriptSystem::TypeDoc* ScriptSystem::typeDoc(const std::string& name) cons
     return nullptr;
 }
 
+// Marks a member as a callable function, purely for autocomplete's "insert
+// ()" behavior (task 126) and the completion list's own display -- ANY
+// member listed with this suffix auto-inserts its parens on completion,
+// generically, via the same code path in ScriptEditor::updateAutocomplete()
+// that handles every other member. This is the one place that decides
+// "is this callable"; nothing downstream special-cases a member by name (see
+// that function's own comment). TypeDoc::members is consumed ONLY here and
+// in ScriptEditor.cpp's two completion-building loops -- never for real type
+// resolution (see builtinMemberType()/resolveChainType(), which use their
+// own separate logic) -- so this cosmetic suffix can never affect runtime
+// behavior.
+static std::string asFn(const std::string& name) { return name + "()"; }
+
 void ScriptSystem::rebuildTypeDocs() {
     typeDocs_.clear();
     auto add = [&](std::string name, std::string base, bool isScript,
                    std::vector<std::string> members) {
         typeDocs_.push_back({std::move(name), std::move(base), isScript, std::move(members)});
     };
-    add("int", "", false, {"str"});
-    add("float", "", false, {"str"});
-    add("bool", "", false, {"str"});
+    add("int", "", false, {asFn("str")});
+    add("float", "", false, {asFn("str")});
+    add("bool", "", false, {asFn("str")});
     add("char", "", false, {});
     add("string", "", false, {"length"});
-    add("array", "", false, {"length", "add", "str"});
-    add("Vector2", "", false, {"x", "y", "str", "normalize"});
-    add("Vector3", "", false, {"x", "y", "z", "str", "normalize"});
+    add("array", "", false, {"length", asFn("add"), asFn("str")});
+    add("Vector2", "", false, {"x", "y", asFn("str"), asFn("normalize")});
+    add("Vector3", "", false, {"x", "y", "z", asFn("str"), asFn("normalize")});
     add("Transform", "", false, {"position", "rotation", "scale", "forward", "right", "up"});
     add("Actor", "", false,
-        {"name", "position", "rotation", "scale", "forward", "right", "up", "get_component",
-         "add_component", "destroy"});
+        {"name", "position", "rotation", "scale", "forward", "right", "up", asFn("get_component"),
+         asFn("add_component"), asFn("destroy")});
     add("Actor2D", "Actor", false,
-        {"name", "position", "rotation", "scale", "forward", "right", "up", "get_component",
-         "add_component", "destroy"});
+        {"name", "position", "rotation", "scale", "forward", "right", "up", asFn("get_component"),
+         asFn("add_component"), asFn("destroy")});
     add("Actor3D", "Actor", false,
-        {"name", "position", "rotation", "scale", "forward", "right", "up", "get_component",
-         "add_component", "destroy"});
+        {"name", "position", "rotation", "scale", "forward", "right", "up", asFn("get_component"),
+         asFn("add_component"), asFn("destroy")});
     // Not spawnable/constructible from script -- only reachable via
     // get_component(type_of(Fog)). Listed so its members show up in
     // completions once you're chained off that call. Every native
     // component view also reaches its OWNING ACTOR's Transform via
     // `.transform` (getNativeField handles this generically for all of
     // them), so "transform" is listed on every one below too.
-    add("Fog", "", false, {"color", "start", "end", "height_range", "transform", "remove"});
+    add("Fog", "", false, {"color", "start", "end", "height_range", "transform", asFn("remove")});
     // "Camera" is also reachable as a bare global for Camera.main (task 77):
     // the scene's one active camera, readable and assignable to switch it.
-    add("Camera", "", false, {"main", "fov", "near", "far", "active", "transform", "remove"});
+    add("Camera", "", false, {"main", "fov", "near", "far", "active", "transform", asFn("remove")});
     // Reachable via get_component(type_of(Light)) / drag-drop onto a field
     // declared with this type -- see ScriptSystem's ctx_.getComponent.
     add("Light", "", false,
         {"type", "color", "intensity", "range", "spot_inner_deg", "spot_outer_deg", "is_static",
-         "transform", "remove"});
-    add("VolumetricFog", "", false, {"color", "density", "transform", "remove"});
-    add("MeshRenderer", "", false, {"tint", "cast_shadows", "receive_shadows", "transform", "remove"});
-    add("LightProbe", "", false, {"baked_light", "baked_valid", "transform", "remove"});
-    add("Spinner", "", false, {"degrees_per_second", "axis", "transform", "remove"});
+         "transform", asFn("remove")});
+    add("VolumetricFog", "", false, {"color", "density", "transform", asFn("remove")});
+    add("MeshRenderer", "", false,
+        {"tint", "cast_shadows", "receive_shadows", "transform", asFn("remove")});
+    add("LightProbe", "", false, {"baked_light", "baked_valid", "transform", asFn("remove")});
+    add("Spinner", "", false, {"degrees_per_second", "axis", "transform", asFn("remove")});
     // Not a component -- an ASSET reference (a saved .cscene path), for a
     // field declared `Scene`. Drag a scene tile from the Asset Browser onto
     // it in the Inspector; .instantiate() spawns a live instance at runtime
     // (Scenes task; see Runtime.h's valueInstantiate).
-    add("Scene", "", false, {"instantiate"});
+    add("Scene", "", false, {asFn("instantiate")});
     // Global helper namespace, reached as Math.<fn>(...) (Interpreter::
     // evalCall's mathCall branch) -- registered here purely for
     // autocomplete visibility, which it never had before (Math wasn't in
@@ -782,9 +803,10 @@ void ScriptSystem::rebuildTypeDocs() {
     // ones that already existed, like clamp/lerp/sin/rand_i_range -- were
     // simply undiscoverable via Ctrl+Space).
     add("Math", "", false,
-       {"clamp", "lerp", "slerp", "sin", "cos", "tan", "sqrt", "exp", "pow", "abs", "floor", "ceil",
-        "round", "min", "max", "deg2rad", "rad2deg", "rand_f", "rand_i", "rand_f_range",
-        "rand_i_range"});
+       {asFn("clamp"), asFn("lerp"), asFn("slerp"), asFn("sin"), asFn("cos"), asFn("tan"),
+        asFn("sqrt"), asFn("exp"), asFn("pow"), asFn("abs"), asFn("floor"), asFn("ceil"),
+        asFn("round"), asFn("min"), asFn("max"), asFn("deg2rad"), asFn("rad2deg"), asFn("rand_f"),
+        asFn("rand_i"), asFn("rand_f_range"), asFn("rand_i_range")});
     // Global namespace reached as Input.<method>(...), handled directly in
     // Interpreter::evalCall rather than through get_component -- listed here
     // purely so its methods show up in autocomplete (task: "Input global
@@ -797,7 +819,8 @@ void ScriptSystem::rebuildTypeDocs() {
     // (a member-access chain, not a method call -- see Interpreter::
     // evalMember / CodeGen's identical structural check).
     add("Input", "", false,
-       {"get_button", "get_axis", "is_pressed", "is_just_pressed", "is_just_released", "Mouse"});
+       {asFn("get_button"), asFn("get_axis"), asFn("is_pressed"), asFn("is_just_pressed"),
+        asFn("is_just_released"), "Mouse"});
     add("InputMouse", "", false,
        {"delta", "scroll", "left_down", "left_just_down", "left_just_up", "right_down",
         "right_just_down", "right_just_up", "middle_down", "middle_just_down", "middle_just_up"});
@@ -807,7 +830,7 @@ void ScriptSystem::rebuildTypeDocs() {
         for (const auto& fd : ci->decl->fields)
             members.push_back(fd.name);
         for (const auto& fn : ci->decl->functions)
-            members.push_back(fn.name);
+            members.push_back(asFn(fn.name));
         add(ci->name, ci->base, true, std::move(members));
     }
 }
@@ -817,8 +840,8 @@ std::vector<std::string> ScriptSystem::completions(const std::string& prefix) co
                                      "switch", "case",   "default", "do",     "do_async", "true",
                                      "false",  "null",   "static", "abstract", "this",  "base",
                                      "break",  "continue"};
-    static const char* globals[] = {"print", "type_of", "Vector2", "Vector3", "transform",
-                                    "actor", "Camera",  "Input",   "get_root", "Math"};
+    static const char* globals[] = {"print()", "type_of()", "Vector2", "Vector3", "transform",
+                                    "actor", "Camera",  "Input",   "get_root()", "Math"};
 
     std::vector<std::string> out;
     auto consider = [&](const std::string& s) {

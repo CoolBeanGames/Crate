@@ -44,6 +44,7 @@ private:
     void drawCode();
     void pushToSystem();     // editor text -> ScriptSystem (recompile)
     void refreshFunctions();
+    void refreshLanguageIdentifiers(); // task 127: known-type highlighting from the live registry
     void updateAutocomplete();
     void applyElectricIndent(); // +1 indent after '{' on Enter, snap '}' back
     void applyAutoBrackets();   // auto-insert/skip-over matching } and )
