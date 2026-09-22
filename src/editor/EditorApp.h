@@ -2,6 +2,7 @@
 #include "assets/MaterialLibrary.h"
 #include "assets/MeshLibrary.h"
 #include "editor/AssetPicker.h"
+#include "editor/PathRegistry.h"
 #include "editor/Popup.h"
 #include "editor/ProjectFile.h"
 #include "editor/ScriptEditor.h"
@@ -41,6 +42,14 @@ public:
     void ingestDroppedFile(const std::string& path);
 
     void setScriptMode(bool on) { openScriptsTab_ = on; }
+
+    // Opens the project at `crateFilePath` unconditionally (no unsaved-changes
+    // guard, no dialog) -- used by main.cpp's `--project <path>` startup
+    // argument (task 125, the launcher/`crate open` CLI) to mount a specific
+    // project non-interactively before the first frame. The interactive
+    // File > Open Project menu item wraps this same logic in the usual
+    // requestReplaceScene() guard.
+    void openProjectAt(const std::string& crateFilePath);
 
     // Draw one editor frame. Call between ImGui::NewFrame() and ImGui::Render().
     void onFrame();
@@ -113,7 +122,7 @@ private:
     // (assetDir_ defaults to "assets" next to the exe/cwd) -- there's always
     // an implicit default project, never a "no project" state.
     void newProject();  // prompts for a new .crate path, creates folder+assets/, mounts it
-    void openProject(); // prompts for an existing .crate file, mounts its assets/
+    void openProject(); // prompts for an existing .crate file; guard + openProjectAt()
     void saveProject(); // re-writes the current project's .crate file; no-op if none is open
     // Re-points assetDir_ at `newAssetDir` and reloads everything keyed off
     // it (AssetDatabase, ScriptSystem, the Asset Browser scan, folder colors,

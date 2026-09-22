@@ -2481,56 +2481,48 @@ void EditorApp::newProject() {
         fs::path chosen(path);
         std::string projectName = chosen.stem().string();
         fs::path projectDir = chosen.parent_path() / projectName;
-        fs::path projPath = projectDir / (projectName + ".crate");
 
-        std::error_code ec;
-        // Don't silently reuse/clobber a folder that already holds something
-        // -- an existing empty folder (e.g. one the user pre-made out of
-        // habit) is fine to build into, but any existing content there is
-        // someone else's, not this new project's to overwrite.
-        if (fs::exists(projectDir, ec)) {
-            std::error_code ec2;
-            bool nonEmpty = fs::directory_iterator(projectDir, ec2) != fs::directory_iterator();
-            if (nonEmpty) {
-                CR_ERROR("project", "New Project failed: '" + projectDir.generic_string() +
-                                        "' already exists and is not empty");
-                return;
-            }
-        }
-        fs::create_directories(projectDir / "assets", ec);
-        if (ec) {
-            CR_ERROR("project",
-                     "New Project failed: could not create '" + projectDir.generic_string() + "'");
+        CreateProjectResult result = createProjectInFolder(projectDir.generic_string(), projectName);
+        if (!result.ok) {
+            CR_ERROR("project", "New Project failed: " + result.error);
             return;
         }
 
-        // A fresh project should have a real physical default asset from the
-        // start (task 124), not just in-memory state -- matches the file this
-        // same InputMap::save() format already produces via the "Create Input
-        // Map" asset-browser action, and the filename this repo's own
-        // long-standing default project has always used.
-        InputMap defaultInputMap;
-        defaultInputMap.buttons.push_back({"jump", 0});
-        defaultInputMap.save((projectDir / "assets" / "Default.inputmap").generic_string());
-
-        ProjectInfo info;
-        info.name = projectName;
-        std::string error;
-        if (!saveProjectFile(projPath.generic_string(), info, &error)) {
-            CR_ERROR("project", "New Project failed: " + error);
-            return;
-        }
-
-        currentProjectPath_ = projPath.generic_string();
-        mountProjectAssets((projectDir / "assets").generic_string());
+        currentProjectPath_ = result.crateFilePath;
+        registerKnownProject(currentProjectPath_); // so the launcher lists it too
+        mountProjectAssets(result.assetsDir);
         scene_ = Scene("Untitled");
         renderer_.loadLightmap(scene_, assetDir_);
         currentScenePath_.clear();
         hierarchyFocusRoot_ = nullptr;
         prefabEditReturnPath_.clear();
         savedSceneSnapshot_ = scene_.serializeToString();
-        CR_LOG("project", "Created project '" + info.name + "' at " + currentProjectPath_);
+        CR_LOG("project", "Created project '" + projectName + "' at " + currentProjectPath_);
     });
+}
+
+void EditorApp::openProjectAt(const std::string& crateFilePath) {
+    ProjectInfo info;
+    std::string error;
+    if (!loadProjectFile(crateFilePath, &info, &error)) {
+        CR_ERROR("project", "Open Project failed: " + error);
+        return;
+    }
+    fs::path dir = fs::path(crateFilePath).parent_path();
+
+    currentProjectPath_ = crateFilePath;
+    registerKnownProject(currentProjectPath_); // so the launcher lists it too
+    mountProjectAssets((dir / "assets").generic_string());
+    // No "last open scene" is persisted in the (deliberately minimal) .crate
+    // file yet -- start from a blank scene; the project's own saved .cscene
+    // files are reachable from the Asset Browser as usual.
+    scene_ = Scene("Untitled");
+    renderer_.loadLightmap(scene_, assetDir_);
+    currentScenePath_.clear();
+    hierarchyFocusRoot_ = nullptr;
+    prefabEditReturnPath_.clear();
+    savedSceneSnapshot_ = scene_.serializeToString();
+    CR_LOG("project", "Opened project '" + info.name + "' from " + crateFilePath);
 }
 
 void EditorApp::openProject() {
@@ -2542,28 +2534,7 @@ void EditorApp::openProject() {
         platform::openFileDialog("Open Project", "Crate Project\0*.crate\0All\0*.*\0");
     if (path.empty())
         return;
-    requestReplaceScene([this, path] {
-        ProjectInfo info;
-        std::string error;
-        if (!loadProjectFile(path, &info, &error)) {
-            CR_ERROR("project", "Open Project failed: " + error);
-            return;
-        }
-        fs::path dir = fs::path(path).parent_path();
-
-        currentProjectPath_ = path;
-        mountProjectAssets((dir / "assets").generic_string());
-        // No "last open scene" is persisted in the (deliberately minimal)
-        // .crate file yet -- start from a blank scene; the project's own
-        // saved .cscene files are reachable from the Asset Browser as usual.
-        scene_ = Scene("Untitled");
-        renderer_.loadLightmap(scene_, assetDir_);
-        currentScenePath_.clear();
-        hierarchyFocusRoot_ = nullptr;
-        prefabEditReturnPath_.clear();
-        savedSceneSnapshot_ = scene_.serializeToString();
-        CR_LOG("project", "Opened project '" + info.name + "' from " + path);
-    });
+    requestReplaceScene([this, path] { openProjectAt(path); });
 }
 
 void EditorApp::saveProject() {
