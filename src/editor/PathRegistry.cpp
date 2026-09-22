@@ -161,4 +161,28 @@ void registerKnownProject(const std::string& crateFilePath) {
     out << crateFilePath << "\n";
 }
 
+void writeLastOpened(const std::string& projectCratePath, const std::string& scenePath) {
+    fs::path p = fs::path(crateAppDataDir()) / "last_opened.txt";
+    std::ofstream out(p, std::ios::binary | std::ios::trunc);
+    if (out)
+        out << projectCratePath << "\n" << scenePath << "\n";
+}
+
+void readLastOpened(std::string* outProject, std::string* outScene) {
+    fs::path p = fs::path(crateAppDataDir()) / "last_opened.txt";
+    std::ifstream in(p, std::ios::binary);
+    if (!in)
+        return;
+    std::string proj, scene;
+    std::getline(in, proj);
+    std::getline(in, scene);
+    std::error_code ec;
+    if (proj.empty() || !fs::exists(proj, ec))
+        return;
+    if (outProject)
+        *outProject = proj;
+    if (outScene)
+        *outScene = scene;
+}
+
 } // namespace crate

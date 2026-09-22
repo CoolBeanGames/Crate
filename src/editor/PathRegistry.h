@@ -54,4 +54,17 @@ std::string ensureCrateCliOnPath(const std::string& sourceExePath);
 // of creating one, not just this particular entry point.
 void registerKnownProject(const std::string& crateFilePath);
 
+// Records the project + scene the editor currently has open
+// (%LOCALAPPDATA%\Crate\last_opened.txt), so a bare launch of Crate.exe (no
+// --project arg) can reopen exactly where the user left off instead of
+// always falling back to the built-in sample scene (task 130). `scenePath`
+// may be empty (e.g. a brand-new, never-saved scene).
+void writeLastOpened(const std::string& projectCratePath, const std::string& scenePath);
+
+// Fills *outProject/*outScene from the last writeLastOpened() call, leaving
+// them untouched if there's no record yet or the recorded project file no
+// longer exists on disk (the scene path is not existence-checked here --
+// callers should verify it themselves before loading).
+void readLastOpened(std::string* outProject, std::string* outScene);
+
 } // namespace crate

@@ -152,6 +152,7 @@ int main(int argc, char** argv) {
     }
 
     CR_LOG("platform", "Shutting down");
+    app.recordLastOpened(); // task 130 -- resume here on the next bare launch
     app.attachDevice(nullptr, nullptr); // release renderer GPU objects before the device
     ImGui_ImplDX11_Shutdown();
     ImGui_ImplWin32_Shutdown();

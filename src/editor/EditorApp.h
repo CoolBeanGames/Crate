@@ -51,6 +51,15 @@ public:
     // requestReplaceScene() guard.
     void openProjectAt(const std::string& crateFilePath);
 
+    // Persists the currently-open project + scene as the "last opened" pair
+    // (task 130) so a future bare launch (no --project arg) can resume here
+    // instead of the built-in sample scene. main.cpp calls this once at clean
+    // shutdown; EditorApp itself also calls it right after opening/creating a
+    // project, so at least the project (if not the in-progress scene edits)
+    // survives a crash or force-quit. No-op if no project is open (the
+    // implicit default project has nothing meaningful to remember).
+    void recordLastOpened() const;
+
     // Draw one editor frame. Call between ImGui::NewFrame() and ImGui::Render().
     void onFrame();
 
@@ -109,9 +118,16 @@ private:
 
     // Scene file I/O (Scenes task, Phase 1: see scene/SceneIO.cpp). saveScene()
     // reuses currentScenePath_ if the scene was already Saved/Opened this
-    // session, else behaves like saveSceneAs() (prompts for a path).
-    bool saveSceneAs(); // false if the save dialog was cancelled or the write failed
-    bool saveScene();   // false if it fell through to saveSceneAs() and that was cancelled/failed
+    // session, else behaves like saveSceneAs() (prompts for a name inline,
+    // task 128 -- no OS file dialog). Both are asynchronous when a name
+    // prompt is needed: they open the popup and return immediately, and
+    // onSaved (if given) fires once the popup is actually confirmed and the
+    // write succeeds -- callers that need to sequence work after a save (see
+    // drawUnsavedScenePopup) must use the callback, not the return value, to
+    // find out when a save-as actually completes.
+    void saveSceneAs(std::function<void()> onSaved = nullptr);
+    bool saveScene(std::function<void()> onSaved = nullptr); // true only if saved synchronously
+                                                              // right now (had a path already)
     void openScene();
 
     // Project file I/O (task 92, "Projects"): a .crate file marking a folder
@@ -211,10 +227,11 @@ private:
     std::string assetCwd_; // current sub-folder relative to assetDir_ ("" = root)
     std::map<std::string, unsigned int> folderColors_; // relPath -> ImU32 (0xAABBGGRR)
     struct { std::string path; bool cut = false; } folderClip_;
-    enum class AssetDlg { None, NewFolder, RenameFolder, DeleteFolder, ColorFolder };
+    enum class AssetDlg { None, NewFolder, RenameFolder, DeleteFolder, ColorFolder, SaveScene };
     AssetDlg assetDlg_ = AssetDlg::None;
     std::string assetDlgTarget_;   // folder relPath the dialog acts on
     std::string assetDlgBuf_;      // name entry
+    std::function<void()> saveSceneAsCallback_; // fires once AssetDlg::SaveScene succeeds (task 128)
     float assetDlgColor_[4] = {0.55f, 0.49f, 1.0f, 1.0f};
     ui::Popup assetPopup_;
     ui::Popup extractPrefabPopup_;

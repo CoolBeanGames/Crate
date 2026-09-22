@@ -67,14 +67,34 @@ static void disableOtherCameras(Actor& node, CameraComponent* keep) {
 
 EditorApp::EditorApp() : scene_(Scene::makeSample()) {
     registerBuiltinComponents();
-    mountProjectAssets(assetDir_); // assetDir_'s in-class default ("assets") is
-                                     // the implicit default project
     renderer_.setMeshLibrary(&meshLib_);
     renderer_.setMaterialLibrary(&materialLib_);
-    renderer_.loadLightmap(scene_, assetDir_); // apply any lightmap baked for this scene
-    savedSceneSnapshot_ = scene_.serializeToString();
-    CR_LOG("app", "Crate editor started");
-    CR_LOG("scene", "Loaded sample scene with " + std::to_string(scene_.actorCount()) + " actors");
+
+    // Task 130: a bare launch (no --project arg, see main.cpp) resumes the
+    // last project + scene the user actually had open, rather than always
+    // falling back to the built-in sample scene -- once a real project
+    // exists, main.cpp's explicit --project argument (the launcher/`crate
+    // open`) is the only thing that should still land on a DIFFERENT
+    // project; it's applied after this constructor runs and simply
+    // overrides whatever gets mounted here.
+    std::string lastProject, lastScenePath;
+    readLastOpened(&lastProject, &lastScenePath);
+    if (!lastProject.empty()) {
+        openProjectAt(lastProject); // mounts assets, sets scene_ = Scene("Untitled") for now
+        std::error_code ec;
+        if (!lastScenePath.empty() && fs::exists(lastScenePath, ec))
+            loadSceneNow(lastScenePath);
+        savedSceneSnapshot_ = scene_.serializeToString();
+        CR_LOG("app", "Crate editor started");
+    } else {
+        mountProjectAssets(assetDir_); // assetDir_'s in-class default ("assets") is
+                                         // the implicit default project
+        renderer_.loadLightmap(scene_, assetDir_); // apply any lightmap baked for this scene
+        savedSceneSnapshot_ = scene_.serializeToString();
+        CR_LOG("app", "Crate editor started");
+        CR_LOG("scene",
+               "Loaded sample scene with " + std::to_string(scene_.actorCount()) + " actors");
+    }
 }
 
 // Shared by startup (mounts the implicit default project) and by New/Open
@@ -286,6 +306,14 @@ void EditorApp::onFrame() {
     drawMenuBar();
     drawToolbar();
     drawUnsavedScenePopup();
+    // Unconditional (task 128): AssetDlg::SaveScene can now be triggered from
+    // the File menu regardless of whether the Asset Browser tab happens to
+    // be open, unlike every other AssetDlg case, which only ever fires from
+    // inside the Asset Browser's own context menu -- drawing this here too
+    // (drawAssetPopups() no-ops instantly when assetDlg_ == None) instead of
+    // only from deep inside the Asset Browser panel keeps it working no
+    // matter which bottom-panel tab is active.
+    drawAssetPopups();
 
     ImGuiID dockspace_id = ImGui::GetID("CrateDockspace");
     if (ImGui::DockBuilderGetNode(dockspace_id) == nullptr) {
@@ -2107,11 +2135,35 @@ void EditorApp::drawAssetPopups() {
                     ImVec4(assetDlgColor_[0], assetDlgColor_[1], assetDlgColor_[2], 1.0f));
                 saveFolderColors();
                 break;
+            case AssetDlg::SaveScene: {
+                if (assetDlgBuf_.empty())
+                    break;
+                fs::path dir = fs::path(assetDir_) / assetCwd_;
+                fs::create_directories(dir, ec);
+                fs::path p = dir / (assetDlgBuf_ + ".cscene");
+                std::string error;
+                if (scene_.save(p.generic_string(), &error)) {
+                    currentScenePath_ = p.generic_string();
+                    savedSceneSnapshot_ = scene_.serializeToString();
+                    AssetDatabase::get().idFor(p.generic_string());
+                    CR_LOG("scene", "Saved scene to " + currentScenePath_);
+                    if (saveSceneAsCallback_) {
+                        auto cb = std::move(saveSceneAsCallback_);
+                        cb();
+                    }
+                } else {
+                    CR_ERROR("scene", "Save failed: " + error);
+                }
+                saveSceneAsCallback_ = nullptr;
+                break;
+            }
             default:
                 break;
         }
         if (ec)
             CR_WARN("assets", "Folder operation failed: " + ec.message());
+    } else if (assetDlg_ == AssetDlg::SaveScene) {
+        saveSceneAsCallback_ = nullptr; // cancelled -- drop the pending continuation too
     }
     assetDlg_ = AssetDlg::None;
 }
@@ -2231,7 +2283,9 @@ void EditorApp::drawBottomPanel() {
             // Handled by the OS WM_DROPFILES path; this keeps the target visible.
             ImGui::EndDragDropTarget();
         }
-        drawAssetPopups();
+        // drawAssetPopups() now runs unconditionally each frame from onFrame()
+        // (task 128) so File > Save Scene As works even when this tab isn't
+        // the active one -- no need to also call it from here.
     }
     ImGui::End();
 
@@ -2278,29 +2332,26 @@ void EditorApp::deleteSelection() {
     }
 }
 
-bool EditorApp::saveSceneAs() {
-    std::string path = platform::saveFileDialog("Save Scene", "Crate Scene\0*.cscene\0All\0*.*\0",
-                                                "cscene");
-    if (path.empty())
-        return false;
-    std::string error;
-    if (scene_.save(path, &error)) {
-        currentScenePath_ = path;
-        savedSceneSnapshot_ = scene_.serializeToString();
-        CR_LOG("scene", "Saved scene to " + path);
-        return true;
-    }
-    CR_ERROR("scene", "Save failed: " + error);
-    return false;
+void EditorApp::saveSceneAs(std::function<void()> onSaved) {
+    assetDlg_ = AssetDlg::SaveScene;
+    assetDlgBuf_ = currentScenePath_.empty() ? scene_.name() : fs::path(currentScenePath_).stem().string();
+    saveSceneAsCallback_ = std::move(onSaved);
+    assetPopup_.title("Save Scene")
+        .onBody([this](ui::Popup& p) { p.inputText("Name", &assetDlgBuf_, true); })
+        .open();
 }
 
-bool EditorApp::saveScene() {
-    if (currentScenePath_.empty())
-        return saveSceneAs();
+bool EditorApp::saveScene(std::function<void()> onSaved) {
+    if (currentScenePath_.empty()) {
+        saveSceneAs(std::move(onSaved));
+        return false;
+    }
     std::string error;
     if (scene_.save(currentScenePath_, &error)) {
         savedSceneSnapshot_ = scene_.serializeToString();
         CR_LOG("scene", "Saved scene to " + currentScenePath_);
+        if (onSaved)
+            onSaved();
         return true;
     }
     CR_ERROR("scene", "Save failed: " + error);
@@ -2367,13 +2418,22 @@ void EditorApp::drawUnsavedScenePopup() {
     if (r == ui::Popup::Result::Open)
         return;
     if (r == ui::Popup::Result::Ok) {
-        bool proceed = true;
-        if (pendingSceneAction_ == PendingSceneAction::Save)
-            proceed = saveScene(); // false if Save fell through to a cancelled Save As
-        if (proceed && pendingSceneReplace_) {
-            pendingSceneReplace_();
-            savedSceneSnapshot_ = scene_.serializeToString();
+        auto proceedWithReplace = [this] {
+            if (pendingSceneReplace_) {
+                auto replace = std::move(pendingSceneReplace_);
+                replace();
+                savedSceneSnapshot_ = scene_.serializeToString();
+            }
+        };
+        if (pendingSceneAction_ == PendingSceneAction::Save) {
+            // saveScene() may need the inline Save-As name prompt (task 128),
+            // which spans frames -- proceedWithReplace runs from its onSaved
+            // callback either way (synchronously now, or once that popup is
+            // confirmed later), so there's nothing left to do here.
+            saveScene(proceedWithReplace);
+            return;
         }
+        proceedWithReplace();
     }
     pendingSceneReplace_ = nullptr;
 }
@@ -2511,6 +2571,7 @@ void EditorApp::newProject() {
         prefabEditReturnPath_.clear();
         savedSceneSnapshot_ = scene_.serializeToString();
         CR_LOG("project", "Created project '" + projectName + "' at " + currentProjectPath_);
+        recordLastOpened(); // task 130 -- survives even if the session ends uncleanly
     });
 }
 
@@ -2536,6 +2597,21 @@ void EditorApp::openProjectAt(const std::string& crateFilePath) {
     prefabEditReturnPath_.clear();
     savedSceneSnapshot_ = scene_.serializeToString();
     CR_LOG("project", "Opened project '" + info.name + "' from " + crateFilePath);
+    recordLastOpened(); // task 130 -- caller may load a specific scene right
+                        // after this (e.g. the ctor restoring the last
+                        // session), which updates the record again itself
+}
+
+void EditorApp::recordLastOpened() const {
+    if (currentProjectPath_.empty())
+        return; // the implicit default project has nothing meaningful to remember
+    // If we're currently inside an "Edit Prefab" isolation view (task 106),
+    // prefabEditReturnPath_ holds the REAL working scene to come back to --
+    // that's what a future session should resume into, not the prefab file
+    // being edited in isolation.
+    const std::string& scenePath =
+        !prefabEditReturnPath_.empty() ? prefabEditReturnPath_ : currentScenePath_;
+    writeLastOpened(currentProjectPath_, scenePath);
 }
 
 void EditorApp::openProject() {
