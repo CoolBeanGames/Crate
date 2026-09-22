@@ -480,67 +480,6 @@
           "updatedAt": "2026-09-16T05:15:13.4134771+00:00"
         },
         {
-          "id": "16e98af6b7d54cad9703533e6f9dfedc",
-          "index": 128,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Save Scene should prompt for a name, not open a file browser",
-          "task": "Saving a scene currently opens a native Windows file-browser save dialog. It should instead just prompt inline for a name (a simple text-input popup, matching other in-editor naming prompts like Create Material/Create Input Map) and save the .cscene directly into the currently-open asset folder -- no OS file dialog involved.",
-          "tags": [
-            "Scenes",
-            "scene tree"
-          ],
-          "files": [],
-          "customTypeId": null,
-          "customValues": {},
-          "requirements": [],
-          "notes": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-22T04:19:36.3323896+00:00",
-          "updatedAt": "2026-09-22T04:19:36.3325465+00:00"
-        },
-        {
-          "id": "9579898c46394cd4bd03a06c78871884",
-          "index": 130,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Remember and auto-open the last project \u002B scene on launch",
-          "task": "Launching Crate.exe directly (not via the Launcher) currently always loads the hardcoded default/sample scene, with no indication of which project or scene is actually open. It should instead remember the last project and last scene that were open, and automatically reopen both on startup -- so a user can make their own real test project with their own test setup and never need the built-in debug/sample scene again. The Launcher\u0027s own \u0027last used\u0027 state and this startup behavior should share the same persisted record.",
-          "tags": [
-            "projects"
-          ],
-          "files": [],
-          "customTypeId": null,
-          "customValues": {},
-          "requirements": [],
-          "notes": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-22T04:19:37.0186357+00:00",
-          "updatedAt": "2026-09-22T04:19:37.0188108+00:00"
-        },
-        {
           "id": "93ef602b0a2c4b2db33f5b944e5ce276",
           "index": 133,
           "kind": "task",
@@ -5233,6 +5172,67 @@
           "isCollapsed": false,
           "createdAt": "2026-09-22T04:19:37.6901111+00:00",
           "updatedAt": "2026-09-22T06:43:23.3142452+00:00"
+        },
+        {
+          "id": "16e98af6b7d54cad9703533e6f9dfedc",
+          "index": 128,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Save Scene should prompt for a name, not open a file browser",
+          "task": "Saving a scene currently opens a native Windows file-browser save dialog. It should instead just prompt inline for a name (a simple text-input popup, matching other in-editor naming prompts like Create Material/Create Input Map) and save the .cscene directly into the currently-open asset folder -- no OS file dialog involved.",
+          "tags": [
+            "Scenes",
+            "scene tree"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-22T04:19:36.3323896+00:00",
+          "updatedAt": "2026-09-22T08:23:50.6833652+00:00"
+        },
+        {
+          "id": "9579898c46394cd4bd03a06c78871884",
+          "index": 130,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Remember and auto-open the last project \u002B scene on launch",
+          "task": "Launching Crate.exe directly (not via the Launcher) currently always loads the hardcoded default/sample scene, with no indication of which project or scene is actually open. It should instead remember the last project and last scene that were open, and automatically reopen both on startup -- so a user can make their own real test project with their own test setup and never need the built-in debug/sample scene again. The Launcher\u0027s own \u0027last used\u0027 state and this startup behavior should share the same persisted record.",
+          "tags": [
+            "projects"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-22T04:19:37.0186357+00:00",
+          "updatedAt": "2026-09-22T08:23:50.9905346+00:00"
         }
       ]
     }
