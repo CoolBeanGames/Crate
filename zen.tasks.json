@@ -685,37 +685,6 @@
           "isCollapsed": false,
           "createdAt": "2026-09-17T03:43:19.2725286+00:00",
           "updatedAt": "2026-09-17T03:43:19.2725286+00:00"
-        },
-        {
-          "id": "ecd8908158f54809a9c834a001d8b9f9",
-          "index": 125,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Projects Launcher (separate executable)",
-          "task": "Build a separate launcher executable for creating/opening/managing Crate projects, as originally scoped (deferred from task 92). Requirements: list every project the user has created; create a new project; open an existing project; delete an existing project (remove from the list, and ask whether to also delete the project\u0027s files from disk); open the current project\u0027s folder in the OS file explorer. Persist the known-projects list to disk (e.g. an AppData JSON file). Launching a project from the launcher should open the main Crate editor exe pointed at that project (a new command-line argument on the editor exe, e.g. --project \u003Cpath-to-.crate\u003E, which does not exist yet and needs adding).\n\nALSO: a \u0027crate\u0027 CLI tool that gets registered on PATH when the launcher runs (first run / on launch, similar to how zen-operator registers itself on PATH for the Zen tool -- check that project\u0027s approach for a reference pattern if useful, but don\u0027t take a dependency on it). Must support \u0027crate new \u0022path/to/folder\u0022\u0027 (create a new project at that folder, same behavior as the launcher\u0027s New Project) and \u0027crate open \u0022path/to/folder\u0022\u0027 (open an existing project there, launching the main editor pointed at it) directly from a regular terminal, without going through the launcher UI.",
-          "tags": [
-            "projects",
-            "ui"
-          ],
-          "files": [],
-          "customTypeId": null,
-          "customValues": {},
-          "requirements": [],
-          "notes": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-22T00:26:06.2033793+00:00",
-          "updatedAt": "2026-09-22T00:46:52.8486098+00:00"
         }
       ]
     },
@@ -5052,6 +5021,42 @@
           "isCollapsed": false,
           "createdAt": "2026-09-22T00:26:05.8762057+00:00",
           "updatedAt": "2026-09-22T00:46:58.1327866+00:00"
+        },
+        {
+          "id": "ecd8908158f54809a9c834a001d8b9f9",
+          "index": 125,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Projects Launcher (separate executable)",
+          "task": "Build a separate launcher executable for creating/opening/managing Crate projects, as originally scoped (deferred from task 92). Requirements: list every project the user has created; create a new project; open an existing project; delete an existing project (remove from the list, and ask whether to also delete the project\u0027s files from disk); open the current project\u0027s folder in the OS file explorer. Persist the known-projects list to disk (e.g. an AppData JSON file). Launching a project from the launcher should open the main Crate editor exe pointed at that project (a new command-line argument on the editor exe, e.g. --project \u003Cpath-to-.crate\u003E, which does not exist yet and needs adding).\n\nALSO: a \u0027crate\u0027 CLI tool that gets registered on PATH when the launcher runs (first run / on launch, similar to how zen-operator registers itself on PATH for the Zen tool -- check that project\u0027s approach for a reference pattern if useful, but don\u0027t take a dependency on it). Must support \u0027crate new \u0022path/to/folder\u0022\u0027 (create a new project at that folder, same behavior as the launcher\u0027s New Project) and \u0027crate open \u0022path/to/folder\u0022\u0027 (open an existing project there, launching the main editor pointed at it) directly from a regular terminal, without going through the launcher UI.",
+          "tags": [
+            "projects",
+            "ui"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [
+            {
+              "id": "89380cb8a9d5452d886d283a58fe3685",
+              "text": "Built: CrateLauncher.exe (separate exe, list/New/Open/Delete/Open-Folder for known projects, persisted at %LOCALAPPDATA%\\Crate\\projects.txt), Crate.exe --project \u003Cpath\u003E startup arg, and a crate CLI (crate new \u0022path\u0022 / crate open \u0022path\u0022) registered onto PATH by the launcher via %LOCALAPPDATA%\\Crate\\bin \u002B HKCU\\Environment. PATH mechanism deliberately avoids the stale-hardcoded-path failure this session hit with the zen tool\u0027s own wrapper: nothing is hardcoded, Crate.exe/CrateLauncher each refresh a pointer file every run. Note found and fixed a real bug during verification: crate_cli\u0027s output name \u0027crate.exe\u0027 collided with \u0027Crate.exe\u0027 on Windows\u0027 case-insensitive filesystem when both built into the same dir (whichever linked last silently overwrote the other) -- fixed by giving crate_cli its own build/cli-tool/ output directory. All three creation entry points (editor File\u003ENew Project, launcher, crate CLI) now register into the same known-projects list. Verified live: crate new creates a real project \u002B registers it; crate open finds it and launches Crate.exe --project correctly (confirmed via screenshot -- empty Untitled scene, not the default sample); launcher lists a CLI-created project; PATH registry entry \u002B copied crate.exe both confirmed working. NOT verified: a brand-new terminal resolving \u0027crate\u0027 bare after registration, since an already-running shell in this environment can\u0027t pick up a fresh Windows PATH without restarting -- ordinary OS behavior, not something this session could exercise further; the underlying registry\u002Bbroadcast\u002Bbinary mechanism is otherwise fully confirmed. Full 30-target test suite passes on both Debug and Release, zero regressions. latestExePath/latestReleasePath updated (this branch is the current feature-complete one)."
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-22T00:26:06.2033793+00:00",
+          "updatedAt": "2026-09-22T01:52:35.3448883+00:00"
         }
       ]
     }
