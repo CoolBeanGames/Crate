@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "projectId": "8afe2a0217d7419db234ceda7ecb9dff",
   "name": "Crate",
-  "nextCardIndex": 146,
+  "nextCardIndex": 147,
   "latestExePath": "build-Release/Crate.exe",
   "latestReleasePath": "build-Release/Crate.exe",
   "tagCatalog": [
@@ -377,17 +377,18 @@
       "isLocked": false,
       "tasks": [
         {
-          "id": "cac2099fc96b4895a43ec0100da5cb75",
-          "index": 143,
+          "id": "996cf63304b24ea987ef99cae0474aac",
+          "index": 146,
           "kind": "task",
           "dueDate": null,
           "startedDate": null,
           "priority": null,
-          "title": "Fog toggle in Scene View does nothing",
-          "task": "The fog on/off toggle in the Scene View currently has no visible effect at all -- toggling it does not enable or disable the fog effect in the viewport.",
+          "title": "Disabling an actor (Inspector Enabled checkbox) doesn\u0027t affect its light contribution",
+          "task": "Found while verifying task 133 (spotlight/fog): unchecking \u0027Enabled\u0027 on a Light-bearing actor (tested on both the sample scene\u0027s Directional \u0027Sun\u0027 and the \u0027Ceiling Lamp\u0027 point light) does not remove its contribution from the rendered scene -- the viewport brightness was unchanged before/after disabling both. Actor-level Enabled appears to be decoupled from the renderer\u0027s light-collection pass (collectLights walks all actors regardless of an enabled flag, or the flag is checked somewhere that doesn\u0027t reach lighting). Repro: sample scene, select Sun, uncheck Enabled, observe Game View unchanged; same for Ceiling Lamp.",
           "tags": [
             "bug",
-            "rendering"
+            "rendering",
+            "scene tree"
           ],
           "files": [],
           "customTypeId": null,
@@ -404,8 +405,8 @@
           "isLocked": false,
           "isAwaitingFeedback": false,
           "isCollapsed": false,
-          "createdAt": "2026-09-22T11:11:59.3138141+00:00",
-          "updatedAt": "2026-09-22T11:11:59.3142165+00:00"
+          "createdAt": "2026-09-22T19:52:56.4381507+00:00",
+          "updatedAt": "2026-09-22T19:52:56.4383168+00:00"
         },
         {
           "id": "3f89cf8e4c0c42e38ad52eced68c0fdb",
@@ -531,7 +532,12 @@
           "customTypeId": null,
           "customValues": {},
           "requirements": [],
-          "notes": [],
+          "notes": [
+            {
+              "id": "30a4ed8c54934b5ab9016d55d5b7aefd",
+              "text": "Code fix landed (commit fd0d164): PSVolume now samples lighting at 5 points along the ray (brightest wins) instead of one midpoint sample, and direct light contribution is no longer capped to the fog\u0027s own dim base color -- only clamped against runaway HDR values. This is a strict improvement over the old formula, which unconditionally capped ANY light to the dim fog color (guaranteeing a weak beam). However: could not get a clean live \u0027dark room \u002B flashlight\u0027 comparison screenshot -- the sample scene stayed bright even after disabling the Sun and Ceiling Lamp actors via their Inspector Enabled checkbox, which appears not to affect the renderer\u0027s light collection (looks like actor-Enabled and light-contribution are decoupled in the renderer -- worth its own bug report, tags rendering/scene tree, separate from this task). Recommend testing live with your own dark scene (zero out light intensities directly rather than relying on Enabled) before judging whether this reads as a good flashlight now. Left open pending that judgment rather than archiving on unverified confidence."
+            }
+          ],
           "flags": {
             "commit": true,
             "build": true,
@@ -540,10 +546,10 @@
           },
           "isDone": false,
           "isLocked": false,
-          "isAwaitingFeedback": false,
+          "isAwaitingFeedback": true,
           "isCollapsed": false,
           "createdAt": "2026-09-22T04:19:38.0243987+00:00",
-          "updatedAt": "2026-09-22T04:19:38.024561+00:00"
+          "updatedAt": "2026-09-22T19:52:45.8578361+00:00"
         },
         {
           "id": "8d40334dbe704d0fae3035899f6e8800",
@@ -1852,6 +1858,37 @@
           "isCollapsed": false,
           "createdAt": "2026-09-22T11:12:00.0120808+00:00",
           "updatedAt": "2026-09-22T12:30:39.6604554+00:00"
+        },
+        {
+          "id": "cac2099fc96b4895a43ec0100da5cb75",
+          "index": 143,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Fog toggle in Scene View does nothing",
+          "task": "The fog on/off toggle in the Scene View currently has no visible effect at all -- toggling it does not enable or disable the fog effect in the viewport.",
+          "tags": [
+            "bug",
+            "rendering"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-22T11:11:59.3138141+00:00",
+          "updatedAt": "2026-09-22T19:52:44.8006062+00:00"
         },
         {
           "id": "c9d4482b33c94eeda497726091ff6dbf",
