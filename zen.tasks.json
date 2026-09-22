@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "projectId": "8afe2a0217d7419db234ceda7ecb9dff",
   "name": "Crate",
-  "nextCardIndex": 134,
+  "nextCardIndex": 146,
   "latestExePath": "build-Release/Crate.exe",
   "latestReleasePath": "build-Release/Crate.exe",
   "tagCatalog": [
@@ -173,6 +173,10 @@
     {
       "name": "projects",
       "color": "#386D9A"
+    },
+    {
+      "name": "asset browser",
+      "color": "#8C553E"
     }
   ],
   "customCardTypes": [
@@ -373,6 +377,37 @@
       "isLocked": false,
       "tasks": [
         {
+          "id": "cac2099fc96b4895a43ec0100da5cb75",
+          "index": 143,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Fog toggle in Scene View does nothing",
+          "task": "The fog on/off toggle in the Scene View currently has no visible effect at all -- toggling it does not enable or disable the fog effect in the viewport.",
+          "tags": [
+            "bug",
+            "rendering"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-22T11:11:59.3138141+00:00",
+          "updatedAt": "2026-09-22T11:11:59.3142165+00:00"
+        },
+        {
           "id": "3f89cf8e4c0c42e38ad52eced68c0fdb",
           "index": 89,
           "kind": "task",
@@ -509,6 +544,281 @@
           "isCollapsed": false,
           "createdAt": "2026-09-22T04:19:38.0243987+00:00",
           "updatedAt": "2026-09-22T04:19:38.024561+00:00"
+        },
+        {
+          "id": "8d40334dbe704d0fae3035899f6e8800",
+          "index": 134,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Asset Browser: full context-menu actions per asset",
+          "task": "Right-click context menu in the Asset Browser needs full actions on every asset type EXCEPT input maps: Delete, Copy, Rename, Duplicate. Also: right-clicking blank space in the Asset Browser (not on an asset) should offer Paste (of whatever was last Copied).",
+          "tags": [
+            "assets",
+            "asset browser"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-22T11:11:56.1123317+00:00",
+          "updatedAt": "2026-09-22T11:11:56.112482+00:00"
+        },
+        {
+          "id": "4daa6d13381c4692902d0ca4f93eba5b",
+          "index": 135,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Delete key deletes the selected object (Hierarchy \u002B Asset Browser)",
+          "task": "Pressing the Delete key should delete the currently-selected object, both when a Hierarchy actor is selected and when an Asset Browser asset is selected.",
+          "tags": [
+            "scene tree",
+            "asset browser"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-22T11:11:56.5054583+00:00",
+          "updatedAt": "2026-09-22T11:11:56.5056686+00:00"
+        },
+        {
+          "id": "f114bd2479bd4325b6c2bcd57956674d",
+          "index": 136,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Title bar: [Scene] - [Project] - Crate [version]",
+          "task": "Title bar currently always reads \u0027Crate - PSX Horror Engine\u0027. Change it to show the live current scene name, current project name, and the engine version, formatted as: [current_scene_name] - [current_project_name] - Crate [crate_version_number].",
+          "tags": [
+            "UI"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-22T11:11:56.8635718+00:00",
+          "updatedAt": "2026-09-22T11:11:56.8638332+00:00"
+        },
+        {
+          "id": "7a582f27ab374f6d9126b313e0da3027",
+          "index": 137,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Hierarchy: double-click an actor enters rename mode",
+          "task": "Double-clicking an actor\u0027s row in the Hierarchy panel should enter inline rename mode for that actor\u0027s name, same UX as other in-place renames already in this editor.",
+          "tags": [
+            "scene tree"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-22T11:11:57.1984381+00:00",
+          "updatedAt": "2026-09-22T11:11:57.198679+00:00"
+        },
+        {
+          "id": "1e34d731b9b34d56b7caefcb69bfaf8b",
+          "index": 138,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Asset Browser: double-click an asset\u0027s NAME enters rename mode",
+          "task": "Double-clicking an asset\u0027s name/label in the Asset Browser (not its icon) should enter inline rename mode for that asset.",
+          "tags": [
+            "asset browser"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-22T11:11:57.5357316+00:00",
+          "updatedAt": "2026-09-22T11:11:57.5359016+00:00"
+        },
+        {
+          "id": "983f816775fb4e47b113fa6fcbc7c91d",
+          "index": 139,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Asset Browser: double-click an asset\u0027s ICON performs a type-specific action",
+          "task": "Double-clicking an asset\u0027s ICON (as opposed to its name -- see the separate rename-on-name-double-click task) in the Asset Browser should perform an action specific to that asset\u0027s type: image -\u003E open it in the OS default image viewer/editor; scene (.cscene) -\u003E open that scene for editing (reuse the existing open/Edit-Prefab scene-opening path); script (.cscript) -\u003E open that script in the Script Editor; input map -\u003E open the input-map editor.",
+          "tags": [
+            "asset browser"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-22T11:11:57.8905875+00:00",
+          "updatedAt": "2026-09-22T11:11:57.8907535+00:00"
+        },
+        {
+          "id": "8a8b8c63d9b04f42869012f4cfcbeb45",
+          "index": 140,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Plane mesh: add a subdivision parameter",
+          "task": "The built-in Plane primitive mesh needs a subdivision-count parameter (Inspector-editable), actually hooked up to real mesh generation -- i.e. increasing it should actually subdivide the plane\u0027s geometry into more quads/triangles, not just be a cosmetic field.",
+          "tags": [
+            "rendering",
+            "components"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-22T11:11:58.2284874+00:00",
+          "updatedAt": "2026-09-22T11:11:58.2286479+00:00"
+        },
+        {
+          "id": "b7541db7c758459f868ec5ce7a72c4ec",
+          "index": 141,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Hierarchy: inline eye icon to toggle actor visibility",
+          "task": "Add a visibility-toggle (eye) icon directly on each Hierarchy row so an actor\u0027s visibility can be toggled without right-clicking or opening the Inspector.",
+          "tags": [
+            "scene tree",
+            "UI"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-22T11:11:58.6090563+00:00",
+          "updatedAt": "2026-09-22T11:11:58.6092299+00:00"
+        },
+        {
+          "id": "3ce009b04e5c48caa7a67fdac9e21547",
+          "index": 142,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Hierarchy: inline icon to toggle actor enabled/disabled",
+          "task": "Add an enabled/disabled toggle icon directly on each Hierarchy row (distinct from the visibility/eye toggle) so an actor can be enabled or disabled without right-clicking or opening the Inspector.",
+          "tags": [
+            "scene tree",
+            "UI"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": false,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-22T11:11:58.9750834+00:00",
+          "updatedAt": "2026-09-22T11:11:58.9752423+00:00"
         }
       ]
     },
@@ -1468,6 +1778,80 @@
           "isCollapsed": false,
           "createdAt": "2026-09-22T04:19:36.6836963+00:00",
           "updatedAt": "2026-09-22T05:07:28.8271304+00:00"
+        },
+        {
+          "id": "aec99c644d314042bd11183a059b8f27",
+          "index": 144,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Right-click \u003E New Script does not actually create a script",
+          "task": "Right-click in the Asset Browser -\u003E New Script opens the script-naming menu/prompt, but does not actually create the script file, and it never shows up in the Script Editor\u0027s script list afterward.",
+          "tags": [
+            "bug",
+            "asset browser",
+            "Scripting"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [
+            {
+              "id": "1ae1bd9727484a0f9531e1efd4127f08",
+              "text": "Root cause: ScriptEditor::draw() early-returned on an empty script list before drawSidebar() ever ran, and drawSidebar() is the only place a pending New Script request gets consumed -- so on a project with zero scripts, New Script (from the Asset Browser\u0027s right-click menu) silently did nothing. Fixed by extracting the New/Reload toolbar \u002B popup into a shared drawNewScriptPopup() called from both the empty state and the normal sidebar. Verified live end to end: popup opens, typing a name and OK creates the file and opens it in the editor. Commit b2f361a."
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-22T11:11:59.6583286+00:00",
+          "updatedAt": "2026-09-22T12:30:38.7290927+00:00"
+        },
+        {
+          "id": "3fe89c0934e44dbd862a47134b25ac00",
+          "index": 145,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Scripts dropped into the project folder externally aren\u0027t recognized",
+          "task": "Dragging a .cscript file into a project\u0027s assets folder from outside the editor (e.g. directly in Windows Explorer), then clicking Reload Scripts in the editor: the file DOES show up as a tile in the Asset Browser, but is not recognized as an actual script -- it can\u0027t be opened in the Script Editor. Likely related to the recently-changed project-wide script discovery (task 132) -- check whether that change covers a script added to the filesystem externally and picked up via Reload Scripts, not just ones already present at project-mount time. NOTE from the user: as of right now they cannot test scripting features at all in this build, blocked partly by this and the New Script bug above -- treat both as higher priority than usual since they\u0027re blocking the user\u0027s own testing.",
+          "tags": [
+            "bug",
+            "asset browser",
+            "Scripting"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [
+            {
+              "id": "1d825e6c072c4687bfd12c6df499d275",
+              "text": "Investigated via direct ScriptSystem tests (tests/scripting_new_and_reload_tests.cpp): the core discovery/reload path-matching logic was already correct for externally-added files, renamed-class/filename mismatches, and compile-failing files. Found and fixed a related real bug while verifying live: loadFolder()\u0027s dedup check used raw string equality, so a path recorded with different case than what\u0027s physically on disk (Windows is case-insensitive) produced a duplicate list entry on every Reload Scripts -- fixed via fs::equivalent(). Verified live via console log (externally-dropped Grenade.cscript loads cleanly, no duplicate after reload) and the new unit tests; did not get a clean live double-click-to-open screenshot due to UI automation timing in this environment (documented flakiness elsewhere in this project too) -- the exact path-comparison the click relies on is directly covered by the new tests instead. If double-click-to-open still doesn\u0027t work for a genuinely externally-dropped file after this fix, please report back with repro details since that would point to a UI-layer issue beyond what these tests can see. Commit b2f361a."
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-22T11:12:00.0120808+00:00",
+          "updatedAt": "2026-09-22T12:30:39.6604554+00:00"
         },
         {
           "id": "c9d4482b33c94eeda497726091ff6dbf",
