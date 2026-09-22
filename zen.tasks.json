@@ -373,37 +373,6 @@
       "isLocked": false,
       "tasks": [
         {
-          "id": "80d0f6729dd342e89aafc27edb389374",
-          "index": 129,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Script referencing Input.* fails: \u0027unknown identifier Input\u0027, actor\u002Bchildren vanish on Play",
-          "task": "Repro: attach this script to an actor with children and press Play.\n\nclass PlayerControl : Actor\n{\n    Camera headCam;\n    Transform body;\n    float look_speed = 3;\n    func start()\n    {\n    }\n\n    func update(float delta)\n    {\n        Vector2 input = Input.mouse.delta * look_speed * delta;\n        print(input.str());\n    }\n\n    func physics_update(float delta)\n    {\n    }\n}\n\nTwo symptoms observed, likely the same root cause: (1) the actor and ALL of its children disappear the moment Play starts; (2) the console/error log shows \u0027PlayerControl.update unknown identifier Input\u0027. \u0027Input\u0027 (and Input.mouse.delta specifically) is supposed to be a recognized global -- this session\u0027s own notes describe Input.Mouse as \u0027a real nested member-access object, interpreted \u002B native parity tested\u0027 (commit a779ba4), so this looks like a regression or a gap specific to this exact call shape (Input.mouse.delta, lowercase \u0027mouse\u0027, chained through look_speed*delta arithmetic, then Vector2.str()). Find the actual root cause -- do not just silence the error, and figure out why a script identifier error is making the whole actor hierarchy disappear rather than just failing that one line.",
-          "tags": [
-            "bug",
-            "in progress"
-          ],
-          "files": [],
-          "customTypeId": null,
-          "customValues": {},
-          "requirements": [],
-          "notes": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-22T04:19:36.6836963+00:00",
-          "updatedAt": "2026-09-22T04:19:36.6838822+00:00"
-        },
-        {
           "id": "3f89cf8e4c0c42e38ad52eced68c0fdb",
           "index": 89,
           "kind": "task",
@@ -1649,6 +1618,41 @@
           "isCollapsed": true,
           "createdAt": "2026-09-17T09:38:39.7338057+00:00",
           "updatedAt": "2026-09-21T22:58:59.4017074+00:00"
+        },
+        {
+          "id": "80d0f6729dd342e89aafc27edb389374",
+          "index": 129,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Script referencing Input.* fails: \u0027unknown identifier Input\u0027, actor\u002Bchildren vanish on Play",
+          "task": "Repro: attach this script to an actor with children and press Play.\n\nclass PlayerControl : Actor\n{\n    Camera headCam;\n    Transform body;\n    float look_speed = 3;\n    func start()\n    {\n    }\n\n    func update(float delta)\n    {\n        Vector2 input = Input.mouse.delta * look_speed * delta;\n        print(input.str());\n    }\n\n    func physics_update(float delta)\n    {\n    }\n}\n\nTwo symptoms observed, likely the same root cause: (1) the actor and ALL of its children disappear the moment Play starts; (2) the console/error log shows \u0027PlayerControl.update unknown identifier Input\u0027. \u0027Input\u0027 (and Input.mouse.delta specifically) is supposed to be a recognized global -- this session\u0027s own notes describe Input.Mouse as \u0027a real nested member-access object, interpreted \u002B native parity tested\u0027 (commit a779ba4), so this looks like a regression or a gap specific to this exact call shape (Input.mouse.delta, lowercase \u0027mouse\u0027, chained through look_speed*delta arithmetic, then Vector2.str()). Find the actual root cause -- do not just silence the error, and figure out why a script identifier error is making the whole actor hierarchy disappear rather than just failing that one line.",
+          "tags": [
+            "bug"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [
+            {
+              "id": "27f26952f91844eea8d8952c1e2f1ed7",
+              "text": "Fixed and verified live (commit 314a24b): root cause was case-sensitive matching of Input.Mouse\u0027s \u0027Mouse\u0027 segment -- Input.mouse (lowercase, as the user actually typed it) fell through to a plain identifier lookup and threw \u0027unknown identifier Input\u0027. Fixed with a shared case-insensitive isInputMouseSegment() helper used by both interpreted and native codegen paths. The \u0027actor\u002Bchildren disappear on Play\u0027 symptom was tested live with the exact repro script and does NOT reproduce once the identifier resolves -- it was evidently a consequence of the uncaught exception, not a separate bug. 31/31 tests pass on Debug\u002BRelease, zero regressions."
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-22T04:19:36.6836963+00:00",
+          "updatedAt": "2026-09-22T05:07:28.8271304+00:00"
         },
         {
           "id": "c9d4482b33c94eeda497726091ff6dbf",
