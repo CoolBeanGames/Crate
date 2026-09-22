@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "projectId": "8afe2a0217d7419db234ceda7ecb9dff",
   "name": "Crate",
-  "nextCardIndex": 147,
+  "nextCardIndex": 149,
   "latestExePath": "build-Release/Crate.exe",
   "latestReleasePath": "build-Release/Crate.exe",
   "tagCatalog": [
@@ -1889,6 +1889,38 @@
           "isCollapsed": false,
           "createdAt": "2026-09-22T19:52:56.4381507+00:00",
           "updatedAt": "2026-09-22T22:54:16.2313524+00:00"
+        },
+        {
+          "id": "0b97df126fe3477b8fadde7852392aa6",
+          "index": 147,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Disabled actor\u0027s mesh still renders (same gap as the light fix)",
+          "task": "Same root cause class as task 146 (now fixed for lights): Renderer::drawActor checks MeshRenderer::enabled \u0026\u0026 actor.visible() but never actor.enabled() -- so unchecking an actor\u0027s Inspector \u0027Enabled\u0027 checkbox does not stop its mesh from rendering, only its light contribution (now fixed) does. Fix drawActor\u0027s gating the same way collectLights was fixed.",
+          "tags": [
+            "bug",
+            "rendering",
+            "scene tree"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-22T22:54:55.535253+00:00",
+          "updatedAt": "2026-09-22T23:18:40.9648094+00:00"
         },
         {
           "id": "c9d4482b33c94eeda497726091ff6dbf",
@@ -5654,6 +5686,37 @@
           "isCollapsed": false,
           "createdAt": "2026-09-22T04:19:37.0186357+00:00",
           "updatedAt": "2026-09-22T08:23:50.9905346+00:00"
+        },
+        {
+          "id": "0f744f0574c14f27898761c0183db6e3",
+          "index": 148,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Decide \u002B implement whether disabling a parent actor cascades to children",
+          "task": "Found while fixing task 146: collectLights/collectFog/collectVolumeFog/drawActor all recurse into a disabled actor\u0027s children unconditionally -- disabling a parent actor currently does NOT suppress its children\u0027s own light/mesh/fog contributions, only the disabled actor\u0027s own. This is a real scene-graph semantics question (does Actor.enabled=false mean \u0027just this node\u0027 or \u0027this whole subtree\u0027?) that needs a decision, then consistent implementation across every collect*/draw* pass that walks children.",
+          "tags": [
+            "rendering",
+            "scene tree"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-22T22:54:55.8490054+00:00",
+          "updatedAt": "2026-09-22T23:18:41.576772+00:00"
         }
       ]
     }
