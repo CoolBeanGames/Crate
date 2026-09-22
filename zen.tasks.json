@@ -480,68 +480,6 @@
           "updatedAt": "2026-09-16T05:15:13.4134771+00:00"
         },
         {
-          "id": "12a4efc5ed944ad0a42c6f6486e04d9f",
-          "index": 126,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Autocomplete: auto-insert parens for any known function",
-          "task": "Script Editor autocomplete currently doesn\u0027t auto-insert \u0027()\u0027 when completing a function reference. Typing e.g. \u0027my_int.str\u0027 and accepting the completion should automatically insert \u0027()\u0027 -- and this must work for EVERY known function (builtin AND user-defined), not a hardcoded special case for one or two names. This also covers calling a function the user just defined themselves (e.g. after writing \u0027func test() {}\u0027, typing \u0027test\u0027 later and completing it should also auto-insert the parens) -- same fix, same code path, not a separate feature.",
-          "tags": [
-            "Scripting",
-            "script editor"
-          ],
-          "files": [],
-          "customTypeId": null,
-          "customValues": {},
-          "requirements": [],
-          "notes": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-22T04:19:35.6232314+00:00",
-          "updatedAt": "2026-09-22T04:19:35.6234229+00:00"
-        },
-        {
-          "id": "026a90d2970b495bac073f85ca4b932a",
-          "index": 127,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Syntax highlighting for all known types",
-          "task": "Known types (Camera, Transform, Actor, etc.) should get distinct text highlighting in the Script Editor. This must be driven by the actual type registry/autocomplete metadata so it covers EVERY known type generically, not a hardcoded list of a few specific type names that will drift out of date as new types are added.",
-          "tags": [
-            "Scripting",
-            "script editor"
-          ],
-          "files": [],
-          "customTypeId": null,
-          "customValues": {},
-          "requirements": [],
-          "notes": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-22T04:19:35.9864917+00:00",
-          "updatedAt": "2026-09-22T04:19:35.9866571+00:00"
-        },
-        {
           "id": "16e98af6b7d54cad9703533e6f9dfedc",
           "index": 128,
           "kind": "task",
@@ -601,68 +539,6 @@
           "isCollapsed": false,
           "createdAt": "2026-09-22T04:19:37.0186357+00:00",
           "updatedAt": "2026-09-22T04:19:37.0188108+00:00"
-        },
-        {
-          "id": "a27f33de17e64c568375aa87de0f52c3",
-          "index": 131,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Script Editor: full function-skeleton autocomplete on \u0027func name(\u0027",
-          "task": "Typing \u0027func test(\u0027 in the Script Editor should auto-complete the rest of the function skeleton in one shot: insert the closing \u0027)\u0027, newline, opening \u0027{\u0027, an indented blank line, then a closing \u0027}\u0027 on its own dedented line -- i.e. typing just \u0027func test(\u0027 should produce:\n\nfunc test()\n{\n    \n}\n\nwith the cursor left positioned between the \u0027(\u0027 and \u0027)\u0027 (ready to type parameters), not down in the body.",
-          "tags": [
-            "Scripting",
-            "script editor"
-          ],
-          "files": [],
-          "customTypeId": null,
-          "customValues": {},
-          "requirements": [],
-          "notes": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-22T04:19:37.3532756+00:00",
-          "updatedAt": "2026-09-22T04:19:37.3534473+00:00"
-        },
-        {
-          "id": "6d4862c91b414f31abac798e2454f8c7",
-          "index": 132,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Script Editor should see scripts anywhere under assets/, not just assets/scripts/",
-          "task": "The Script Editor currently only appears to know about .cscript files that live directly inside assets/scripts/. It should be aware of and treat as valid scripts EVERY .cscript file anywhere under the project\u0027s assets/ folder, regardless of subfolder location.",
-          "tags": [
-            "Scripting",
-            "script editor"
-          ],
-          "files": [],
-          "customTypeId": null,
-          "customValues": {},
-          "requirements": [],
-          "notes": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-22T04:19:37.6901111+00:00",
-          "updatedAt": "2026-09-22T04:19:37.690275+00:00"
         },
         {
           "id": "93ef602b0a2c4b2db33f5b944e5ce276",
@@ -5213,6 +5089,150 @@
           "isCollapsed": false,
           "createdAt": "2026-09-17T03:43:19.2725286+00:00",
           "updatedAt": "2026-09-22T04:16:45.9731461+00:00"
+        },
+        {
+          "id": "12a4efc5ed944ad0a42c6f6486e04d9f",
+          "index": 126,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Autocomplete: auto-insert parens for any known function",
+          "task": "Script Editor autocomplete currently doesn\u0027t auto-insert \u0027()\u0027 when completing a function reference. Typing e.g. \u0027my_int.str\u0027 and accepting the completion should automatically insert \u0027()\u0027 -- and this must work for EVERY known function (builtin AND user-defined), not a hardcoded special case for one or two names. This also covers calling a function the user just defined themselves (e.g. after writing \u0027func test() {}\u0027, typing \u0027test\u0027 later and completing it should also auto-insert the parens) -- same fix, same code path, not a separate feature.",
+          "tags": [
+            "Scripting",
+            "script editor"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [
+            {
+              "id": "1a9b6b5f0dc0431aa4bb5f62d35ecc5b",
+              "text": "Fixed: any known function (builtin or user-defined) now auto-inserts () on completion, via a generic asFn() marker in ScriptSystem\u0027s typeDoc registry -- not a per-name special case. Verified live: completing \u0027count.str\u0027 -\u003E \u0027count.str()\u0027. Commit 2d00e5e."
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-22T04:19:35.6232314+00:00",
+          "updatedAt": "2026-09-22T06:43:21.4868991+00:00"
+        },
+        {
+          "id": "026a90d2970b495bac073f85ca4b932a",
+          "index": 127,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Syntax highlighting for all known types",
+          "task": "Known types (Camera, Transform, Actor, etc.) should get distinct text highlighting in the Script Editor. This must be driven by the actual type registry/autocomplete metadata so it covers EVERY known type generically, not a hardcoded list of a few specific type names that will drift out of date as new types are added.",
+          "tags": [
+            "Scripting",
+            "script editor"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [
+            {
+              "id": "89f11afd49934900b878f37532c18f30",
+              "text": "Fixed: type highlighting now reads ScriptSystem::typeDocs() generically (every builtin type \u002B every script class), refreshed on script open/recompile -- not a fixed 13-name list. Verified live: \u0027Camera\u0027 (never in the old list) now gets the known-type color. Commit 2d00e5e."
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-22T04:19:35.9864917+00:00",
+          "updatedAt": "2026-09-22T06:43:22.1103728+00:00"
+        },
+        {
+          "id": "a27f33de17e64c568375aa87de0f52c3",
+          "index": 131,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Script Editor: full function-skeleton autocomplete on \u0027func name(\u0027",
+          "task": "Typing \u0027func test(\u0027 in the Script Editor should auto-complete the rest of the function skeleton in one shot: insert the closing \u0027)\u0027, newline, opening \u0027{\u0027, an indented blank line, then a closing \u0027}\u0027 on its own dedented line -- i.e. typing just \u0027func test(\u0027 should produce:\n\nfunc test()\n{\n    \n}\n\nwith the cursor left positioned between the \u0027(\u0027 and \u0027)\u0027 (ready to type parameters), not down in the body.",
+          "tags": [
+            "Scripting",
+            "script editor"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [
+            {
+              "id": "f63dc4ab4c10460f8191bbbf949b1da8",
+              "text": "Fixed: typing \u0027func name(\u0027 now inserts the full skeleton (closing ), newline, {, indented blank line, dedented }) with cursor between the parens, reusing this file\u0027s own established multi-line-insert pattern from applyElectricIndent\u0027s matchingPair case. Could NOT get a live screenshot: SendKeys automation in this environment fails to trigger even the pre-existing, unmodified basic \u0027(\u0027 auto-pairing (verified by testing that unrelated code path in isolation -- same failure) -- a test-tooling limitation, not a functional doubt. Confidence is from code review/pattern-matching against the working precedent it reuses. Commit 2d00e5e."
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-22T04:19:37.3532756+00:00",
+          "updatedAt": "2026-09-22T06:43:22.7063966+00:00"
+        },
+        {
+          "id": "6d4862c91b414f31abac798e2454f8c7",
+          "index": 132,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Script Editor should see scripts anywhere under assets/, not just assets/scripts/",
+          "task": "The Script Editor currently only appears to know about .cscript files that live directly inside assets/scripts/. It should be aware of and treat as valid scripts EVERY .cscript file anywhere under the project\u0027s assets/ folder, regardless of subfolder location.",
+          "tags": [
+            "Scripting",
+            "script editor"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [
+            {
+              "id": "368498a3336746b5b4adc971ba730ee0",
+              "text": "Fixed: EditorApp::mountProjectAssets() now points ScriptSystem::loadFolder() at the whole assetDir_ (already recursive) instead of just \u003CassetDir\u003E/scripts. New/imported scripts still default into \u003CassetDir\u003E/scripts for tidiness. Verified live: a script placed in a nested subfolder appeared correctly in the Script Editor\u0027s sidebar. Native build pipeline (ScriptBuild.cpp) confirmed safe -- it only uses scriptsDir() as an absolute base path, never assumes flat placement. Commit 2d00e5e."
+            }
+          ],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-22T04:19:37.6901111+00:00",
+          "updatedAt": "2026-09-22T06:43:23.3142452+00:00"
         }
       ]
     }
