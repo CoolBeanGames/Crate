@@ -195,9 +195,11 @@ StmtPtr Parser::parseStmt() {
 
     auto s = mks(StmtKind::ExprStmt, peek().line);
     s->expr = parseExpr();
-    // cScript is permissive about the trailing ';' on an expression statement
-    // (the sample script omits it after print()).
-    accept(Tok::Semicolon);
+    // Semicolons are mandatory on every statement, including a bare
+    // expression statement -- this used to be the one permissive spot
+    // (accept() instead of expect()), so a missing ';' here silently
+    // compiled instead of being reported as a parse error.
+    expect(Tok::Semicolon, "';'");
     return s;
 }
 
