@@ -106,6 +106,7 @@ int main(int argc, char** argv) {
         app.openProjectAt(startupProjectPath);
 
     const ImVec4 clear_col = ImVec4(0.043f, 0.051f, 0.070f, 1.0f);
+    std::string lastTitle; // task 136 -- only touch the real window title when it changes
     bool running = true;
     while (running) {
         MSG msg;
@@ -140,6 +141,12 @@ int main(int argc, char** argv) {
         ImGui::NewFrame();
 
         app.onFrame();
+
+        std::string title = app.windowTitle();
+        if (title != lastTitle) {
+            ::SetWindowTextA(hwnd, title.c_str());
+            lastTitle = std::move(title);
+        }
 
         ImGui::Render();
         const float clear[4] = {clear_col.x, clear_col.y, clear_col.z, clear_col.w};

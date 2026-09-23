@@ -65,6 +65,10 @@ public:
 
     bool isPlaying() const { return playing_; }
 
+    // "[scene] - [project] - Crate [version]" (task 136). main.cpp polls this
+    // once per frame and only calls SetWindowText when it actually changes.
+    std::string windowTitle() const;
+
 private:
     void drawMenuBar();
     void drawToolbar();
@@ -250,6 +254,11 @@ private:
 
     // Drag/drop bookkeeping for the hierarchy.
     uint64_t dragActorId_ = 0; // actor currently being dragged (0 = none)
+
+    // Inline rename (task 137): double-click a Hierarchy row's name to edit
+    // it in place. 0 = not renaming anything.
+    uint64_t renamingActorId_ = 0;
+    std::string hierarchyRenameBuf_;
 
     // Prefab-instance sub-view (item 107): a scene instance's children are
     // hidden inline in the normal tree (it draws as a leaf) until double-

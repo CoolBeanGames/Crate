@@ -8,6 +8,7 @@
 #include "editor/ContextMenu.h"
 #include "editor/Theme.h"
 #include "core/Log.h"
+#include "core/Version.h"
 #include "scene/Actor2D.h"
 #include "scene/Actor3D.h"
 #include "scene/BuiltinComponents.h"
@@ -580,6 +581,34 @@ bool EditorApp::hierarchyContextMenu(Actor& a) {
     return false;
 }
 
+// Small inline Hierarchy-row toggle icons (tasks 141/142). This build has no
+// icon font (see AssetIconKind's own vector-drawn tiles for the precedent),
+// so these are hand-drawn with plain ImDrawList primitives rather than
+// relying on a glyph that may not exist in the default ImGui font.
+static bool hierarchyToggleIcon(const char* strId, bool active, bool isEyeIcon) {
+    ImGui::PushID(strId);
+    const ImVec2 size(15.0f, 15.0f);
+    const ImVec2 pos = ImGui::GetCursorScreenPos();
+    bool clicked = ImGui::InvisibleButton("##toggle", size);
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    const ImVec2 c(pos.x + size.x * 0.5f, pos.y + size.y * 0.5f);
+    const ImU32 col = active ? IM_COL32(225, 225, 235, 255) : IM_COL32(100, 100, 112, 255);
+    if (isEyeIcon) {
+        if (active) {
+            dl->AddRect(ImVec2(pos.x + 1, c.y - 4), ImVec2(pos.x + size.x - 1, c.y + 4), col, 5.0f,
+                       0, 1.4f);
+            dl->AddCircleFilled(c, 1.7f, col);
+        } else {
+            dl->AddLine(ImVec2(pos.x + 2, c.y), ImVec2(pos.x + size.x - 2, c.y), col, 1.6f);
+        }
+    } else {
+        dl->AddCircle(c, 5.5f, col, 0, 1.4f);
+        dl->AddLine(ImVec2(c.x, pos.y + 1), ImVec2(c.x, c.y - 1), col, 1.6f);
+    }
+    ImGui::PopID();
+    return clicked;
+}
+
 void EditorApp::drawHierarchyNode(Actor& actor) {
     ImGui::PushID(static_cast<int>(actor.id()));
 
@@ -607,10 +636,43 @@ void EditorApp::drawHierarchyNode(Actor& actor) {
     else if (isInstance)
         ImGui::PushStyleColor(ImGuiCol_Text, ImColor(0x5A, 0x9C, 0xF5).Value);
 
-    bool open = ImGui::TreeNodeEx(actor.name().c_str(), flags);
+    // TreeNodeEx's SpanFullWidth hit-region would otherwise swallow every
+    // click in this row before it ever reaches the eye/enabled icons drawn
+    // later on the same line (tasks 141/142) -- the exact same overlap bug
+    // already diagnosed once in this file for the Asset Browser (see the
+    // "root cause of the Asset Browser click-blocking bug" note): an item
+    // submitted first, without this flag, wins hover over anything drawn
+    // after it at the same screen position.
+    ImGui::SetNextItemAllowOverlap();
+    // Inline rename (task 137): while renaming this actor, TreeNodeEx gets an
+    // invisible label ("##id") -- still real space for the arrow/selection/
+    // indent -- and an InputText drawn over where the name would be handles
+    // the actual editing, matching the row-replaces-label pattern this file
+    // has no prior instance of but that every other in-place-rename UI uses.
+    const bool isRenaming = renamingActorId_ == actor.id();
+    std::string nodeLabel = isRenaming ? "##renaming" : actor.name();
+    bool open = ImGui::TreeNodeEx(nodeLabel.c_str(), flags);
 
     if (dimmed || isInstance)
         ImGui::PopStyleColor();
+
+    if (isRenaming) {
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
+        ImGui::SetKeyboardFocusHere();
+        bool committed = ImGui::InputText("##renameBuf", &hierarchyRenameBuf_,
+                                          ImGuiInputTextFlags_EnterReturnsTrue |
+                                              ImGuiInputTextFlags_AutoSelectAll);
+        // Any way the field loses focus ends rename mode: Enter (committed),
+        // clicking elsewhere, or Escape (ImGui reverts the buffer to its
+        // pre-edit value for us before deactivating, so this "commit" is a
+        // no-op rename-to-the-same-name in that case).
+        if (committed || ImGui::IsItemDeactivated()) {
+            if (!hierarchyRenameBuf_.empty())
+                actor.setName(hierarchyRenameBuf_);
+            renamingActorId_ = 0;
+        }
+    }
 
     // IsItemClicked() fires on mouse-DOWN, before any drag has a chance to
     // register -- selecting here would swap out whatever the Inspector was
@@ -623,8 +685,15 @@ void EditorApp::drawHierarchyNode(Actor& actor) {
         scene_.select(&actor);
     // Double-click an instance root to drill into its own sub-view (item 107)
     // instead of inline-expanding -- the normal tree never shows its children.
-    if (isInstance && ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-        hierarchyFocusRoot_ = &actor;
+    // A plain actor double-click enters inline rename instead (task 137).
+    if (!isRenaming && ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+        if (isInstance) {
+            hierarchyFocusRoot_ = &actor;
+        } else {
+            renamingActorId_ = actor.id();
+            hierarchyRenameBuf_ = actor.name();
+        }
+    }
 
     // Drag source: carries the actor id, shows a ghost label ("where it was").
     if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoHoldToOpenOthers)) {
@@ -676,6 +745,18 @@ void EditorApp::drawHierarchyNode(Actor& actor) {
             ImGui::TreePop();
         ImGui::PopID();
         return;
+    }
+
+    // Inline visibility/enabled toggles (tasks 141/142), right-aligned so
+    // they land in the same column regardless of indent depth.
+    float iconsX = ImGui::GetWindowContentRegionMax().x - 36.0f;
+    if (iconsX > ImGui::GetCursorPosX()) {
+        ImGui::SameLine(iconsX);
+        if (hierarchyToggleIcon("eye", actor.visible(), /*isEyeIcon=*/true))
+            actor.setVisible(!actor.visible());
+        ImGui::SameLine();
+        if (hierarchyToggleIcon("pwr", actor.enabled(), /*isEyeIcon=*/false))
+            actor.setEnabled(!actor.enabled());
     }
 
     // Trailing metadata.
@@ -2322,12 +2403,24 @@ void EditorApp::deleteSelection() {
         return;
     }
     if (!selectedAsset_.empty()) {
+        // Previously this only forgot imported (image/fbx) assets from the
+        // in-memory list -- the actual FILE on disk was left behind, so it
+        // silently came back on the next Asset Browser rescan, and a
+        // selected script/scene (never added to importedAssets_ at all,
+        // e.g. line ~2031) wasn't deleted in any sense at all. Delete-key
+        // deletion should be real deletion, matching what the existing
+        // folder-delete context menu already does (fs::remove_all above).
         auto it = std::find(importedAssets_.begin(), importedAssets_.end(), selectedAsset_);
         if (it != importedAssets_.end()) {
-            CR_LOG("assets", "Removed asset '" + *it + "' from the browser");
             AssetDatabase::get().forget(*it);
             importedAssets_.erase(it);
         }
+        std::error_code ec;
+        fs::path full = fs::path(assetDir_) / selectedAsset_;
+        if (fs::is_regular_file(full, ec) && fs::remove(full, ec))
+            CR_LOG("assets", "Deleted '" + selectedAsset_ + "'");
+        else if (ec)
+            CR_ERROR("assets", "Delete failed for '" + selectedAsset_ + "': " + ec.message());
         selectedAsset_.clear();
     }
 }
@@ -2612,6 +2705,14 @@ void EditorApp::recordLastOpened() const {
     const std::string& scenePath =
         !prefabEditReturnPath_.empty() ? prefabEditReturnPath_ : currentScenePath_;
     writeLastOpened(currentProjectPath_, scenePath);
+}
+
+std::string EditorApp::windowTitle() const {
+    // "Default" for the implicit default project (task 92/130) -- no
+    // .crate file, so there's no real project name to show.
+    std::string projectName =
+        currentProjectPath_.empty() ? "Default" : fs::path(currentProjectPath_).stem().string();
+    return scene_.name() + " - " + projectName + " - Crate " + kCrateVersion;
 }
 
 void EditorApp::openProject() {
