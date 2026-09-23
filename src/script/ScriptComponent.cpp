@@ -8,6 +8,7 @@
 
 #include <cstring>
 #include <functional>
+#include <unordered_set>
 #include <vector>
 
 namespace crate::script {
@@ -222,7 +223,35 @@ void ScriptComponent::drawInspector() {
     }
     ensureObject();
     if (obj_) {
-        for (auto& [name, val] : obj_->fields) {
+        // obj_->fields is an unordered_map (keyed for O(1) access at runtime),
+        // so iterating it directly draws fields in arbitrary hash order --
+        // not the order they're declared in the script. Walk the same
+        // base-then-derived class chain constructFields() used to populate
+        // it instead, so declaration order (including inherited fields, in
+        // the order Interpreter::constructFields() lays them down) is
+        // preserved. A field already shown via a base class is skipped when
+        // a derived class re-declares it (override), and any leftover field
+        // with no matching decl anywhere in the chain -- shouldn't normally
+        // happen, but keeps this a strict superset of the old behavior --
+        // still gets drawn at the end.
+        std::vector<const ClassInfo*> chain;
+        for (const ClassInfo* c = cls_; c; c = c->baseClass)
+            chain.push_back(c);
+        std::vector<std::string> orderedNames;
+        std::unordered_set<std::string> seen;
+        for (auto it = chain.rbegin(); it != chain.rend(); ++it) {
+            if (!(*it)->decl)
+                continue;
+            for (const auto& fd : (*it)->decl->fields)
+                if (obj_->fields.count(fd.name) && seen.insert(fd.name).second)
+                    orderedNames.push_back(fd.name);
+        }
+        for (const auto& [name, val] : obj_->fields)
+            if (seen.insert(name).second)
+                orderedNames.push_back(name);
+
+        for (const std::string& name : orderedNames) {
+            Value& val = obj_->fields.at(name);
             std::string declType;
             if (cls_->decl)
                 for (const auto& fd : cls_->decl->fields)
