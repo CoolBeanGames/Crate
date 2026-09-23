@@ -235,6 +235,10 @@ void NativeScriptComponent::drawRefField(const std::string& label, const std::st
         if (ImGui::Selectable("(none)"))
             val = Value::Null_();
         for (crate::Actor* c : candidates) {
+            // See the identical fix in ScriptComponent::drawRefField(): actors
+            // commonly share a name, and an unguarded Selectable(name) ID
+            // collides across candidates with the same name.
+            ImGui::PushID(c);
             if (ImGui::Selectable(c->name().c_str())) {
                 if (isActorType)
                     val = Value::ActorRef(c);
@@ -243,6 +247,7 @@ void NativeScriptComponent::drawRefField(const std::string& label, const std::st
                         val = Value::Obj(so);
                 }
             }
+            ImGui::PopID();
         }
         if (candidates.empty())
             ImGui::TextDisabled(isActorType ? "(no actors in the scene)"

@@ -196,6 +196,14 @@ void ScriptComponent::drawRefField(const std::string& label, const std::string& 
         if (ImGui::Selectable("(none)"))
             val = Value::Null_();
         for (crate::Actor* c : candidates) {
+            // Actors commonly share a name (every new actor starts out named
+            // "Actor"), and Selectable()'s ID defaults to its label text --
+            // without PushID, two candidates with the same name collide onto
+            // the same ImGui ID (visible as a "2 visible items with
+            // conflicting ID" debug warning), which can misattribute a click
+            // meant for one item to whatever else on screen shares that same
+            // resulting ID.
+            ImGui::PushID(c);
             if (ImGui::Selectable(c->name().c_str())) {
                 if (isActorType)
                     val = Value::ActorRef(c);
@@ -204,6 +212,7 @@ void ScriptComponent::drawRefField(const std::string& label, const std::string& 
                         val = Value::Obj(so);
                 }
             }
+            ImGui::PopID();
         }
         if (candidates.empty())
             ImGui::TextDisabled(isActorType ? "(no actors in the scene)"
