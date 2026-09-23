@@ -711,6 +711,15 @@ void ScriptEditor::updateAutocomplete() {
         acOpen_ = false;
         return;
     }
+    // The typed word is already a complete, valid name on its own (e.g. the
+    // user finished typing "float" by hand rather than accepting it) --
+    // there's nothing left to usefully complete, so close instead of
+    // lingering with an exact match sitting in the list.
+    if (!acPrefix_.empty() &&
+        std::binary_search(acItems_.begin(), acItems_.end(), acPrefix_)) {
+        acOpen_ = false;
+        return;
+    }
     acIndex_ = std::clamp(acIndex_, 0, (int)acItems_.size() - 1);
 
     // keyboard: editor input is disabled while open
