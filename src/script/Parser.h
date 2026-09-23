@@ -31,6 +31,12 @@ private:
     bool accept(Tok k);
     const Token& expect(Tok k, const char* what);
     [[noreturn]] void fail(const std::string& msg) const;
+    // Rejects identifiers that read like a type but never are one -- namely
+    // "transform" (lowercase), the built-in Transform-typed FIELD name every
+    // actor has, easily mistyped for the real type name "Transform". Used
+    // wherever a bare identifier is captured as a declared type (field,
+    // parameter, local var, return type).
+    void checkTypeName(const std::string& ty) const;
 
     FieldDecl parseField(const std::string& typeOrEmpty);
     FunctionDecl parseFunction(bool isAbstract);

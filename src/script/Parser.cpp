@@ -26,6 +26,12 @@ const Token& Parser::expect(Tok k, const char* what) {
 }
 void Parser::fail(const std::string& msg) const { throw ParseError(msg, peek().line); }
 
+void Parser::checkTypeName(const std::string& ty) const {
+    if (ty == "transform")
+        fail("'transform' is not a type -- it's the built-in Transform-typed field every "
+            "actor already has; did you mean 'Transform'?");
+}
+
 static ExprPtr mk(ExprKind k, int line) {
     auto e = std::make_unique<Expr>();
     e->kind = k;
@@ -78,6 +84,7 @@ std::unique_ptr<ClassDecl> Parser::parseClass() {
         } else if (check(Tok::Identifier)) {
             // typed field:  Type name = init;
             std::string ty = advance().text;
+            checkTypeName(ty);
             cls->fields.push_back(parseField(ty));
         } else {
             fail("expected a field or function declaration");
@@ -111,6 +118,7 @@ FunctionDecl Parser::parseFunction(bool isAbstract) {
             std::string first = expect(Tok::Identifier, "parameter").text;
             if (check(Tok::Identifier)) {
                 p.type = first;
+                checkTypeName(p.type);
                 p.name = advance().text;
             } else {
                 p.name = first;
@@ -119,8 +127,10 @@ FunctionDecl Parser::parseFunction(bool isAbstract) {
         } while (accept(Tok::Comma));
     }
     expect(Tok::RParen, "')'");
-    if (accept(Tok::Colon))
+    if (accept(Tok::Colon)) {
         fn.returnType = expect(Tok::Identifier, "return type").text;
+        checkTypeName(fn.returnType);
+    }
 
     if (isAbstract) {
         accept(Tok::Semicolon);
@@ -186,6 +196,7 @@ StmtPtr Parser::parseStmt() {
     if (check(Tok::Identifier) && peek(1).kind == Tok::Identifier) {
         auto s = mks(StmtKind::VarDecl, peek().line);
         s->declType = advance().text;
+        checkTypeName(s->declType);
         s->name = advance().text;
         if (accept(Tok::Assign))
             s->init = parseExpr();
