@@ -2426,6 +2426,11 @@ void EditorApp::drawAssetPopups() {
                 fs::create_directories(dir, ec);
                 fs::path p = dir / (assetDlgBuf_ + ".cscene");
                 std::string error;
+                // Save As renames the scene, not just the file -- without this
+                // the scene keeps its old in-memory name(), so the title bar
+                // and "SCENE:" toolbar text (both read scene_.name()) keep
+                // showing the old name even though the new file is on disk.
+                scene_.setName(assetDlgBuf_);
                 if (scene_.save(p.generic_string(), &error)) {
                     currentScenePath_ = p.generic_string();
                     savedSceneSnapshot_ = scene_.serializeToString();
