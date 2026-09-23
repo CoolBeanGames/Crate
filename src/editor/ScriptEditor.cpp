@@ -645,10 +645,21 @@ void ScriptEditor::updateAutocomplete() {
         if (ctrlSpace || (justTypedWordChar && (afterDot || !word.empty()))) {
             acOpen_ = true;
             acIndex_ = 0;
+            acAnchorLine_ = cur.mLine;
+            acAnchorCol_ = w;
         }
     }
     if (!acOpen_)
         return;
+    // The caret left the word the popup was triggered for -- a click
+    // elsewhere, a FUNCTIONS-list jump, an Up/Down/Home/End move, etc.
+    // rather than continuing to type it. Close instead of recalculating a
+    // fresh (often much longer, unrelated) candidate list for wherever it
+    // landed.
+    if (cur.mLine != acAnchorLine_ || w != acAnchorCol_) {
+        acOpen_ = false;
+        return;
+    }
 
     acPrefix_ = word;
     acAfterDot_ = afterDot;
@@ -748,9 +759,14 @@ void ScriptEditor::updateAutocomplete() {
         } else if (c == '.') {
             // Chained access (e.g. "transform." then "rotation."): insert the
             // dot and keep the popup open, now completing the new receiver's
-            // members, instead of closing and losing the live trigger.
+            // members, instead of closing and losing the live trigger. Re-
+            // anchor to just past the dot -- the "word" being completed
+            // starts fresh there, not at the original trigger column.
             editor_.InsertText(".");
             acIndex_ = 0;
+            auto afterDotPos = editor_.GetCursorPosition();
+            acAnchorLine_ = afterDotPos.mLine;
+            acAnchorCol_ = editor_.GetCharacterIndex(afterDotPos);
         } else if (handleBracketCharForAc((char)c)) {
             acOpen_ = false;
         } else {

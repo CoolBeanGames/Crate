@@ -86,6 +86,13 @@ private:
     std::string acPrefix_;
     std::vector<std::string> acItems_;
     int acIndex_ = 0;
+    // Line and word-start column the popup was triggered at (see
+    // updateAutocomplete()) -- if the caret ever leaves that word (a click
+    // elsewhere, a FUNCTIONS-list jump, etc. rather than continuing to type
+    // it), the popup closes instead of silently recalculating for wherever
+    // the caret landed.
+    int acAnchorLine_ = -1;
+    int acAnchorCol_ = -1;
 
     // Per-frame input snapshot, captured *before* editor_.Render() (which
     // drains ImGui's character queue and consumes the keypress), so the
