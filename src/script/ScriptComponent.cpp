@@ -2,6 +2,7 @@
 
 #include "core/Log.h"
 #include "scene/Actor.h"
+#include "script/Runtime.h"
 #include "script/ScriptFieldIO.h"
 
 #include "imgui.h"
@@ -40,12 +41,30 @@ bool isPlainValueType(const std::string& t) {
     return t.empty() || t == "int" || t == "float" || t == "bool" || t == "char" ||
           t == "string" || t == "array" || t == "Vector2" || t == "Vector3";
 }
+
+bool sameValue(const Value& a, const Value& b) {
+    return a.t == b.t && valueEquals(a, b).b;
+}
 } // namespace
 
 void ScriptComponent::ensureObject() {
-    // The class was recompiled since we built the object -> rebuild it so field
-    // initialisers re-run and stale do_async state is dropped.
+    // The class was recompiled since we built the object -> rebuild it so
+    // field initialisers re-run and stale do_async/connection state is
+    // dropped. A field the user never touched (its live value still matches
+    // fieldDefaults_, the pure initialiser-produced snapshot from the last
+    // build) re-initialises normally, which is what lets an edited field's
+    // own new initialiser value actually take effect. A field whose live
+    // value has since diverged from that snapshot -- i.e. the user
+    // explicitly set it, typically via the Inspector -- is carried forward
+    // instead, so editing any UNRELATED part of the script doesn't silently
+    // reset every exposed variable back to its default.
+    std::unordered_map<std::string, Value> preserved;
     if (obj_ && cls_ && cls_->generation != objGen_) {
+        for (auto& [name, val] : obj_->fields) {
+            auto dit = fieldDefaults_.find(name);
+            if (dit == fieldDefaults_.end() || !sameValue(dit->second, val))
+                preserved.emplace(name, val);
+        }
         obj_.reset();
         started_ = false;
         lastError_.clear();
@@ -53,6 +72,12 @@ void ScriptComponent::ensureObject() {
     if (!obj_ && cls_) {
         obj_ = Interpreter::instantiate(ctx_, cls_, actor());
         objGen_ = cls_->generation;
+        fieldDefaults_ = obj_->fields; // pure defaults, before merging overrides back in
+        for (auto& [name, oldVal] : preserved) {
+            auto it = obj_->fields.find(name);
+            if (it != obj_->fields.end() && it->second.t == oldVal.t)
+                it->second = std::move(oldVal);
+        }
     }
     if (obj_)
         obj_->owner = actor();

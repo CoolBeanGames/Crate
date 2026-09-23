@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 namespace crate::script {
 
@@ -51,6 +52,13 @@ private:
     const ClassInfo* cls_ = nullptr;
     std::shared_ptr<ScriptObject> obj_;
     uint32_t objGen_ = 0; // ClassInfo generation obj_ was built from
+    // Snapshot of obj_->fields taken right after the most recent
+    // Interpreter::instantiate(), i.e. each field's pure initialiser-produced
+    // default with no Inspector edits applied. Compared against the live
+    // value in ensureObject() on the next recompile to tell an untouched
+    // field (safe to re-initialise to the new default) from one the user
+    // has explicitly overridden (carried forward instead of being reset).
+    std::unordered_map<std::string, Value> fieldDefaults_;
     bool started_ = false;
     std::string lastError_;
 };
