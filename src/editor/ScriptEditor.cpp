@@ -173,8 +173,9 @@ void ScriptEditor::draw() {
     ImGui::Columns(1);
 }
 
-void ScriptEditor::beginNewScript() {
+void ScriptEditor::beginNewScript(const std::string& targetDir) {
     newName_ = "NewScript";
+    newScriptDir_ = targetDir;
     newRequested_ = true;
 }
 
@@ -196,7 +197,7 @@ void ScriptEditor::drawNewScriptPopup() {
             .open();
     }
     if (newPopup_.draw() == ui::Popup::Result::Ok && !newName_.empty()) {
-        std::string made = ScriptSystem::get().newScript(newName_);
+        std::string made = ScriptSystem::get().newScript(newName_, newScriptDir_);
         if (!made.empty())
             openScript(made);
     }

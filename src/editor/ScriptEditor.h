@@ -24,8 +24,11 @@ public:
     void saveAll();
     bool hasUnsaved() const;
 
-    // Start the "name your new script" prompt (the class gets the same name).
-    void beginNewScript();
+    // Start the "name your new script" prompt (the class gets the same
+    // name). `targetDir`, if given, is the folder (relative to the project's
+    // asset root) the new script's file will be created in -- e.g. the
+    // Asset Browser's currently open folder when requested from there.
+    void beginNewScript(const std::string& targetDir = "");
 
     // Gates saveCurrent()/saveAll()/pushToSystem() to a no-op while true --
     // called by EditorApp::setPlaying() (Phase 7). Scripts are force-saved
@@ -74,6 +77,7 @@ private:
 
     ui::Popup newPopup_;
     std::string newName_ = "NewScript";
+    std::string newScriptDir_; // target folder for the pending New Script request; see beginNewScript()
     bool newRequested_ = false;
 
     // autocomplete state

@@ -1724,7 +1724,10 @@ void EditorApp::assetBrowserMenu() {
     if (menu.beginSub("Scripting")) {
         if (menu.item("New Script")) {
             openScriptsTab_ = true;
-            scriptEditor_.beginNewScript();
+            // Land the new script in whatever Asset Browser folder is
+            // currently open, matching Create Scene/Create Input Map above,
+            // instead of always dropping it in a top-level "scripts" folder.
+            scriptEditor_.beginNewScript(assetCwd_);
         }
         if (menu.item("Reload Scripts")) {
             script::ScriptSystem::get().reload();

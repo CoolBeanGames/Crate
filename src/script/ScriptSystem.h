@@ -60,11 +60,17 @@ public:
     // recompiled, deleted files removed from the list / catalogue.
     void reload();
 
-    // Create a new script named `className` from a template in the scripts
-    // folder (file <className>.cscript, `class <className> : Actor`), compile
-    // and register it. The name is validated (uppercase first letter, no
-    // leading digit) and made unique. Returns the final name, or "".
-    std::string newScript(const std::string& className = "NewScript");
+    // Create a new script named `className` from a template (file
+    // <className>.cscript, `class <className> : Actor`), compile and
+    // register it. The name is validated (uppercase first letter, no leading
+    // digit) and made unique. `targetDir`, if non-empty, is the folder
+    // (relative to the project's asset root) to create it in -- e.g. the
+    // Asset Browser's currently open folder, so "New Script" lands where the
+    // user was browsing instead of always in a top-level "scripts" folder.
+    // Empty falls back to that default "scripts" folder. Returns the final
+    // name, or "".
+    std::string newScript(const std::string& className = "NewScript",
+                          const std::string& targetDir = "");
 
     // Compile source into a class; registers/updates the type + component.
     // Returns false and fills `errorOut` on a parse error.

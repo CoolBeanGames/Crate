@@ -612,15 +612,16 @@ void ScriptSystem::loadFolder(const std::string& dir) {
     }
 }
 
-std::string ScriptSystem::newScript(const std::string& className) {
+std::string ScriptSystem::newScript(const std::string& className, const std::string& targetDir) {
     if (dir_.empty())
         dir_ = "assets";
-    // New scripts always land in a "scripts" subfolder of the project's
-    // asset root for tidiness, even though dir_ itself is now that whole
-    // root (task 132: the editor is aware of .cscript files anywhere under
-    // it, but that doesn't mean newly-created ones should scatter loose in
-    // the root).
-    const std::string newScriptDir = dir_ + "/scripts";
+    // Land in the caller-supplied folder (e.g. the Asset Browser's currently
+    // open folder) when given one; otherwise fall back to a "scripts"
+    // subfolder of the project's asset root for tidiness, even though dir_
+    // itself is now that whole root (task 132: the editor is aware of
+    // .cscript files anywhere under it, but that doesn't mean newly-created
+    // ones should scatter loose in the root by default).
+    const std::string newScriptDir = targetDir.empty() ? dir_ + "/scripts" : dir_ + "/" + targetDir;
     std::error_code ec;
     fs::create_directories(newScriptDir, ec);
 
