@@ -4,5 +4,5 @@
 // bar, and anywhere else that ever needs to display it). Bump this alongside
 // each tagged GitHub release.
 namespace crate {
-constexpr const char* kCrateVersion = "0.11.0";
+constexpr const char* kCrateVersion = "0.12.0";
 } // namespace crate
