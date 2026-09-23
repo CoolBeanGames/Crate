@@ -778,10 +778,15 @@ void ScriptEditor::updateAutocomplete() {
     // Just below the cursor's own line, not a fixed guess from the widget's
     // corner -- that could as easily land the popup right on top of the
     // cursor as below it, depending on which line you're actually on.
-    ImGui::SetNextWindowPos(editor_.GetCursorScreenPos(), ImGuiCond_Appearing);
+    // Pinned to the cursor every frame it's open (not just ImGuiCond_Appearing)
+    // -- combined with NoMove/NoDocking below, this keeps it a fixed hint
+    // anchored to where you're typing rather than a draggable/dockable
+    // window a stray click-drag could relocate or dock away entirely.
+    ImGui::SetNextWindowPos(editor_.GetCursorScreenPos());
     ImGui::SetNextWindowSize(ImVec2(240, 180), ImGuiCond_Appearing);
     if (ImGui::Begin("##autocomplete", nullptr,
                      ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                         ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoDocking |
                          ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav)) {
         for (int i = 0; i < (int)acItems_.size(); ++i) {
             if (ImGui::Selectable(acItems_[i].c_str(), i == acIndex_)) {
