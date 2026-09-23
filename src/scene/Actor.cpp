@@ -1,10 +1,14 @@
 #include "scene/Actor.h"
 
 #include "assets/AssetDatabase.h"
+#include "scene/ProfileHook.h"
 
 #include <algorithm>
+#include <chrono>
 
 namespace crate {
+
+ComponentProfileHook g_componentProfileHook = nullptr;
 
 uint64_t Actor::nextId_ = 1;
 
@@ -109,16 +113,34 @@ void Actor::startComponents() {
 
 void Actor::updateComponents(float dt) {
     for (const auto& c : components_)
-        if (c->enabled)
+        if (c->enabled) {
+            if (!g_componentProfileHook) {
+                c->update(dt);
+                continue;
+            }
+            auto t0 = std::chrono::steady_clock::now();
             c->update(dt);
+            auto t1 = std::chrono::steady_clock::now();
+            g_componentProfileHook(name_, c->typeName(),
+                                   std::chrono::duration<double, std::milli>(t1 - t0).count());
+        }
     for (const auto& ch : children_)
         ch->updateComponents(dt);
 }
 
 void Actor::physicsUpdateComponents(float dt) {
     for (const auto& c : components_)
-        if (c->enabled)
+        if (c->enabled) {
+            if (!g_componentProfileHook) {
+                c->physicsUpdate(dt);
+                continue;
+            }
+            auto t0 = std::chrono::steady_clock::now();
             c->physicsUpdate(dt);
+            auto t1 = std::chrono::steady_clock::now();
+            g_componentProfileHook(name_, c->typeName(),
+                                   std::chrono::duration<double, std::milli>(t1 - t0).count());
+        }
     for (const auto& ch : children_)
         ch->physicsUpdateComponents(dt);
 }

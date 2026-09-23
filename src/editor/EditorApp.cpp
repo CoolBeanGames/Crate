@@ -1,4 +1,7 @@
 #include "editor/EditorApp.h"
+#include "editor/BugReport.h"
+#include "core/Profiler.h"
+#include "scene/ProfileHook.h"
 #include "assets/AssetDatabase.h"
 #include "assets/FbxImport.h"
 #include "assets/Image.h"
@@ -19,6 +22,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cfloat>
 #include <cstdlib>
 #include <fstream>
 #include <functional>
@@ -70,6 +74,15 @@ EditorApp::EditorApp() : scene_(Scene::makeSample()) {
     registerBuiltinComponents();
     renderer_.setMeshLibrary(&meshLib_);
     renderer_.setMaterialLibrary(&materialLib_);
+
+    // Wires Actor::updateComponents()/physicsUpdateComponents() (in the
+    // singleton-free crate_script_runtime target) to the real Profiler
+    // singleton (crate_core) -- see ProfileHook.h for why this is an
+    // injected function pointer instead of a direct call.
+    g_componentProfileHook = [](const std::string& actorName, const std::string& componentType,
+                                double milliseconds) {
+        Profiler::get().addComponentSample(actorName, componentType, milliseconds);
+    };
 
     // Task 130: a bare launch (no --project arg, see main.cpp) resumes the
     // last project + scene the user actually had open, rather than always
@@ -238,12 +251,24 @@ void EditorApp::onFrame() {
         CR_LOG("render", "First frame presented");
         firstFrame_ = false;
     }
+    if (!checkedCrashOnStartup_) {
+        checkedCrashOnStartup_ = true;
+        if (takePendingCrashReport(&crashErrorCode_)) {
+            CR_WARN("app", "Crate crashed last run (" + crashErrorCode_ + ")");
+            crashReportPopup_.title("Crate Crashed Last Time")
+                .size(420, 0)
+                .defaultButtons(false)
+                .open();
+        }
+    }
     if (!gizmoInit_) {
         ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
         gizmoInit_ = true;
     }
     ImGuizmo::BeginFrame();
+    Profiler::get().beginFrame();
     const float dt = ImGui::GetIO().DeltaTime;
+    Profiler::get().addSample("compute", dt * 1000.0);
     if (scene_.selected()) {
         // An actor selection supersedes an asset selection (kept exclusive so
         // Delete is unambiguous).
@@ -256,15 +281,21 @@ void EditorApp::onFrame() {
     if (playing_) {
         Input::get().poll();
         script::ScriptSystem::get().dispatchInput();
-        scene_.tick(dt);
-        script::ScriptSystem::get().tickStatics(dt);
+        {
+            ProfileScope _scriptsProf("scripts");
+            scene_.tick(dt);
+            script::ScriptSystem::get().tickStatics(dt);
+        }
         physicsAccum_ += dt;
         const float step = 1.0f / 60.0f;
         int guard = 0;
-        while (physicsAccum_ >= step && guard++ < 8) {
-            scene_.physicsTick(step);
-            script::ScriptSystem::get().physicsStatics(step);
-            physicsAccum_ -= step;
+        {
+            ProfileScope _physicsProf("physics");
+            while (physicsAccum_ >= step && guard++ < 8) {
+                scene_.physicsTick(step);
+                script::ScriptSystem::get().physicsStatics(step);
+                physicsAccum_ -= step;
+            }
         }
         // Actor.destroy() / Component.remove(): actually applied here, once
         // every script this frame has finished running, never mid-hook.
@@ -298,6 +329,7 @@ void EditorApp::onFrame() {
     // only from deep inside the Asset Browser panel keeps it working no
     // matter which bottom-panel tab is active.
     drawAssetPopups();
+    drawBugReportPopups();
 
     ImGuiID dockspace_id = ImGui::GetID("CrateDockspace");
     if (ImGui::DockBuilderGetNode(dockspace_id) == nullptr) {
@@ -359,6 +391,8 @@ void EditorApp::onFrame() {
 
     if (showDemo_)
         ImGui::ShowDemoWindow(&showDemo_);
+    if (profilerOpen_)
+        drawProfiler();
 }
 
 // ---------------------------------------------------------------------------
@@ -445,11 +479,21 @@ void EditorApp::drawMenuBar() {
     }
     if (ImGui::BeginMenu("Window")) {
         ImGui::TextDisabled("Panels are docked; drag tabs to rearrange.");
+        ImGui::Separator();
+        ImGui::MenuItem("Profiler", nullptr, &profilerOpen_);
         ImGui::EndMenu();
     }
 
     float w = ImGui::GetContentRegionAvail().x;
-    ImGui::SameLine(ImGui::GetCursorPosX() + w - 90.0f);
+    ImGui::SameLine(ImGui::GetCursorPosX() + w - 200.0f);
+    if (ImGui::MenuItem("Report Bug")) {
+        bugReportTitle_.clear();
+        bugReportDesc_.clear();
+        bugReportTypeIndex_ = 0;
+        bugReportStatus_.clear();
+        bugReportPopup_.title("Report Bug").size(420, 0).open();
+    }
+    ImGui::SameLine(ImGui::GetCursorPosX() + 12.0f);
     if (ImGui::BeginMenu("Settings")) {
         ImGui::Text("Frame: %.1f FPS", ImGui::GetIO().Framerate);
         ImGui::Checkbox("ImGui Demo", &showDemo_);
@@ -1169,7 +1213,11 @@ void EditorApp::drawViewport() {
                 opt.highlight = scene_.selected();
                 opt.fogEnabled = fog_;
                 opt.shadows = shadows_;
-                void* srv = renderer_.ready() ? renderer_.render(scene_, camera_, w, h, opt) : nullptr;
+                void* srv;
+                {
+                    ProfileScope _renderProf("render");
+                    srv = renderer_.ready() ? renderer_.render(scene_, camera_, w, h, opt) : nullptr;
+                }
 
                 if (srv) {
                     ImVec2 imgPos = ImGui::GetCursorScreenPos();
@@ -1247,6 +1295,7 @@ void EditorApp::drawViewport() {
                     Renderer::Options opt;
                     opt.fogEnabled = fog_;
                     opt.shadows = shadows_;
+                    ProfileScope _renderProf("render");
                     srv = renderer_.render(scene_, view, proj, eye, gameCam->nearZ, gameCam->farZ,
                                           w, h, opt);
                 }
@@ -2397,6 +2446,119 @@ void EditorApp::duplicateFileAsset(const std::string& path) {
         script::ScriptSystem::get().reload();
     CR_LOG("assets",
            "Duplicated '" + src.filename().string() + "' -> '" + dest.filename().string() + "'");
+}
+
+void EditorApp::drawProfiler() {
+    ImGui::SetNextWindowSize(ImVec2(420, 480), ImGuiCond_FirstUseEver);
+    if (!ImGui::Begin("Profiler", &profilerOpen_)) {
+        ImGui::End();
+        return;
+    }
+    if (!playing_)
+        ImGui::TextDisabled("Physics/Scripts only tick during Play; Compute/Render are always live.");
+
+    auto drawSection = [](const char* label, const char* key) {
+        const Profiler::SectionView* v = Profiler::get().section(key);
+        double lastMs = v ? v->lastMs : 0.0;
+        double avgMs = v ? v->avgMs : 0.0;
+        double fps = avgMs > 0.0 ? 1000.0 / avgMs : 0.0;
+        ImGui::Text("%-8s %6.2f ms   avg %6.2f ms   %6.1f FPS", label, lastMs, avgMs, fps);
+        float hist[Profiler::kHistoryLen];
+        int n = Profiler::get().historyOrdered(key, hist);
+        if (n > 0) {
+            std::string plotId = std::string("##") + key;
+            ImGui::PlotLines(plotId.c_str(), hist, n, 0, nullptr, 0.0f, FLT_MAX, ImVec2(-1, 36));
+        }
+    };
+    drawSection("Compute", "compute");
+    drawSection("Render", "render");
+    drawSection("Physics", "physics");
+    drawSection("Scripts", "scripts");
+
+    ImGui::Separator();
+    ImGui::TextDisabled("This frame -- by script / component type");
+    ImGui::BeginChild("##byComponent", ImVec2(0, 120), true);
+    for (const auto& b : Profiler::get().byComponentType())
+        ImGui::Text("%-28s %7.3f ms", b.name.c_str(), b.ms);
+    ImGui::EndChild();
+
+    ImGui::TextDisabled("This frame -- by actor");
+    ImGui::BeginChild("##byActor", ImVec2(0, 120), true);
+    for (const auto& b : Profiler::get().byActor())
+        ImGui::Text("%-28s %7.3f ms", b.name.c_str(), b.ms);
+    ImGui::EndChild();
+
+    ImGui::End();
+}
+
+namespace {
+const char* kBugReportTypes[] = {
+    "Scripting", "UI",         "Rendering",   "New Feature", "Sources",    "Projects",
+    "Scenes",    "Physics",    "Audio",       "Animations",  "Levels",     "Performance",
+};
+} // namespace
+
+void EditorApp::drawBugReportPopups() {
+    bugReportPopup_.title("Report Bug").size(460, 0).defaultButtons(false).onBody([this](ui::Popup& p) {
+        p.help("Files straight into this engine's own Zen task queue.");
+        p.spacing();
+        p.inputText("Title", &bugReportTitle_, true);
+        ImGui::TextUnformatted("Description / repro steps");
+        ImGui::InputTextMultiline("##bugdesc", &bugReportDesc_, ImVec2(-1, 120));
+        ImGui::SetNextItemWidth(-1);
+        ImGui::Combo("##bugtype", &bugReportTypeIndex_, kBugReportTypes,
+                     IM_ARRAYSIZE(kBugReportTypes));
+        p.spacing();
+        if (p.button("Submit")) {
+            BugReportResult res = submitBugReport(
+                bugReportTitle_, bugReportDesc_, kBugReportTypes[bugReportTypeIndex_]);
+            bugReportStatus_ = res.message;
+            if (res.ok) {
+                CR_LOG("app", "Bug report filed: " + bugReportTitle_);
+                p.accept();
+            } else {
+                CR_ERROR("app", "Bug report failed: " + res.message);
+            }
+        }
+        ImGui::SameLine();
+        if (p.button("Cancel"))
+            p.cancel();
+        if (!bugReportStatus_.empty()) {
+            ImGui::Spacing();
+            ImGui::TextWrapped("%s", bugReportStatus_.c_str());
+        }
+    });
+    bugReportPopup_.draw();
+
+    // "Crate crashed last time" -- see BugReport.h's installCrashHandler().
+    if (crashReportPopup_.isOpen() || !crashErrorCode_.empty()) {
+        crashReportPopup_.onBody([this](ui::Popup& p) {
+            ImGui::TextWrapped("Crate didn't shut down cleanly last time (error %s).",
+                               crashErrorCode_.c_str());
+            ImGui::TextWrapped("File a bug report? The error code will be copied to your "
+                               "clipboard either way.");
+            p.spacing();
+            if (p.button("Yes, file it")) {
+                ImGui::SetClipboardText(crashErrorCode_.c_str());
+                bugReportTitle_ = "Crash: " + crashErrorCode_;
+                bugReportDesc_ = "Crate crashed on the previous run with exception " +
+                                 crashErrorCode_ +
+                                 ".\n\n(Fill in what you were doing right before it happened.)";
+                bugReportTypeIndex_ = 0;
+                bugReportStatus_.clear();
+                p.cancel(); // dismiss this popup...
+                bugReportPopup_.title("Report Bug").size(460, 0).open(); // ...and open that one
+            }
+            ImGui::SameLine();
+            if (p.button("No")) {
+                ImGui::SetClipboardText(crashErrorCode_.c_str());
+                CR_LOG("app", "Crash error code copied to clipboard: " + crashErrorCode_);
+                p.cancel();
+            }
+        });
+        if (crashReportPopup_.draw() != ui::Popup::Result::Open)
+            crashErrorCode_.clear();
+    }
 }
 
 void EditorApp::drawAssetPopups() {

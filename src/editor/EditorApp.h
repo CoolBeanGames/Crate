@@ -123,6 +123,18 @@ private:
     void duplicateFileAsset(const std::string& path);
     void drawAssetPopups();  // new folder / rename / delete / colour dialogs
     void drawInputMapEditor(); // double-click an .inputmap -> binding editor window
+    // Basic performance profiler window (Zen task 90): compute/render/physics/
+    // scripts frame time with a rolling sparkline, plus this-frame breakdowns
+    // by actor and by component/script type. Toggled from the Window menu.
+    void drawProfiler();
+
+    // Bug Reporting (Zen task 89): the manual "Report Bug" window (opened from
+    // the menu bar) and the "Crate crashed last time" prompt shown once at
+    // startup if BugReport.h's crash handler left a marker -- both submit
+    // through the same submitBugReport() plumbing. Drawn unconditionally each
+    // frame (like drawAssetPopups) so the crash prompt can appear before any
+    // project/scene is even open.
+    void drawBugReportPopups();
 
     void loadFolderColors();
     void saveFolderColors();
@@ -306,6 +318,18 @@ private:
     // from the Asset Browser (as opposed to the normal working scene) -- the
     // path to return to, shown as a "< Back to X" banner in the Hierarchy.
     std::string prefabEditReturnPath_;
+
+    // Bug Reporting (Zen task 89).
+    ui::Popup bugReportPopup_;
+    std::string bugReportTitle_;
+    std::string bugReportDesc_;
+    int bugReportTypeIndex_ = 0; // index into kBugReportTypes (EditorApp.cpp)
+    std::string bugReportStatus_; // last submitBugReport() outcome, shown under the button
+    ui::Popup crashReportPopup_;
+    std::string crashErrorCode_;    // set when a previous-run crash marker is found
+    bool checkedCrashOnStartup_ = false; // one-shot: takePendingCrashReport() on the first frame
+
+    bool profilerOpen_ = false; // Zen task 90
 };
 
 } // namespace crate

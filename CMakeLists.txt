@@ -74,6 +74,7 @@ endif()
 # --- Crate engine core -----------------------------------------------------
 add_library(crate_core STATIC
     src/core/Log.cpp
+    src/core/Profiler.cpp
     src/scene/Scene.cpp
     src/scene/SceneIO.cpp
     src/scene/ComponentRegistry.cpp
@@ -105,6 +106,7 @@ add_library(crate_core STATIC
     src/editor/Theme.cpp
     src/editor/ProjectFile.cpp
     src/editor/PathRegistry.cpp
+    src/editor/BugReport.cpp
     src/editor/EditorApp.cpp
 )
 target_include_directories(crate_core PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
