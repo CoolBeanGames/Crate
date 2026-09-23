@@ -518,128 +518,6 @@
           "isCollapsed": false,
           "createdAt": "2026-09-22T04:19:38.0243987+00:00",
           "updatedAt": "2026-09-22T19:52:45.8578361+00:00"
-        },
-        {
-          "id": "8d40334dbe704d0fae3035899f6e8800",
-          "index": 134,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Asset Browser: full context-menu actions per asset",
-          "task": "Right-click context menu in the Asset Browser needs full actions on every asset type EXCEPT input maps: Delete, Copy, Rename, Duplicate. Also: right-clicking blank space in the Asset Browser (not on an asset) should offer Paste (of whatever was last Copied).",
-          "tags": [
-            "assets",
-            "asset browser"
-          ],
-          "files": [],
-          "customTypeId": null,
-          "customValues": {},
-          "requirements": [],
-          "notes": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-22T11:11:56.1123317+00:00",
-          "updatedAt": "2026-09-22T11:11:56.112482+00:00"
-        },
-        {
-          "id": "1e34d731b9b34d56b7caefcb69bfaf8b",
-          "index": 138,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Asset Browser: double-click an asset\u0027s NAME enters rename mode",
-          "task": "Double-clicking an asset\u0027s name/label in the Asset Browser (not its icon) should enter inline rename mode for that asset.",
-          "tags": [
-            "asset browser"
-          ],
-          "files": [],
-          "customTypeId": null,
-          "customValues": {},
-          "requirements": [],
-          "notes": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-22T11:11:57.5357316+00:00",
-          "updatedAt": "2026-09-22T11:11:57.5359016+00:00"
-        },
-        {
-          "id": "983f816775fb4e47b113fa6fcbc7c91d",
-          "index": 139,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Asset Browser: double-click an asset\u0027s ICON performs a type-specific action",
-          "task": "Double-clicking an asset\u0027s ICON (as opposed to its name -- see the separate rename-on-name-double-click task) in the Asset Browser should perform an action specific to that asset\u0027s type: image -\u003E open it in the OS default image viewer/editor; scene (.cscene) -\u003E open that scene for editing (reuse the existing open/Edit-Prefab scene-opening path); script (.cscript) -\u003E open that script in the Script Editor; input map -\u003E open the input-map editor.",
-          "tags": [
-            "asset browser"
-          ],
-          "files": [],
-          "customTypeId": null,
-          "customValues": {},
-          "requirements": [],
-          "notes": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-22T11:11:57.8905875+00:00",
-          "updatedAt": "2026-09-22T11:11:57.8907535+00:00"
-        },
-        {
-          "id": "8a8b8c63d9b04f42869012f4cfcbeb45",
-          "index": 140,
-          "kind": "task",
-          "dueDate": null,
-          "startedDate": null,
-          "priority": null,
-          "title": "Plane mesh: add a subdivision parameter",
-          "task": "The built-in Plane primitive mesh needs a subdivision-count parameter (Inspector-editable), actually hooked up to real mesh generation -- i.e. increasing it should actually subdivide the plane\u0027s geometry into more quads/triangles, not just be a cosmetic field.",
-          "tags": [
-            "rendering",
-            "components"
-          ],
-          "files": [],
-          "customTypeId": null,
-          "customValues": {},
-          "requirements": [],
-          "notes": [],
-          "flags": {
-            "commit": true,
-            "build": true,
-            "release": false,
-            "merge": false
-          },
-          "isDone": false,
-          "isLocked": false,
-          "isAwaitingFeedback": false,
-          "isCollapsed": false,
-          "createdAt": "2026-09-22T11:11:58.2284874+00:00",
-          "updatedAt": "2026-09-22T11:11:58.2286479+00:00"
         }
       ]
     },
@@ -5717,6 +5595,128 @@
           "isCollapsed": false,
           "createdAt": "2026-09-22T11:11:58.9750834+00:00",
           "updatedAt": "2026-09-23T00:40:39.7624728+00:00"
+        },
+        {
+          "id": "8d40334dbe704d0fae3035899f6e8800",
+          "index": 134,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Asset Browser: full context-menu actions per asset",
+          "task": "Right-click context menu in the Asset Browser needs full actions on every asset type EXCEPT input maps: Delete, Copy, Rename, Duplicate. Also: right-clicking blank space in the Asset Browser (not on an asset) should offer Paste (of whatever was last Copied).",
+          "tags": [
+            "assets",
+            "asset browser"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-22T11:11:56.1123317+00:00",
+          "updatedAt": "2026-09-23T01:30:15.4095196+00:00"
+        },
+        {
+          "id": "1e34d731b9b34d56b7caefcb69bfaf8b",
+          "index": 138,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Asset Browser: double-click an asset\u0027s NAME enters rename mode",
+          "task": "Double-clicking an asset\u0027s name/label in the Asset Browser (not its icon) should enter inline rename mode for that asset.",
+          "tags": [
+            "asset browser"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-22T11:11:57.5357316+00:00",
+          "updatedAt": "2026-09-23T01:30:15.7247924+00:00"
+        },
+        {
+          "id": "983f816775fb4e47b113fa6fcbc7c91d",
+          "index": 139,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Asset Browser: double-click an asset\u0027s ICON performs a type-specific action",
+          "task": "Double-clicking an asset\u0027s ICON (as opposed to its name -- see the separate rename-on-name-double-click task) in the Asset Browser should perform an action specific to that asset\u0027s type: image -\u003E open it in the OS default image viewer/editor; scene (.cscene) -\u003E open that scene for editing (reuse the existing open/Edit-Prefab scene-opening path); script (.cscript) -\u003E open that script in the Script Editor; input map -\u003E open the input-map editor.",
+          "tags": [
+            "asset browser"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-22T11:11:57.8905875+00:00",
+          "updatedAt": "2026-09-23T01:30:16.0296436+00:00"
+        },
+        {
+          "id": "8a8b8c63d9b04f42869012f4cfcbeb45",
+          "index": 140,
+          "kind": "task",
+          "dueDate": null,
+          "startedDate": null,
+          "priority": null,
+          "title": "Plane mesh: add a subdivision parameter",
+          "task": "The built-in Plane primitive mesh needs a subdivision-count parameter (Inspector-editable), actually hooked up to real mesh generation -- i.e. increasing it should actually subdivide the plane\u0027s geometry into more quads/triangles, not just be a cosmetic field.",
+          "tags": [
+            "rendering",
+            "components"
+          ],
+          "files": [],
+          "customTypeId": null,
+          "customValues": {},
+          "requirements": [],
+          "notes": [],
+          "flags": {
+            "commit": true,
+            "build": true,
+            "release": false,
+            "merge": false
+          },
+          "isDone": true,
+          "isLocked": false,
+          "isAwaitingFeedback": false,
+          "isCollapsed": false,
+          "createdAt": "2026-09-22T11:11:58.2284874+00:00",
+          "updatedAt": "2026-09-23T01:30:16.332952+00:00"
         }
       ]
     }
