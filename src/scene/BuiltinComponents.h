@@ -38,6 +38,7 @@ public:
     float radius = 0.5f;                    // Sphere/Cylinder/Capsule
     float height = 1.0f;                    // Cylinder/Capsule
     float planeSize[2] = {1.0f, 1.0f};      // Plane/Quad: width, depth (or height)
+    int planeSubdivisions = 1;              // Plane only: quads per side (task 140)
 
     // Baked contribution of static lights (task 59), filled by "Bake Lightmaps".
     // Sampled with an up-facing normal at the object's position - a coarse

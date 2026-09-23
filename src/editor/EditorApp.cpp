@@ -1653,20 +1653,32 @@ void EditorApp::assetBrowserMenu() {
             p.inputText("Name", &assetDlgBuf_, true);
         }).open();
     }
-    if (!folderClip_.path.empty() && menu.item("Paste Folder Here")) {
+    // Task 134: generic Paste on blank space, for whatever's on folderClip_
+    // (a file OR a folder -- fs::copy/fs::rename don't care which).
+    if (!folderClip_.path.empty() && menu.item("Paste")) {
         std::error_code ec;
         fs::path srcP(folderClip_.path);
         fs::path dst = fs::path(assetDir_) / assetCwd_ / srcP.filename();
+        bool wasDir = fs::is_directory(srcP, ec);
         if (folderClip_.cut) {
             fs::rename(srcP, dst, ec);
-            if (!ec)
-                AssetDatabase::get().movedPrefix(srcP.generic_string() + "/",
-                                                 dst.generic_string() + "/");
+            if (!ec) {
+                if (wasDir)
+                    AssetDatabase::get().movedPrefix(srcP.generic_string() + "/",
+                                                     dst.generic_string() + "/");
+                else
+                    AssetDatabase::get().moved(srcP.generic_string(), dst.generic_string());
+            }
             folderClip_.path.clear();
         } else {
             fs::copy(srcP, dst, fs::copy_options::recursive, ec);
+            if (!ec && !wasDir) {
+                AssetDatabase::get().idFor(dst.generic_string());
+                if (dst.extension() == ".cscript")
+                    script::ScriptSystem::get().reload();
+            }
         }
-        CR_LOG("assets", ec ? "Paste failed" : "Pasted folder");
+        CR_LOG("assets", ec ? "Paste failed" : ("Pasted '" + srcP.filename().string() + "'"));
     }
     if (menu.item("Create Material")) {
         Material& m = materialLib_.create("Material");
@@ -1889,19 +1901,27 @@ void EditorApp::drawAssetIconGlyph(ImDrawList* dl, ImVec2 iconMin, ImVec2 iconMa
 // instead of 2-3 letter text glyphs).
 bool EditorApp::assetIconTile(const char* strId, AssetIconKind kind, unsigned int accent,
                               const std::string& label, bool selected, bool* dbl,
-                              const std::string& imagePath) {
+                              const std::string& imagePath, bool* dblIcon, bool* dblName) {
     constexpr float kTileW = 84.0f, kTileH = 96.0f, kIconH = 64.0f;
     ImGui::PushID(strId);
     ImVec2 topLeft = ImGui::GetCursorScreenPos();
     bool clicked =
         ImGui::Selectable("##tile", selected, ImGuiSelectableFlags_AllowDoubleClick,
                           ImVec2(kTileW, kTileH));
+    bool isDbl = clicked && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
     if (dbl)
-        *dbl = clicked && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
+        *dbl = isDbl;
 
     ImDrawList* dl = ImGui::GetWindowDrawList();
     ImVec2 iconMin(topLeft.x + 6.0f, topLeft.y + 4.0f);
     ImVec2 iconMax(topLeft.x + kTileW - 6.0f, topLeft.y + 4.0f + kIconH);
+    // Split the double-click by which half of the tile the mouse is actually
+    // over (task 138/139): at or above the icon's bottom edge = the icon,
+    // below it = the name label.
+    if (dblIcon)
+        *dblIcon = isDbl && ImGui::GetMousePos().y <= iconMax.y;
+    if (dblName)
+        *dblName = isDbl && ImGui::GetMousePos().y > iconMax.y;
     drawAssetIconGlyph(dl, iconMin, iconMax, kind, accent, imagePath);
 
     ImGui::PushClipRect(topLeft, ImVec2(topLeft.x + kTileW, topLeft.y + kTileH), true);
@@ -2004,14 +2024,31 @@ void EditorApp::drawAssetFolders() {
             for (const auto& f2 : script::ScriptSystem::get().files())
                 if (fs::path(f2.path) == fs::path(path)) { scriptClassName = f2.name; break; }
 
-        bool dbl = false;
+        bool dblIcon = false, dblName = false;
         bool clicked = assetIconTile(
             path.c_str(), kind, col, name,
-            isScript && !scriptClassName.empty() && selectedScript_ == scriptClassName, &dbl,
-            isImg ? path : std::string());
+            isScript && !scriptClassName.empty() && selectedScript_ == scriptClassName, nullptr,
+            isImg ? path : std::string(), &dblIcon, &dblName);
         if (clicked) {
+            if (dblName) {
+                // Task 138: double-clicking the NAME (as opposed to the icon,
+                // handled per-type below) always means rename, for every
+                // asset kind uniformly -- selection is still updated first
+                // (below) so Rename acts on whatever was actually clicked.
+                assetDlg_ = AssetDlg::RenameAsset;
+                assetDlgIsMaterial_ = false;
+                assetDlgTarget_ = path;
+                assetDlgBuf_ = fs::path(path).stem().string();
+                assetPopup_.title("Rename")
+                    .onBody([this](ui::Popup& p) { p.inputText("Name", &assetDlgBuf_, true); })
+                    .open();
+            }
             if (isMap) {
-                if (dbl) {
+                selectedAsset_ = path;
+                selectedMaterial_.clear();
+                selectedScript_.clear();
+                scene_.select(nullptr);
+                if (dblIcon) {
                     inputMapPath_ = path;
                     inputMap_.load(path);
                     Input::get().setMap(&inputMap_);
@@ -2019,18 +2056,18 @@ void EditorApp::drawAssetFolders() {
                 }
             } else if (isScript) {
                 // Select it in the Inspector (namespace editing, etc.)
-                // without touching disk or recompiling anything; a second
-                // click within the double-click window additionally opens
-                // it in the full Script Editor. Previously ANY click here
-                // fell through to ingestDroppedFile(), which re-copied the
-                // file onto itself and reloaded every script in the project
-                // on every single click.
+                // without touching disk or recompiling anything; double-
+                // clicking the ICON additionally opens it in the full Script
+                // Editor (task 139). Previously ANY click here fell through
+                // to ingestDroppedFile(), which re-copied the file onto
+                // itself and reloaded every script in the project on every
+                // single click.
                 if (!scriptClassName.empty()) {
                     selectedScript_ = scriptClassName;
                     selectedMaterial_.clear();
                     selectedAsset_.clear();
                     scene_.select(nullptr);
-                    if (dbl) {
+                    if (dblIcon) {
                         openScriptsTab_ = true;
                         scriptEditor_.openScript(scriptClassName);
                     }
@@ -2040,14 +2077,28 @@ void EditorApp::drawAssetFolders() {
                 selectedMaterial_.clear();
                 selectedScript_.clear();
                 scene_.select(nullptr);
-                if (dbl) {
+                if (dblIcon) {
                     requestReplaceScene([this, path] {
                         loadSceneNow(path);
                         prefabEditReturnPath_.clear();
                     });
                 }
             } else {
-                ingestDroppedFile(f.path().string());
+                // Image / FBX / generic: just select (task 139's "double-
+                // click the icon" for images opens the OS viewer, handled
+                // below via the context menu's sibling logic isn't needed
+                // here -- see the dblIcon branch right after). This used to
+                // unconditionally call ingestDroppedFile() on every click,
+                // silently re-copying the file onto itself and reloading
+                // every script in the project each time an image/fbx tile
+                // was clicked -- selecting, like every other asset kind
+                // already does, is what a click here should actually do.
+                selectedAsset_ = path;
+                selectedMaterial_.clear();
+                selectedScript_.clear();
+                scene_.select(nullptr);
+                if (dblIcon && isImg)
+                    platform::openWithDefaultApp(path);
             }
         }
         // Every asset type is draggable, to move it into a folder (item 15):
@@ -2089,25 +2140,13 @@ void EditorApp::drawAssetFolders() {
             ImGui::Text("Scene  %s", name.c_str());
             ImGui::EndDragDropSource();
         }
-        // Item 106's "real edit workflow": open this .cscene in isolation
-        // without touching the current working scene. Distinct from
-        // double-click, which replaces the working scene outright (guarded
-        // the same way, but with nothing to come back to).
-        if (isScene) {
-            static ui::ContextMenu sceneCtx(nullptr);
-            if (sceneCtx.beginItemPopup()) {
-                if (sceneCtx.item("Edit Prefab")) {
-                    std::string prevPath = currentScenePath_;
-                    requestReplaceScene([this, path, prevPath] {
-                        loadSceneNow(path);
-                        prefabEditReturnPath_ = prevPath; // empty if the scene we're
-                                                          // leaving was never saved --
-                                                          // "Back" just won't show
-                    });
-                }
-                sceneCtx.end();
-            }
-        }
+        // Task 134: full Rename/Delete/Copy/Duplicate menu for every file
+        // asset except input maps (per the task's own spec) -- folds in
+        // item 106's scene-specific "Edit Prefab" (open this .cscene in
+        // isolation without touching the current working scene, distinct
+        // from double-click which replaces the working scene outright).
+        if (!isMap)
+            fileAssetContextMenu(path);
         assetGridWrap(i + 1 < files.size());
     }
 }
@@ -2179,6 +2218,170 @@ void EditorApp::folderContextMenu(const std::string& relPath) {
     menu.end();
 }
 
+// Task 134: Rename/Delete/Copy/Duplicate for one FILE asset (every type
+// except input maps, which this is never called for -- see the `!isMap`
+// guard at its one call site in drawAssetFolders). Also carries scene's
+// existing "Edit Prefab" (item 106), folded in here now that this is the
+// scene tile's only context menu.
+void EditorApp::fileAssetContextMenu(const std::string& path) {
+    static ui::ContextMenu menu(nullptr);
+    if (!menu.beginItemPopup())
+        return;
+    std::string name = fs::path(path).filename().string();
+    if (fs::path(path).extension() == ".cscene") {
+        if (menu.item("Edit Prefab")) {
+            std::string prevPath = currentScenePath_;
+            requestReplaceScene([this, path, prevPath] {
+                loadSceneNow(path);
+                prefabEditReturnPath_ = prevPath; // empty if the scene we're
+                                                  // leaving was never saved --
+                                                  // "Back" just won't show
+            });
+        }
+        menu.separator();
+    }
+    if (menu.item("Rename")) {
+        assetDlg_ = AssetDlg::RenameAsset;
+        assetDlgIsMaterial_ = false;
+        assetDlgTarget_ = path;
+        assetDlgBuf_ = fs::path(path).stem().string();
+        assetPopup_.title("Rename")
+            .onBody([this](ui::Popup& p) { p.inputText("Name", &assetDlgBuf_, true); })
+            .open();
+    }
+    if (menu.item("Delete")) {
+        assetDlg_ = AssetDlg::DeleteAsset;
+        assetDlgIsMaterial_ = false;
+        assetDlgTarget_ = path;
+        assetPopup_.title("Delete")
+            .okLabel("Delete")
+            .onBody([name](ui::Popup& p) {
+                p.help(("Delete '" + name + "'? This cannot be undone.").c_str());
+            })
+            .open();
+    }
+    menu.separator();
+    if (menu.item("Copy"))
+        folderClip_ = {path, false};
+    if (menu.item("Duplicate"))
+        duplicateFileAsset(path);
+    menu.end();
+}
+
+// Task 134, materials: name-keyed, not file-backed, so Rename/Delete/
+// Duplicate go through MaterialLibrary directly instead of the filesystem.
+// No "Paste" counterpart -- materials aren't positional, so Copy and
+// Duplicate are the same immediate action for them.
+void EditorApp::materialContextMenu(const std::string& matName) {
+    static ui::ContextMenu menu(nullptr);
+    if (!menu.beginItemPopup())
+        return;
+    if (menu.item("Rename")) {
+        assetDlg_ = AssetDlg::RenameAsset;
+        assetDlgIsMaterial_ = true;
+        assetDlgTarget_ = matName;
+        assetDlgBuf_ = matName;
+        assetPopup_.title("Rename Material")
+            .onBody([this](ui::Popup& p) { p.inputText("Name", &assetDlgBuf_, true); })
+            .open();
+    }
+    if (menu.item("Delete")) {
+        assetDlg_ = AssetDlg::DeleteAsset;
+        assetDlgIsMaterial_ = true;
+        assetDlgTarget_ = matName;
+        assetPopup_.title("Delete Material")
+            .okLabel("Delete")
+            .onBody([matName](ui::Popup& p) {
+                p.help(("Delete material '" + matName + "'? This cannot be undone.").c_str());
+            })
+            .open();
+    }
+    menu.separator();
+    auto duplicate = [this, matName] {
+        const Material* src = materialLib_.find(matName);
+        if (!src)
+            return;
+        Material copy = *src;
+        Material& dst = materialLib_.create(matName);
+        copy.name = dst.name;
+        std::string newName = dst.name;
+        materialLib_.set(newName, copy);
+        AssetDatabase::get().idFor("material:" + newName);
+        CR_LOG("assets", "Duplicated material '" + matName + "' -> '" + newName + "'");
+    };
+    if (menu.item("Copy"))
+        duplicate();
+    if (menu.item("Duplicate"))
+        duplicate();
+    menu.end();
+}
+
+// Renames the file at `path` to `newStem` (original extension kept), same
+// folder. Mirrors moveAssetToFolder()'s AssetDatabase/ScriptSystem upkeep --
+// a rename is just a same-folder move.
+void EditorApp::renameFileAsset(const std::string& path, const std::string& newStem) {
+    if (newStem.empty())
+        return;
+    std::error_code ec;
+    fs::path src(path);
+    if (!fs::exists(src, ec))
+        return;
+    fs::path dest = src.parent_path() / (newStem + src.extension().string());
+    if (src == dest)
+        return;
+    if (fs::exists(dest, ec)) {
+        CR_WARN("assets", "Rename failed: '" + dest.filename().string() + "' already exists");
+        return;
+    }
+    const bool wasScript = src.extension() == ".cscript";
+    fs::rename(src, dest, ec);
+    if (ec) {
+        CR_ERROR("assets", "Rename failed: " + ec.message());
+        return;
+    }
+    std::string srcGeneric = src.generic_string(), destGeneric = dest.generic_string();
+    AssetDatabase::get().moved(srcGeneric, destGeneric);
+    if (selectedAsset_ == srcGeneric)
+        selectedAsset_ = destGeneric;
+    if (auto it = std::find(importedAssets_.begin(), importedAssets_.end(), srcGeneric);
+        it != importedAssets_.end())
+        *it = destGeneric;
+    if (wasScript)
+        script::ScriptSystem::get().reload(); // re-discover the file at its new path
+    CR_LOG("assets", "Renamed '" + src.filename().string() + "' to '" + dest.filename().string() +
+                         "'");
+}
+
+// Copies the file at `path` alongside itself as "<stem> N.<ext>", picking
+// the first N that doesn't collide -- same auto-numbering convention as
+// Create Scene/Create Input Map.
+void EditorApp::duplicateFileAsset(const std::string& path) {
+    std::error_code ec;
+    fs::path src(path);
+    if (!fs::exists(src, ec))
+        return;
+    fs::path stem = src.stem(), ext = src.extension(), dir = src.parent_path();
+    fs::path dest;
+    for (int n = 2;; ++n) {
+        dest = dir / (stem.string() + " " + std::to_string(n) + ext.string());
+        if (!fs::exists(dest, ec))
+            break;
+    }
+    fs::copy_file(src, dest, ec);
+    if (ec) {
+        CR_ERROR("assets", "Duplicate failed: " + ec.message());
+        return;
+    }
+    std::string destGeneric = dest.generic_string();
+    AssetDatabase::get().idFor(destGeneric);
+    if (isSupportedImageExt(lowerExt(destGeneric)))
+        importedAssets_.push_back(destGeneric);
+    if (dest.extension() == ".cscript")
+        script::ScriptSystem::get().reload();
+    CR_LOG("assets",
+           "Duplicated '" + src.filename().string() + "' -> '" + dest.filename().string() + "'");
+}
+
 void EditorApp::drawAssetPopups() {
     if (assetDlg_ == AssetDlg::None)
         return;
@@ -2238,6 +2441,47 @@ void EditorApp::drawAssetPopups() {
                 saveSceneAsCallback_ = nullptr;
                 break;
             }
+            case AssetDlg::RenameAsset:
+                if (!assetDlgBuf_.empty()) {
+                    if (assetDlgIsMaterial_) {
+                        if (assetDlgBuf_ != assetDlgTarget_) {
+                            if (materialLib_.rename(assetDlgTarget_, assetDlgBuf_)) {
+                                if (selectedMaterial_ == assetDlgTarget_)
+                                    selectedMaterial_ = assetDlgBuf_;
+                            } else {
+                                CR_WARN("assets",
+                                        "Rename failed: '" + assetDlgBuf_ + "' already in use");
+                            }
+                        }
+                    } else {
+                        renameFileAsset(assetDlgTarget_, assetDlgBuf_);
+                    }
+                }
+                break;
+            case AssetDlg::DeleteAsset:
+                if (assetDlgIsMaterial_) {
+                    materialLib_.remove(assetDlgTarget_);
+                    AssetDatabase::get().forget("material:" + assetDlgTarget_);
+                    if (selectedMaterial_ == assetDlgTarget_)
+                        selectedMaterial_.clear();
+                    CR_LOG("assets", "Deleted material '" + assetDlgTarget_ + "'");
+                } else {
+                    fs::path p(assetDlgTarget_);
+                    std::string name = p.filename().string();
+                    if (fs::remove(p, ec)) {
+                        AssetDatabase::get().forget(assetDlgTarget_);
+                        if (selectedAsset_ == assetDlgTarget_)
+                            selectedAsset_.clear();
+                        if (auto it = std::find(importedAssets_.begin(), importedAssets_.end(),
+                                                assetDlgTarget_);
+                            it != importedAssets_.end())
+                            importedAssets_.erase(it);
+                        CR_LOG("assets", "Deleted '" + name + "'");
+                    } else if (ec) {
+                        CR_ERROR("assets", "Delete failed for '" + name + "': " + ec.message());
+                    }
+                }
+                break;
             default:
                 break;
         }
@@ -2319,6 +2563,7 @@ void EditorApp::drawBottomPanel() {
                 selectedScript_.clear();
                 scene_.select(nullptr);
             }
+            materialContextMenu(mn); // task 134
             if (ImGui::BeginDragDropSource()) {
                 ImGui::SetDragDropPayload(pickPayloadId(PickKind::Material), mn.c_str(),
                                          mn.size() + 1);

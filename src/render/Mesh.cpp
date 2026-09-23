@@ -1,6 +1,7 @@
 #include "render/Mesh.h"
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 
 namespace crate::primitives {
 
@@ -32,10 +33,31 @@ MeshData quad() {
     return m;
 }
 
-MeshData plane() {
+MeshData plane(int subdivisions) {
+    int n = std::max(1, subdivisions);
     MeshData m;
     const float h = 0.5f;
-    addQuad(m, {-h, 0, -h}, {-h, 0, h}, {h, 0, h}, {h, 0, -h}, {0, 1, 0});
+    // n x n grid of quads spanning the same [-h, h] footprint the old
+    // single-quad plane() covered. row maps to X, col maps to Z, uv=(col,row)
+    // fraction -- chosen so n=1 produces the same 4 corner positions/UVs/
+    // winding as the old single addQuad() call (just via a differently
+    // ordered vertex array, which renders identically since only the
+    // indices below reference it).
+    int stride = n + 1;
+    for (int row = 0; row <= n; ++row) {
+        float q = static_cast<float>(row) / n;
+        for (int col = 0; col <= n; ++col) {
+            float p = static_cast<float>(col) / n;
+            m.vertices.push_back(
+                {{-h + q * 2.0f * h, 0, -h + p * 2.0f * h}, {0, 1, 0}, p, q});
+        }
+    }
+    for (int row = 0; row < n; ++row)
+        for (int col = 0; col < n; ++col) {
+            uint32_t i00 = static_cast<uint32_t>(row * stride + col);
+            uint32_t i01 = i00 + 1, i10 = i00 + stride, i11 = i10 + 1;
+            m.indices.insert(m.indices.end(), {i00, i01, i11, i00, i11, i10});
+        }
     return m;
 }
 
@@ -141,11 +163,20 @@ MeshData capsule(int segments, int rings) {
 }
 
 MeshData byName(const std::string& name) {
+    // A plane's cache key encodes its subdivision count as "plane#N" (task
+    // 140) -- meshFor()'s cache is keyed by this whole fallback string, so
+    // different subdivision counts naturally get distinct cached meshes.
+    std::string base = name;
+    int subdivisions = 1;
+    if (auto hash = name.find('#'); hash != std::string::npos) {
+        base = name.substr(0, hash);
+        subdivisions = std::max(1, std::atoi(name.c_str() + hash + 1));
+    }
     std::string n;
-    for (char c : name)
+    for (char c : base)
         n += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     if (n == "quad") return quad();
-    if (n == "plane") return plane();
+    if (n == "plane") return plane(subdivisions);
     if (n == "sphere") return sphere();
     if (n == "cylinder") return cylinder();
     if (n == "capsule") return capsule();

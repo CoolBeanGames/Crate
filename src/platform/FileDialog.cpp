@@ -2,6 +2,7 @@
 
 #include <windows.h>
 #include <commdlg.h>
+#include <shellapi.h>
 
 #include <vector>
 
@@ -77,6 +78,15 @@ std::string saveFileDialog(const char* title, const char* filterSpec, const char
     std::string out(static_cast<size_t>(len - 1), '\0');
     WideCharToMultiByte(CP_UTF8, 0, file, -1, out.data(), len, nullptr, nullptr);
     return out;
+}
+
+void openWithDefaultApp(const std::string& path) {
+    int wlen = MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, nullptr, 0);
+    if (wlen <= 0)
+        return;
+    std::vector<wchar_t> wpath(static_cast<size_t>(wlen));
+    MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, wpath.data(), wlen);
+    ShellExecuteW(nullptr, L"open", wpath.data(), nullptr, nullptr, SW_SHOWNORMAL);
 }
 
 } // namespace crate::platform

@@ -5,6 +5,8 @@
 #include "imgui.h"
 #include "misc/cpp/imgui_stdlib.h"
 
+#include <algorithm>
+
 namespace crate {
 
 void MeshRenderer::drawInspector() {
@@ -32,6 +34,10 @@ void MeshRenderer::drawInspector() {
             ImGui::DragFloat("Height", &height, 0.05f, 0.001f, 1000.0f);
         } else if (primitive == "Plane" || primitive == "Quad") {
             ImGui::DragFloat2("Size", planeSize, 0.05f, 0.001f, 1000.0f);
+            if (primitive == "Plane") {
+                ImGui::DragInt("Subdivisions", &planeSubdivisions, 1, 1, 64);
+                planeSubdivisions = std::max(1, planeSubdivisions);
+            }
         } else { // Cube
             ImGui::DragFloat3("Size", boxSize, 0.05f, 0.001f, 1000.0f);
         }
@@ -57,6 +63,7 @@ void MeshRenderer::writeFields(std::ostream& out, const std::function<int(const 
     writeFieldFloat(out, "radius", radius);
     writeFieldFloat(out, "height", height);
     writeFieldVec2(out, "planeSize", planeSize[0], planeSize[1]);
+    writeFieldInt(out, "planeSubdivisions", planeSubdivisions);
 }
 void MeshRenderer::readField(const std::string& key, const std::string&, const std::string& value,
                              const std::function<Actor*(int)>&) {
@@ -73,6 +80,7 @@ void MeshRenderer::readField(const std::string& key, const std::string&, const s
     else if (key == "radius") radius = (float)fieldF(value);
     else if (key == "height") height = (float)fieldF(value);
     else if (key == "planeSize") { float v[2]; parseFieldVec2(value, v); planeSize[0]=v[0]; planeSize[1]=v[1]; }
+    else if (key == "planeSubdivisions") planeSubdivisions = std::max(1, (int)fieldI(value));
 }
 
 void LightComponent::drawInspector() {

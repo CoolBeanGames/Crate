@@ -13,4 +13,9 @@ std::string openFileDialog(const char* title, const char* filterSpec);
 // user cancels or the dialog is unavailable.
 std::string saveFileDialog(const char* title, const char* filterSpec, const char* defaultExt);
 
+// Opens `path` in whatever the OS default application for its file type is
+// (task 139, e.g. double-clicking an image asset's icon). Fire-and-forget;
+// failures just don't open anything (there's no dialog result to report).
+void openWithDefaultApp(const std::string& path);
+
 } // namespace crate::platform

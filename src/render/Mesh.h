@@ -22,7 +22,9 @@ struct MeshData {
 namespace primitives {
 MeshData cube();
 MeshData quad();     // 1x1 facing +Z
-MeshData plane();    // 1x1 ground plane, facing +Y
+// 1x1 ground plane, facing +Y. `subdivisions` is quads per side (1 = a
+// single flat quad, matching the old no-arg behaviour); task 140.
+MeshData plane(int subdivisions = 1);
 MeshData sphere(int segments = 24, int rings = 16);
 MeshData cylinder(int segments = 24);
 MeshData capsule(int segments = 24, int rings = 8);

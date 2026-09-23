@@ -817,8 +817,13 @@ void Renderer::drawActor(Actor& actor, const Mat4& viewProj, const Options& opt,
         ctx_->PSSetShaderResources(0, 1, &srv);
     }
 
-    const GpuMesh& gm =
-        meshFor(mr->meshKey(), mr->primitive.empty() ? "Cube" : mr->primitive);
+    // Plane's cache key encodes its subdivision count (task 140) so different
+    // subdivision values -- a real geometry difference, not just a uniform --
+    // get distinct cached meshes instead of colliding on the plain "Plane" key.
+    std::string primFallback = mr->primitive.empty() ? "Cube" : mr->primitive;
+    if (primFallback == "Plane")
+        primFallback += "#" + std::to_string((std::max)(1, mr->planeSubdivisions));
+    const GpuMesh& gm = meshFor(mr->meshKey(), primFallback);
     UINT stride = sizeof(Vertex), offset = 0;
     ctx_->IASetVertexBuffers(0, 1, &gm.vb, &stride, &offset);
     ctx_->IASetIndexBuffer(gm.ib, DXGI_FORMAT_R32_UINT, 0);

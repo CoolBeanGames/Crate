@@ -86,10 +86,16 @@ private:
     // One icon-grid cell: a per-type drawn icon + wrapped label. Returns true
     // on a single click; *dbl is set if that click was a double-click.
     // `imagePath` is only used for AssetIconKind::Image, to load and draw an
-    // actual thumbnail instead of a generic glyph.
+    // actual thumbnail instead of a generic glyph. *dblIcon/*dblName (task
+    // 138/139) further split *dbl by which half of the tile the double-click
+    // landed on -- the icon (top ~kIconH) vs. the name label (below it) --
+    // so a caller can tell "double-clicked the icon" (a type-specific open
+    // action) apart from "double-clicked the name" (rename) instead of both
+    // triggering off the same *dbl.
     bool assetIconTile(const char* strId, AssetIconKind kind, unsigned int accent,
                        const std::string& label, bool selected, bool* dbl = nullptr,
-                       const std::string& imagePath = std::string());
+                       const std::string& imagePath = std::string(), bool* dblIcon = nullptr,
+                       bool* dblName = nullptr);
     // Draws the icon glyph itself (folder/sphere/paper+C/cube/gamepad/thumbnail)
     // into the given rect; split out of assetIconTile so it only deals with
     // per-type visuals.
@@ -100,6 +106,21 @@ private:
     void assetGridWrap(bool moreFollow);
     void scanAssets();       // register image/model files under assets/ as pickable
     void folderContextMenu(const std::string& relPath);
+    // Right-click menu for one FILE asset (image/fbx/script/scene -- not
+    // input maps, excluded per task 134's own spec) and for one MATERIAL
+    // (name-keyed, not file-backed, so it gets its own smaller menu):
+    // Rename, Delete (both via the same popup-confirm pattern as
+    // folderContextMenu's), Copy, Duplicate.
+    void fileAssetContextMenu(const std::string& path);
+    void materialContextMenu(const std::string& name);
+    // Rename the file at `path` to `newStem` (extension preserved), keeping
+    // AssetDatabase/ScriptSystem in sync -- same pattern moveAssetToFolder
+    // already established for a cross-folder move, just same-folder.
+    void renameFileAsset(const std::string& path, const std::string& newStem);
+    // Copy the file at `path` alongside itself under an auto-numbered name
+    // ("Name 2.ext", "Name 3.ext", ...), registering it the same way
+    // Create Scene/Create Input Map do for a newly made asset.
+    void duplicateFileAsset(const std::string& path);
     void drawAssetPopups();  // new folder / rename / delete / colour dialogs
     void drawInputMapEditor(); // double-click an .inputmap -> binding editor window
 
@@ -235,11 +256,19 @@ private:
     // Asset-browser folder navigation.
     std::string assetCwd_; // current sub-folder relative to assetDir_ ("" = root)
     std::map<std::string, unsigned int> folderColors_; // relPath -> ImU32 (0xAABBGGRR)
+    // Also doubles as the generic asset clipboard for task 134's Copy/Paste
+    // (fs::copy/fs::rename don't care whether `path` is a file or a folder).
     struct { std::string path; bool cut = false; } folderClip_;
-    enum class AssetDlg { None, NewFolder, RenameFolder, DeleteFolder, ColorFolder, SaveScene };
+    enum class AssetDlg {
+        None, NewFolder, RenameFolder, DeleteFolder, ColorFolder, SaveScene,
+        RenameAsset, DeleteAsset // task 134: shared by file assets AND materials,
+                                  // disambiguated by assetDlgIsMaterial_
+    };
     AssetDlg assetDlg_ = AssetDlg::None;
-    std::string assetDlgTarget_;   // folder relPath the dialog acts on
+    std::string assetDlgTarget_;   // folder relPath / file path / material name the dialog acts on
     std::string assetDlgBuf_;      // name entry
+    bool assetDlgIsMaterial_ = false; // RenameAsset/DeleteAsset: assetDlgTarget_ is a
+                                       // material name, not a file path
     std::function<void()> saveSceneAsCallback_; // fires once AssetDlg::SaveScene succeeds (task 128)
     float assetDlgColor_[4] = {0.55f, 0.49f, 1.0f, 1.0f};
     ui::Popup assetPopup_;
