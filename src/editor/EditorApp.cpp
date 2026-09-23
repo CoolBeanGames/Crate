@@ -759,8 +759,11 @@ void EditorApp::drawHierarchyNode(Actor& actor) {
     }
 
     // Inline visibility/enabled toggles (tasks 141/142), right-aligned so
-    // they land in the same column regardless of indent depth.
-    float iconsX = ImGui::GetWindowContentRegionMax().x - 36.0f;
+    // they land in the same column regardless of indent depth. Two 15px
+    // icons plus one ItemSpacing.x (10px, see Theme.cpp) gap between them
+    // need 40px; the old 36px budget was 4px short, so the second (enabled)
+    // icon was clipped at the panel's right edge.
+    float iconsX = ImGui::GetWindowContentRegionMax().x - 44.0f;
     if (iconsX > ImGui::GetCursorPosX()) {
         ImGui::SameLine(iconsX);
         if (hierarchyToggleIcon("eye", actor.visible(), /*isEyeIcon=*/true))
