@@ -271,23 +271,6 @@ void EditorApp::onFrame() {
         script::ScriptSystem::get().flushPending(scene_);
     }
 
-    // Global editor shortcuts (skipped while typing in a field).
-    if (!ImGui::GetIO().WantTextInput) {
-        if (Actor* s = scene_.selected()) {
-            if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_C)) copyActor(s);
-            if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_X)) cutActor(s);
-            if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_D)) scene_.select(scene_.duplicate(s));
-        }
-        if (ImGui::IsKeyPressed(ImGuiKey_Delete))
-            deleteSelection();
-        if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_V))
-            scene_.select(pasteInto(scene_.selected()));
-        // Gizmo mode: W / E / R (Blender/Unity-ish).
-        if (ImGui::IsKeyPressed(ImGuiKey_W)) gizmoOp_ = 0;
-        if (ImGui::IsKeyPressed(ImGuiKey_E)) gizmoOp_ = 1;
-        if (ImGui::IsKeyPressed(ImGuiKey_R)) gizmoOp_ = 2;
-    }
-
     ImGuiViewport* vp = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(vp->WorkPos);
     ImGui::SetNextWindowSize(vp->WorkSize);
@@ -345,6 +328,34 @@ void EditorApp::onFrame() {
     drawBottomPanel();
     if (inputMapOpen_)
         drawInputMapEditor();
+
+    // Global editor shortcuts (skipped while typing in a field). Checked
+    // here, AFTER every panel has drawn for this frame, not at the top of
+    // onFrame() -- io.WantTextInput/WantCaptureKeyboard are reset to false
+    // by ImGui::NewFrame() and only set back to true by whichever widget
+    // claims focus *while it draws*, so reading them before any panel
+    // (including the Script Editor's TextEditor, which has its own focus
+    // handling separate from ImGui::InputText) has drawn this frame always
+    // saw them as false. That silently defeated this guard entirely: with
+    // an actor selected in the Hierarchy, Ctrl+C/X/V/D fired no matter where
+    // keyboard focus actually was, including while selecting/copying text in
+    // the Script Editor -- e.g. copying script text then pasting elsewhere
+    // would ALSO duplicate the still-Hierarchy-selected actor.
+    if (!ImGui::GetIO().WantTextInput) {
+        if (Actor* s = scene_.selected()) {
+            if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_C)) copyActor(s);
+            if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_X)) cutActor(s);
+            if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_D)) scene_.select(scene_.duplicate(s));
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_Delete))
+            deleteSelection();
+        if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_V))
+            scene_.select(pasteInto(scene_.selected()));
+        // Gizmo mode: W / E / R (Blender/Unity-ish).
+        if (ImGui::IsKeyPressed(ImGuiKey_W)) gizmoOp_ = 0;
+        if (ImGui::IsKeyPressed(ImGuiKey_E)) gizmoOp_ = 1;
+        if (ImGui::IsKeyPressed(ImGuiKey_R)) gizmoOp_ = 2;
+    }
 
     if (showDemo_)
         ImGui::ShowDemoWindow(&showDemo_);
