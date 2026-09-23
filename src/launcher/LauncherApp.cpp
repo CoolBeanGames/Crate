@@ -181,37 +181,50 @@ void LauncherApp::onFrame() {
 
     if (projects_.empty()) {
         ImGui::TextDisabled("No projects yet -- click New Project or Open Existing above.");
-    } else if (ImGui::BeginTable("projects", 4,
-                                 ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV)) {
-        ImGui::TableSetupColumn("Project");
-        ImGui::TableSetupColumn("Path");
-        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 260);
-        ImGui::TableHeadersRow();
-        for (int i = 0; i < static_cast<int>(projects_.size()); ++i) {
-            ProjectEntry& e = projects_[i];
-            ImGui::PushID(i);
-            ImGui::TableNextRow();
-            ImGui::TableSetColumnIndex(0);
-            if (e.missing)
-                ImGui::TextDisabled("%s (missing)", e.displayName.c_str());
-            else
-                ImGui::Text("%s", e.displayName.c_str());
-            ImGui::TableSetColumnIndex(1);
-            ImGui::TextDisabled("%s", e.crateFilePath.c_str());
-            ImGui::TableSetColumnIndex(2);
-            ImGui::BeginDisabled(e.missing);
-            if (ImGui::Button("Launch")) launchProject(e.crateFilePath);
-            ImGui::SameLine();
-            if (ImGui::Button("Open Folder")) doOpenFolder(e.crateFilePath);
-            ImGui::EndDisabled();
-            ImGui::SameLine();
-            if (ImGui::Button("Delete")) {
-                pendingDeleteIndex_ = i;
-                ImGui::OpenPopup("Delete Project");
+    } else {
+        // Set when a row's Delete is clicked; consumed just below, after
+        // EndTable(). OpenPopup("Delete Project") must run in the exact same
+        // ID-stack context as the BeginPopupModal("Delete Project") call
+        // further down -- both BeginTable() and this row's PushID(i) push
+        // extra ID scope, so calling OpenPopup() from inside the table (even
+        // after popping the row ID) still resolves to a different ID than
+        // BeginPopupModal() finds outside the table, and the modal silently
+        // never opens.
+        bool openDeletePopup = false;
+        if (ImGui::BeginTable("projects", 4,
+                              ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV)) {
+            ImGui::TableSetupColumn("Project");
+            ImGui::TableSetupColumn("Path");
+            ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 260);
+            ImGui::TableHeadersRow();
+            for (int i = 0; i < static_cast<int>(projects_.size()); ++i) {
+                ProjectEntry& e = projects_[i];
+                ImGui::PushID(i);
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                if (e.missing)
+                    ImGui::TextDisabled("%s (missing)", e.displayName.c_str());
+                else
+                    ImGui::Text("%s", e.displayName.c_str());
+                ImGui::TableSetColumnIndex(1);
+                ImGui::TextDisabled("%s", e.crateFilePath.c_str());
+                ImGui::TableSetColumnIndex(2);
+                ImGui::BeginDisabled(e.missing);
+                if (ImGui::Button("Launch")) launchProject(e.crateFilePath);
+                ImGui::SameLine();
+                if (ImGui::Button("Open Folder")) doOpenFolder(e.crateFilePath);
+                ImGui::EndDisabled();
+                ImGui::SameLine();
+                if (ImGui::Button("Delete")) {
+                    pendingDeleteIndex_ = i;
+                    openDeletePopup = true;
+                }
+                ImGui::PopID();
             }
-            ImGui::PopID();
+            ImGui::EndTable();
         }
-        ImGui::EndTable();
+        if (openDeletePopup)
+            ImGui::OpenPopup("Delete Project");
     }
 
     if (ImGui::BeginPopupModal("Delete Project", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
