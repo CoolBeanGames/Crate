@@ -273,12 +273,20 @@ void ScriptComponent::drawInspector() {
             chain.push_back(c);
         std::vector<std::string> orderedNames;
         std::unordered_set<std::string> seen;
+        // Declared type per field name, from the same chain walk -- a field
+        // only ever declared on a base class (never overridden) otherwise
+        // has no entry in cls_->decl->fields alone, so its declType would
+        // read as empty and it would wrongly render as a plain value instead
+        // of the correct ref-picker widget.
+        std::unordered_map<std::string, std::string> declTypes;
         for (auto it = chain.rbegin(); it != chain.rend(); ++it) {
             if (!(*it)->decl)
                 continue;
-            for (const auto& fd : (*it)->decl->fields)
+            for (const auto& fd : (*it)->decl->fields) {
                 if (obj_->fields.count(fd.name) && seen.insert(fd.name).second)
                     orderedNames.push_back(fd.name);
+                declTypes[fd.name] = fd.type; // derived-class override wins (walked base-first)
+            }
         }
         for (const auto& [name, val] : obj_->fields)
             if (seen.insert(name).second)
@@ -287,12 +295,8 @@ void ScriptComponent::drawInspector() {
         for (const std::string& name : orderedNames) {
             Value& val = obj_->fields.at(name);
             std::string declType;
-            if (cls_->decl)
-                for (const auto& fd : cls_->decl->fields)
-                    if (fd.name == name) {
-                        declType = fd.type;
-                        break;
-                    }
+            if (auto dit = declTypes.find(name); dit != declTypes.end())
+                declType = dit->second;
             if (declType == "Scene") {
                 drawSceneRefField(name, val);
             } else if (!isPlainValueType(declType)) {
